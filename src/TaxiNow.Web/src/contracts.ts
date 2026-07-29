@@ -27,6 +27,12 @@ export interface AirportMap {
       maxLat: number;
     };
   };
+  counts: {
+    runways: number;
+    taxiways: number;
+    stands: number;
+    terminals: number;
+  };
   sources: Array<{ name: string; url: string | null; license: string | null }>;
   features: AirportFeature[];
 }
@@ -64,4 +70,3 @@ export interface TelemetrySnapshot {
     | "groundTracking"
     | "reconnecting";
 }
-

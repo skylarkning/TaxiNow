@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Globalization;
 
 namespace TaxiNow.Core.Airports;
 
@@ -12,15 +13,17 @@ internal static class SchemaV1Adapter
         var airport = upgraded["airport"] as JsonObject ?? new JsonObject();
         upgraded["airport"] = airport;
 
-        if (airport["icao"] is null && upgraded["icao"] is not null)
-        {
-            airport["icao"] = upgraded["icao"]!.DeepClone();
-        }
-
-        airport["name"] ??= airport["icao"]?.DeepClone() ?? "Unknown airport";
-        airport["countryCode"] ??= "ZZ";
-        airport["regionCode"] ??= null;
-        airport["municipality"] ??= null;
+        airport["icao"] ??=
+            upgraded["ident"]?.DeepClone() ??
+            upgraded["icao"]?.DeepClone() ??
+            "UNKNOWN";
+        airport["name"] ??=
+            upgraded["name"]?.DeepClone() ??
+            airport["icao"]?.DeepClone() ??
+            "Unknown airport";
+        airport["countryCode"] ??= upgraded["countryCode"]?.DeepClone() ?? "ZZ";
+        airport["regionCode"] ??= upgraded["regionCode"]?.DeepClone();
+        airport["municipality"] ??= upgraded["municipality"]?.DeepClone();
 
         var features = upgraded["features"] as JsonArray ?? [];
         upgraded["features"] = features;
@@ -29,33 +32,78 @@ internal static class SchemaV1Adapter
             .SelectMany(ReadPoints)
             .ToArray();
 
-        airport["center"] ??= points.Length == 0
-            ? new JsonArray(0d, 0d)
-            : new JsonArray(points.Average(static p => p[0]), points.Average(static p => p[1]));
-        airport["bounds"] ??= CreateBounds(points);
+        airport["center"] ??=
+            upgraded["center"]?.DeepClone() ??
+            (points.Length == 0
+                ? new JsonArray(0d, 0d)
+                : new JsonArray(
+                    points.Average(static p => p[0]),
+                    points.Average(static p => p[1])));
+        airport["bounds"] ??= upgraded["bounds"]?.DeepClone() ?? CreateBounds(points);
         upgraded["generatedAt"] ??= DateTimeOffset.UnixEpoch;
+        var sourceName = upgraded["source"]?.GetValue<string>() ??
+            "SkyCharts schema v1 import";
+        var sourceUrl = upgraded["sourceURL"]?.GetValue<string>();
         upgraded["sources"] ??= new JsonArray
         {
             new JsonObject
             {
-                ["name"] = "SkyCharts schema v1 import",
-                ["url"] = null,
-                ["license"] = null,
-                ["retrievedAt"] = DateTimeOffset.UnixEpoch,
+                ["name"] = sourceName,
+                ["url"] = sourceUrl,
+                ["license"] = sourceName.Contains(
+                    "OpenStreetMap",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "ODbL 1.0"
+                    : null,
+                ["retrievedAt"] = upgraded["generatedAt"]?.DeepClone() ??
+                    DateTimeOffset.UnixEpoch,
                 ["revision"] = null
             }
         };
 
+        var index = 0;
         foreach (var feature in features.OfType<JsonObject>())
         {
-            feature["id"] ??= $"v1-{Guid.NewGuid():N}";
-            feature["source"] ??= "SkyCharts schema v1 import";
-            feature["closed"] ??= false;
-            feature["kind"] = NormalizeKind(feature["kind"]?.GetValue<string>());
+            var kind = NormalizeKind(feature["kind"]?.GetValue<string>());
+            feature["kind"] = kind;
+            feature["id"] ??= $"v1-{index++:D5}-{kind}";
+            feature["source"] ??=
+                feature["operator"]?.DeepClone() ??
+                sourceName;
+            feature["closed"] = false;
+            feature["widthMeters"] ??= ReadWidthMeters(feature["width"]);
+            feature["headingDegrees"] ??= null;
+            if (kind == "terminal")
+            {
+                feature["name"] ??= feature["label"]?.DeepClone();
+            }
         }
 
-        upgraded["counts"] ??= CountFeatures(features);
+        upgraded["counts"] = CountFeatures(features);
         return upgraded;
+    }
+
+    private static JsonNode? ReadWidthMeters(JsonNode? value)
+    {
+        if (value is JsonValue jsonValue &&
+            jsonValue.TryGetValue<double>(out var number))
+        {
+            return number;
+        }
+        if (value is JsonValue stringValue &&
+            stringValue.TryGetValue<string>(out var text))
+        {
+            text = text.Trim().TrimEnd('m', 'M').Trim();
+            if (double.TryParse(
+                    text,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out number))
+            {
+                return number;
+            }
+        }
+        return null;
     }
 
     private static IEnumerable<double[]> ReadPoints(JsonObject feature)
@@ -132,4 +180,3 @@ internal static class SchemaV1Adapter
             var normalized => normalized
         };
 }
-

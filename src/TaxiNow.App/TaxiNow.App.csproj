@@ -24,6 +24,9 @@
     <Content Include="..\..\tools\map_pipeline\taxinow_map_pipeline.py"
              Link="pipeline\taxinow_map_pipeline.py"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\tools\map_pipeline\skycharts_airport_map.py"
+             Link="pipeline\skycharts_airport_map.py"
+             CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\TaxiNow.Web\dist\**\*"
              Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest"

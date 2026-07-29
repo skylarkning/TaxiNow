@@ -1,3 +1,4 @@
+using System.Text.Json;
 using TaxiNow.Storage;
 using Xunit;
 
@@ -40,7 +41,10 @@ public sealed class MapAssetStoreTests : IAsyncLifetime
 
         Assert.Equal("CYYZ", asset.Icao);
         Assert.NotNull(json);
-        Assert.Contains("\"schemaVersion\": 2", json);
+        using var document = JsonDocument.Parse(json);
+        Assert.Equal(
+            2,
+            document.RootElement.GetProperty("schemaVersion").GetInt32());
         Assert.True(File.Exists(Path.Combine(_paths.MapsPath, "CYYZ.json.gz")));
         Assert.Equal(1, summary.AirportCount);
         Assert.True(summary.TotalBytes > 0);

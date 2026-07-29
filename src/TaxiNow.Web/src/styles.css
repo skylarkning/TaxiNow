@@ -147,11 +147,11 @@ button:hover {
 }
 
 .fallback-runway-outline {
-  stroke: #090d12;
+  stroke: #dce3e8;
 }
 
 .fallback-runway-pavement {
-  stroke: #4a5663;
+  stroke: #15191f;
 }
 
 .fallback-runway-centerline {
@@ -167,7 +167,7 @@ button:hover {
 
 .fallback-taxiway-pavement {
   fill: none;
-  stroke: #6f7c86;
+  stroke: #686d71;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -199,8 +199,8 @@ button:hover {
 
 .fallback-label-taxiway,
 .fallback-label-taxilane {
-  fill: #151b22;
-  stroke: #f7d24b;
+  fill: #ffd52f;
+  stroke: #080b0e;
   stroke-width: 4;
 }
 
@@ -226,6 +226,11 @@ footer {
   border-top: 1px solid rgba(136, 165, 183, 0.18);
   font-size: 10px;
   backdrop-filter: blur(10px);
+}
+
+#map-summary {
+  color: #c2cbd0;
+  text-align: center;
 }
 
 .maplibregl-ctrl-bottom-right {

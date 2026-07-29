@@ -15,5 +15,9 @@
     <ProjectReference Include="..\..\src\TaxiNow.Core\TaxiNow.Core.csproj" />
     <ProjectReference Include="..\..\src\TaxiNow.SimConnect\TaxiNow.SimConnect.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\fixtures\airport-maps\CYYZ.v2.json"
+             Link="fixtures\airport-maps\CYYZ.v2.json"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
-

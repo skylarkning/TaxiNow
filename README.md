@@ -10,7 +10,8 @@ desktop WebView2 shell and in an optional browser view.
 
 - ASP.NET Core host with status, airport-map, storage, download-job, and
   telemetry endpoints.
-- Shared MapLibre SPA with a bundled CYYZ fixture.
+- Shared MapLibre SPA with a full-detail CYYZ regression asset: 5 physical
+  runways, 400 taxiways/taxilanes, 402 stands, and 4 terminal polygons.
 - Proportional runway pavement, centerlines, thresholds, aiming marks,
   end-designators, taxiway centerlines, and zoom-dependent labels, informed by
   the proven SkyCharts map-drawing behavior.
@@ -18,9 +19,10 @@ desktop WebView2 shell and in an optional browser view.
 - Schema v2 validation and a schema v1 adapter.
 - SQLite-backed asset catalog and atomic map replacement.
 - WPF/WebView2 desktop shell.
-- JSON-lines Python acquisition pipeline with multiple Overpass endpoints,
-  positive/negative caching, country/ICAO jobs, and an OurAirports runway
-  fallback.
+- JSON-lines Python acquisition pipeline with the proven SkyCharts
+  airport-geometry acquisition logic, country/ICAO jobs, caching, coordinated
+  OpenStreetMap queries, X-Plane Scenery Gateway detail fallback, and an
+  OurAirports runway fallback.
 - Native x64 SimConnect C ABI spike, managed wrapper, JSONL recorder, and replay
   source.
 
@@ -53,3 +55,10 @@ recording to override it.
 The implementation follows the boundaries and milestones in
 [`docs/IMPLEMENTATION_HANDOFF.md`](docs/IMPLEMENTATION_HANDOFF.md). No
 taxi-route/pathfinding code is included.
+
+## Map data
+
+Airport geometry downloaded from OpenStreetMap is © OpenStreetMap contributors
+and licensed under the ODbL 1.0. The included CYYZ regression asset retains that
+attribution in its metadata and in the map UI. See [`NOTICE`](NOTICE) for data
+licensing details.

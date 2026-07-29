@@ -39,8 +39,15 @@ async function start(): Promise<void> {
   document.querySelector("#airport-name")!.textContent =
     `${airport.airport.icao} — ${airport.airport.name}`;
   document.querySelector("#attribution")!.textContent = airport.sources
-    .map((source) => source.name)
+    .map((source) =>
+      source.name.toLowerCase().includes("openstreetmap")
+        ? `© ${source.name}`
+        : source.name
+    )
     .join(" · ");
+  document.querySelector("#map-summary")!.textContent =
+    `Offline vector map · ${airport.counts.runways} runways · ` +
+    `${airport.counts.taxiways} taxiways · ${airport.counts.stands} stands`;
 
   map = createMap(airport);
   document
@@ -97,6 +104,10 @@ function createMap(airport: AirportMap): MapLibreMap {
       created.addSource("runway-labels", {
         type: "geojson",
         data: runwayDecorations.labels
+      });
+      created.addSource("terminal-labels", {
+        type: "geojson",
+        data: terminalLabelCollection(airport.features)
       });
       created.addSource("ownship", {
         type: "geojson",
@@ -161,7 +172,7 @@ function addAirportLayers(target: MapLibreMap): void {
     source: "airport",
     filter: ["==", ["get", "kind"], "runway"],
     paint: {
-      "line-color": "#090d12",
+      "line-color": "#dce3e8",
       "line-width": [
         "interpolate", ["exponential", 1.55], ["zoom"],
         10, ["+", 2, ["*", ["get", "widthMeters"], 0.045]],
@@ -176,7 +187,7 @@ function addAirportLayers(target: MapLibreMap): void {
     source: "airport",
     filter: ["==", ["get", "kind"], "runway"],
     paint: {
-      "line-color": "#4a5663",
+      "line-color": "#15191f",
       "line-width": [
         "interpolate", ["exponential", 1.55], ["zoom"],
         10, ["max", 2, ["*", ["get", "widthMeters"], 0.04]],
@@ -226,7 +237,7 @@ function addAirportLayers(target: MapLibreMap): void {
     source: "airport",
     filter: ["in", ["get", "kind"], ["literal", ["taxiway", "taxilane"]]],
     paint: {
-      "line-color": "#101820",
+      "line-color": "#252a2e",
       "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 10, 2, 17, 20]
     },
     layout: { "line-cap": "round", "line-join": "round" }
@@ -237,7 +248,7 @@ function addAirportLayers(target: MapLibreMap): void {
     source: "airport",
     filter: ["in", ["get", "kind"], ["literal", ["taxiway", "taxilane"]]],
     paint: {
-      "line-color": "#88949d",
+      "line-color": "#686d71",
       "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 10, 1, 17, 15]
     },
     layout: { "line-cap": "round", "line-join": "round" }
@@ -278,7 +289,7 @@ function addAirportLayers(target: MapLibreMap): void {
     type: "symbol",
     source: "airport",
     filter: ["in", ["get", "kind"], ["literal", ["taxiway", "taxilane"]]],
-    minzoom: 11,
+    minzoom: 13.5,
     layout: {
       "symbol-placement": "line",
       "symbol-spacing": 170,
@@ -289,18 +300,17 @@ function addAirportLayers(target: MapLibreMap): void {
       "text-keep-upright": true
     },
     paint: {
-      "text-color": "#141b23",
-      "text-halo-color": "#f5d64e",
-      "text-halo-width": 2
+      "text-color": "#ffd52f",
+      "text-halo-color": "#080b0e",
+      "text-halo-width": 2.5
     }
   });
   target.addLayer({
     id: "building-labels",
     type: "symbol",
-    source: "airport",
-    filter: ["in", ["get", "kind"], ["literal", ["terminal", "hangar"]]],
+    source: "terminal-labels",
     layout: {
-      "text-field": ["coalesce", ["get", "name"], ["get", "ref"], ""],
+      "text-field": ["get", "label"],
       "text-size": ["interpolate", ["linear"], ["zoom"], 10, 11, 16, 15],
       "text-font": ["Segoe UI", "Arial Unicode MS Regular"],
       "text-max-width": 8
@@ -351,7 +361,7 @@ function addOwnshipLayer(target: MapLibreMap): void {
     source: "ownship",
     layout: {
       "icon-image": "ownship-plane",
-      "icon-size": 0.72,
+      "icon-size": 0.58,
       "icon-allow-overlap": true,
       "icon-ignore-placement": true,
       "icon-rotate": ["get", "heading"],
@@ -463,6 +473,63 @@ function toFeatureCollection(
   };
 }
 
+function terminalLabelCollection(
+  features: AirportFeature[]
+): FeatureCollection<Point> {
+  const selected = selectTerminalLabelFeatures(features);
+  return {
+    type: "FeatureCollection",
+    features: selected.map((feature) => {
+      const points = feature.points.length > 1 &&
+        feature.points[0]![0] === feature.points.at(-1)![0] &&
+        feature.points[0]![1] === feature.points.at(-1)![1]
+        ? feature.points.slice(0, -1)
+        : feature.points;
+      return {
+        type: "Feature",
+        properties: { label: feature.name?.trim() || feature.ref?.trim() || "" },
+        geometry: {
+          type: "Point",
+          coordinates: [
+            points.reduce((sum, point) => sum + point[0], 0) / points.length,
+            points.reduce((sum, point) => sum + point[1], 0) / points.length
+          ]
+        }
+      };
+    })
+  };
+}
+
+function selectTerminalLabelFeatures(
+  features: AirportFeature[]
+): AirportFeature[] {
+  const selected = new Map<string, AirportFeature>();
+  for (const feature of features) {
+    if (feature.kind !== "terminal") {
+      continue;
+    }
+    const label = feature.name?.trim() || feature.ref?.trim();
+    if (!label) {
+      continue;
+    }
+    const existing = selected.get(label.toLowerCase());
+    if (!existing || polygonArea(feature.points) > polygonArea(existing.points)) {
+      selected.set(label.toLowerCase(), feature);
+    }
+  }
+  return [...selected.values()];
+}
+
+function polygonArea(points: [number, number][]): number {
+  let area = 0;
+  for (let index = 0; index < points.length; index++) {
+    const current = points[index]!;
+    const next = points[(index + 1) % points.length]!;
+    area += current[0] * next[1] - next[0] * current[1];
+  }
+  return Math.abs(area) / 2;
+}
+
 function toGeometry(feature: AirportFeature): Geometry {
   const polygonKinds = new Set([
     "apron",
@@ -564,9 +631,14 @@ function activateFallbackOverlay(
   fallbackOwnship = createFallbackOwnship();
   svg.append(fallbackOwnship);
   mapContainer.append(svg);
+  const terminalLabelIds = new Set(
+    selectTerminalLabelFeatures(features).map((feature) => feature.id)
+  );
+  const renderedTerminalLabels = new Set<string>();
 
   const redraw = () => {
     staticGroup.replaceChildren();
+    renderedTerminalLabels.clear();
     const zoom = target.getZoom();
     for (const feature of features) {
       const projected = feature.points.map((coordinate) =>
@@ -582,10 +654,17 @@ function activateFallbackOverlay(
           createFallbackLabel(feature.ref, projected, feature.kind)
         );
       }
-      if (feature.name && feature.kind === "terminal") {
+      const terminalName = feature.name?.trim();
+      if (
+        terminalName &&
+        feature.kind === "terminal" &&
+        terminalLabelIds.has(feature.id) &&
+        !renderedTerminalLabels.has(terminalName.toLowerCase())
+      ) {
         staticGroup.append(
-          createFallbackLabel(feature.name, projected, feature.kind)
+          createFallbackLabel(terminalName, projected, feature.kind)
         );
+        renderedTerminalLabels.add(terminalName.toLowerCase());
       }
     }
   };
@@ -757,7 +836,10 @@ function shouldShowFallbackLabel(
     return false;
   }
   if (feature.kind === "taxiway" || feature.kind === "taxilane") {
-    return zoom >= 11;
+    return zoom >= 13.5;
+  }
+  if (feature.kind === "terminal" || feature.kind === "hangar") {
+    return false;
   }
   return zoom >= 15;
 }

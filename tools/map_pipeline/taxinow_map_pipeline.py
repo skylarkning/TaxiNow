@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import csv
 import gzip
 import hashlib
@@ -21,6 +22,8 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
+
+import skycharts_airport_map as skycharts_map
 
 PROTOCOL_VERSION = "1"
 OURAIRPORTS_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
@@ -433,6 +436,7 @@ def normalize(airport: Airport, overpass: dict[str, Any]) -> dict[str, Any]:
             }
         )
 
+    features = merge_runway_features(features)
     if not features:
         raise PipelineError("OpenStreetMap returned no supported airport features.")
     bounds = calculate_bounds(all_points, airport)
@@ -479,6 +483,82 @@ def normalize(airport: Airport, overpass: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def merge_runway_features(
+    features: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    result = [
+        feature for feature in features if feature.get("kind") != "runway"
+    ]
+    anonymous = 0
+    for feature in features:
+        if feature.get("kind") != "runway":
+            continue
+        reference = str(feature.get("ref") or "").replace(" ", "").upper()
+        if not reference:
+            anonymous += 1
+            reference = f"RUNWAY-{anonymous}"
+        groups.setdefault(reference, []).append(feature)
+
+    for reference, members in groups.items():
+        points = [
+            point
+            for feature in members
+            for point in feature.get("points") or []
+        ]
+        if len(points) < 2:
+            continue
+        mean_latitude = sum(point[1] for point in points) / len(points)
+        longitude_scale = math.cos(math.radians(mean_latitude))
+        start, end = max(
+            (
+                (left, right)
+                for index, left in enumerate(points)
+                for right in points[index + 1 :]
+            ),
+            key=lambda pair: (
+                (pair[1][0] - pair[0][0]) * longitude_scale
+            ) ** 2 + (pair[1][1] - pair[0][1]) ** 2,
+        )
+        widths = [
+            float(feature["widthMeters"])
+            for feature in members
+            if feature.get("widthMeters") is not None
+        ]
+        result.append(
+            {
+                "id": f"runway-{reference.lower().replace('/', '-')}",
+                "kind": "runway",
+                "points": [start, end],
+                "ref": None if reference.startswith("RUNWAY-") else reference,
+                "name": next(
+                    (feature.get("name") for feature in members if feature.get("name")),
+                    None,
+                ),
+                "surface": next(
+                    (
+                        feature.get("surface")
+                        for feature in members
+                        if feature.get("surface")
+                    ),
+                    None,
+                ),
+                "widthMeters": max(widths) if widths else None,
+                "headingDegrees": None,
+                "closed": any(bool(feature.get("closed")) for feature in members),
+                "source": next(
+                    (
+                        str(feature.get("source"))
+                        for feature in members
+                        if feature.get("source")
+                    ),
+                    "Unknown",
+                ),
+            }
+        )
+    return result
+
+
 def calculate_bounds(
     points: Iterable[list[float]], airport: Airport
 ) -> dict[str, float]:
@@ -503,8 +583,23 @@ def download_airport(
     output_directory: pathlib.Path,
     cache: SourceCache,
 ) -> tuple[pathlib.Path, int]:
-    overpass = fetch_overpass(airport, cache)
-    normalized = normalize(airport, overpass)
+    # Reuse SkyCharts' mature source coordination and normalization. It issues
+    # smaller OSM requests, reconstructs relations, and can fall back to the
+    # X-Plane Scenery Gateway before TaxiNow's runway-only last resort.
+    skycharts_map.ROOT = cache.root
+    try:
+        source, _ = skycharts_map.build_airport_map(
+            airport.icao,
+            cache_dir=cache.root / "airport-map-cache",
+        )
+    except skycharts_map.AirportMapError as error:
+        raise PipelineError(str(error)) from error
+    normalized = upgrade_skycharts_data(
+        source,
+        airport.country_code,
+        airport.region_code,
+        airport.municipality,
+    )
     encoded = json.dumps(
         normalized, ensure_ascii=False, separators=(",", ":")
     ).encode("utf-8")
@@ -636,6 +731,147 @@ def atomic_write(path: pathlib.Path, data: bytes) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def upgrade_skycharts_v1(
+    source_path: pathlib.Path,
+    output_path: pathlib.Path,
+    country_code: str,
+    region_code: str | None,
+    municipality: str | None,
+) -> None:
+    source = json.loads(source_path.read_text(encoding="utf-8"))
+    result = upgrade_skycharts_data(
+        source,
+        country_code,
+        region_code,
+        municipality,
+    )
+    encoded = json.dumps(
+        result, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    atomic_write(output_path.resolve(), encoded)
+
+
+def upgrade_skycharts_data(
+    source: dict[str, Any],
+    country_code: str,
+    region_code: str | None,
+    municipality: str | None,
+) -> dict[str, Any]:
+    if int(source.get("schemaVersion", 1)) != 1:
+        raise PipelineError("SkyCharts import requires a schema-v1 map.")
+    source_name = str(source.get("source") or "SkyCharts schema v1 import")
+    features: list[dict[str, Any]] = []
+    for index, original in enumerate(source.get("features") or []):
+        if not isinstance(original, dict):
+            continue
+        kind = str(original.get("kind") or "pavement").strip().lower()
+        kind = {
+            "parking": "parking_position",
+            "parkingposition": "parking_position",
+            "taxi_lane": "taxilane",
+            "holding": "holding_position",
+            "hold_short": "holding_position",
+        }.get(kind, kind)
+        if kind not in SUPPORTED_KINDS:
+            continue
+        points = original.get("points") or original.get("coordinates") or []
+        normalized_points = [
+            [float(point[0]), float(point[1])]
+            for point in points
+            if isinstance(point, list) and len(point) >= 2
+        ]
+        if not normalized_points:
+            continue
+        name = original.get("name")
+        if kind == "terminal" and not name:
+            name = original.get("label")
+        features.append(
+            {
+                "id": f"skycharts-v1-{index:05d}-{kind}",
+                "kind": kind,
+                "points": normalized_points,
+                "ref": original.get("ref"),
+                "name": name,
+                "surface": original.get("surface"),
+                "widthMeters": parse_width(
+                    None
+                    if original.get("width") is None
+                    else str(original.get("width"))
+                ),
+                "headingDegrees": None,
+                "closed": False,
+                "source": str(original.get("operator") or source_name),
+            }
+        )
+    features = merge_runway_features(features)
+    if not features:
+        raise PipelineError("SkyCharts map contained no supported features.")
+    all_points = [
+        point
+        for feature in features
+        for point in feature["points"]
+    ]
+    bounds = source.get("bounds")
+    if not isinstance(bounds, dict):
+        airport = Airport(
+            str(source.get("ident") or source.get("icao") or "UNKNOWN"),
+            str(source.get("name") or "Unknown airport"),
+            country_code,
+            region_code,
+            municipality,
+            float((source.get("center") or [0, 0])[1]),
+            float((source.get("center") or [0, 0])[0]),
+            "",
+        )
+        bounds = calculate_bounds(all_points, airport)
+    counts = {
+        "runways": sum(feature["kind"] == "runway" for feature in features),
+        "taxiways": sum(
+            feature["kind"] in {"taxiway", "taxilane"} for feature in features
+        ),
+        "stands": sum(
+            feature["kind"] in {"parking_position", "gate"}
+            for feature in features
+        ),
+        "terminals": sum(feature["kind"] == "terminal" for feature in features),
+    }
+    generated_at = str(source.get("generatedAt") or iso_now())
+    result = {
+        "schemaVersion": 2,
+        "airport": {
+            "icao": str(
+                source.get("ident") or source.get("icao") or "UNKNOWN"
+            ).upper(),
+            "name": str(source.get("name") or "Unknown airport"),
+            "countryCode": country_code.upper(),
+            "regionCode": region_code,
+            "municipality": municipality,
+            "center": source.get("center") or [
+                sum(point[0] for point in all_points) / len(all_points),
+                sum(point[1] for point in all_points) / len(all_points),
+            ],
+            "bounds": bounds,
+        },
+        "generatedAt": generated_at,
+        "sources": [
+            {
+                "name": source_name,
+                "url": source.get("sourceURL"),
+                "license": (
+                    "ODbL 1.0"
+                    if "openstreetmap" in source_name.lower()
+                    else None
+                ),
+                "retrievedAt": generated_at,
+                "revision": source.get("sourceRevision"),
+            }
+        ],
+        "counts": counts,
+        "features": features,
+    }
+    return result
+
+
 def iso_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -661,10 +897,31 @@ def serve() -> int:
 
 
 def main() -> int:
-    if len(sys.argv) != 2 or sys.argv[1] != "serve":
-        print("usage: taxinow_map_pipeline.py serve", file=sys.stderr)
-        return 2
-    return serve()
+    parser = argparse.ArgumentParser(
+        description="TaxiNow airport acquisition and normalization pipeline"
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers.add_parser("serve", help="serve the JSON-lines process protocol")
+    converter = subparsers.add_parser(
+        "convert-skycharts",
+        help="upgrade a SkyCharts schema-v1 map to TaxiNow schema v2",
+    )
+    converter.add_argument("source", type=pathlib.Path)
+    converter.add_argument("output", type=pathlib.Path)
+    converter.add_argument("--country-code", required=True)
+    converter.add_argument("--region-code")
+    converter.add_argument("--municipality")
+    args = parser.parse_args()
+    if args.command == "serve":
+        return serve()
+    upgrade_skycharts_v1(
+        args.source,
+        args.output,
+        args.country_code,
+        args.region_code,
+        args.municipality,
+    )
+    return 0
 
 
 if __name__ == "__main__":
