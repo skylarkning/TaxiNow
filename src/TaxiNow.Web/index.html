@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#08111d" />
+    <title>TaxiNow</title>
+  </head>
+  <body>
+    <main id="app">
+      <header>
+        <div>
+          <span class="wordmark">TaxiNow</span>
+          <span id="airport-name">Loading airport…</span>
+        </div>
+        <div class="actions">
+          <span id="status" class="status">Connecting</span>
+          <button id="fit-airport" type="button">Fit airport</button>
+        </div>
+      </header>
+      <div id="map" role="application" aria-label="TaxiNow airport map"></div>
+      <footer>
+        <span>Flight simulation use only — not for real-world navigation.</span>
+        <span id="attribution">Bundled TaxiNow fixture</span>
+      </footer>
+      <output id="map-diagnostics" hidden aria-hidden="true"></output>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

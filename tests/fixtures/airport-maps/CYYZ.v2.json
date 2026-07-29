@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 2,
+  "airport": {
+    "icao": "CYYZ",
+    "name": "Toronto Pearson International Airport",
+    "countryCode": "CA",
+    "regionCode": "CA-ON",
+    "municipality": "Toronto",
+    "center": [-79.6306, 43.6762],
+    "bounds": {
+      "minLon": -79.675,
+      "maxLon": -79.585,
+      "minLat": 43.645,
+      "maxLat": 43.705
+    }
+  },
+  "generatedAt": "2026-07-29T19:30:00Z",
+  "sources": [
+    {
+      "name": "Bundled TaxiNow fixture",
+      "url": null,
+      "license": "CC0-1.0",
+      "retrievedAt": "2026-07-29T19:29:00Z",
+      "revision": "1"
+    }
+  ],
+  "counts": {
+    "runways": 3,
+    "taxiways": 8,
+    "stands": 8,
+    "terminals": 2
+  },
+  "features": [
+    {
+      "id": "rwy-05-23",
+      "kind": "runway",
+      "points": [[-79.6656, 43.6711], [-79.5938, 43.6957]],
+      "ref": "05/23",
+      "name": null,
+      "surface": "asphalt",
+      "widthMeters": 61,
+      "headingDegrees": 53,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "rwy-06l-24r",
+      "kind": "runway",
+      "points": [[-79.6578, 43.6588], [-79.5956, 43.6802]],
+      "ref": "06L/24R",
+      "name": null,
+      "surface": "asphalt",
+      "widthMeters": 61,
+      "headingDegrees": 58,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "rwy-15l-33r",
+      "kind": "runway",
+      "points": [[-79.6352, 43.6976], [-79.6146, 43.6504]],
+      "ref": "15L/33R",
+      "name": null,
+      "surface": "asphalt",
+      "widthMeters": 61,
+      "headingDegrees": 151,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "apron-t1",
+      "kind": "apron",
+      "points": [[-79.6289, 43.6761], [-79.6222, 43.6790], [-79.6169, 43.6740], [-79.6220, 43.6698], [-79.6289, 43.6761]],
+      "ref": null,
+      "name": "Terminal 1 apron",
+      "surface": "concrete",
+      "widthMeters": null,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "apron-t3",
+      "kind": "apron",
+      "points": [[-79.6411, 43.6830], [-79.6324, 43.6873], [-79.6273, 43.6825], [-79.6354, 43.6786], [-79.6411, 43.6830]],
+      "ref": null,
+      "name": "Terminal 3 apron",
+      "surface": "concrete",
+      "widthMeters": null,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "terminal-1",
+      "kind": "terminal",
+      "points": [[-79.6249, 43.6764], [-79.6222, 43.6774], [-79.6197, 43.6747], [-79.6224, 43.6737], [-79.6249, 43.6764]],
+      "ref": "T1",
+      "name": "Terminal 1",
+      "surface": null,
+      "widthMeters": null,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "terminal-3",
+      "kind": "terminal",
+      "points": [[-79.6377, 43.6831], [-79.6344, 43.6843], [-79.6317, 43.6816], [-79.6351, 43.6802], [-79.6377, 43.6831]],
+      "ref": "T3",
+      "name": "Terminal 3",
+      "surface": null,
+      "widthMeters": null,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "tw-a",
+      "kind": "taxiway",
+      "points": [[-79.6599, 43.6685], [-79.6456, 43.6735], [-79.6313, 43.6785], [-79.6150, 43.6842], [-79.6009, 43.6890]],
+      "ref": "A",
+      "name": null,
+      "surface": "asphalt",
+      "widthMeters": 23,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "tw-b",
+      "kind": "taxiway",
+      "points": [[-79.6538, 43.6622], [-79.6410, 43.6667], [-79.6285, 43.6711], [-79.6159, 43.6755], [-79.6033, 43.6798]],
+      "ref": "B",
+      "name": null,
+      "surface": "asphalt",
+      "widthMeters": 23,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "tw-d",
+      "kind": "taxiway",
+      "points": [[-79.6436, 43.6906], [-79.6363, 43.6839], [-79.6294, 43.6774], [-79.6221, 43.6706], [-79.6156, 43.6645]],
+      "ref": "D",
+      "name": null,
+      "surface": "asphalt",
+      "widthMeters": 23,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "tw-e",
+      "kind": "taxiway",
+      "points": [[-79.6514, 43.6868], [-79.6430, 43.6792], [-79.6350, 43.6718], [-79.6274, 43.6648]],
+      "ref": "E",
+      "name": null,
+      "surface": "asphalt",
+      "widthMeters": 23,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "tw-h",
+      "kind": "taxiway",
+      "points": [[-79.6398, 43.6820], [-79.6347, 43.6805], [-79.6295, 43.6788], [-79.6240, 43.6768]],
+      "ref": "H",
+      "name": null,
+      "surface": "asphalt",
+      "widthMeters": 18,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "tw-k",
+      "kind": "taxiway",
+      "points": [[-79.6350, 43.6871], [-79.6310, 43.6823], [-79.6272, 43.6780], [-79.6230, 43.6734]],
+      "ref": "K",
+      "name": null,
+      "surface": "asphalt",
+      "widthMeters": 18,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "tw-c",
+      "kind": "taxiway",
+      "points": [[-79.6327, 43.6950], [-79.6273, 43.6828], [-79.6220, 43.6705], [-79.6169, 43.6586]],
+      "ref": "C",
+      "name": null,
+      "surface": "asphalt",
+      "widthMeters": 23,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "tw-f",
+      "kind": "taxiway",
+      "points": [[-79.6492, 43.6750], [-79.6425, 43.6776], [-79.6359, 43.6801], [-79.6294, 43.6826], [-79.6228, 43.6851]],
+      "ref": "F",
+      "name": null,
+      "surface": "asphalt",
+      "widthMeters": 18,
+      "headingDegrees": null,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "gate-d20",
+      "kind": "gate",
+      "points": [[-79.6251, 43.6763]],
+      "ref": "D20",
+      "name": null,
+      "surface": "concrete",
+      "widthMeters": null,
+      "headingDegrees": 230,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "gate-d24",
+      "kind": "gate",
+      "points": [[-79.6238, 43.6750]],
+      "ref": "D24",
+      "name": null,
+      "surface": "concrete",
+      "widthMeters": null,
+      "headingDegrees": 230,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "gate-e73",
+      "kind": "gate",
+      "points": [[-79.6209, 43.6755]],
+      "ref": "E73",
+      "name": null,
+      "surface": "concrete",
+      "widthMeters": null,
+      "headingDegrees": 45,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "gate-c32",
+      "kind": "gate",
+      "points": [[-79.6365, 43.6826]],
+      "ref": "C32",
+      "name": null,
+      "surface": "concrete",
+      "widthMeters": null,
+      "headingDegrees": 240,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "gate-c36",
+      "kind": "gate",
+      "points": [[-79.6349, 43.6832]],
+      "ref": "C36",
+      "name": null,
+      "surface": "concrete",
+      "widthMeters": null,
+      "headingDegrees": 60,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "stand-171",
+      "kind": "parking_position",
+      "points": [[-79.6299, 43.6798]],
+      "ref": "171",
+      "name": null,
+      "surface": "concrete",
+      "widthMeters": null,
+      "headingDegrees": 145,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "stand-172",
+      "kind": "parking_position",
+      "points": [[-79.6310, 43.6803]],
+      "ref": "172",
+      "name": null,
+      "surface": "concrete",
+      "widthMeters": null,
+      "headingDegrees": 145,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    },
+    {
+      "id": "stand-173",
+      "kind": "parking_position",
+      "points": [[-79.6322, 43.6807]],
+      "ref": "173",
+      "name": null,
+      "surface": "concrete",
+      "widthMeters": null,
+      "headingDegrees": 145,
+      "closed": false,
+      "source": "Bundled TaxiNow fixture"
+    }
+  ]
+}
+

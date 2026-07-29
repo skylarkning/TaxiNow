@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="..\TaxiNow.Core\TaxiNow.Core.csproj" />
+    <ProjectReference Include="..\TaxiNow.Pipeline\TaxiNow.Pipeline.csproj" />
+    <ProjectReference Include="..\TaxiNow.SimConnect\TaxiNow.SimConnect.csproj" />
+    <ProjectReference Include="..\TaxiNow.Storage\TaxiNow.Storage.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\tests\fixtures\airport-maps\CYYZ.v2.json"
+             Link="fixtures\airport-maps\CYYZ.v2.json"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\tests\fixtures\telemetry\cyyz-taxi.jsonl"
+             Link="fixtures\telemetry\cyyz-taxi.jsonl"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\tools\map_pipeline\taxinow_map_pipeline.py"
+             Link="pipeline\taxinow_map_pipeline.py"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\TaxiNow.Web\dist\**\*"
+             Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             Condition="Exists('..\TaxiNow.Web\dist')" />
+  </ItemGroup>
+</Project>
