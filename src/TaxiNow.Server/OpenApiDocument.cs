@@ -24,6 +24,10 @@ internal static class OpenApiDocument
                 get = Operation("List download jobs"),
                 post = Operation("Create a download job")
             },
+            ["/api/v1/downloads/completed"] = new
+            {
+                delete = Operation("Clear finished download jobs")
+            },
             ["/api/v1/downloads/{jobId}"] = Get("Download job status"),
             ["/api/v1/downloads/{jobId}/cancel"] = new
             {

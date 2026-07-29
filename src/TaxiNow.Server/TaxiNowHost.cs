@@ -27,8 +27,15 @@ public static class TaxiNowHost
         };
         var builder = WebApplication.CreateBuilder(options);
         builder.WebHost.ConfigureKestrel(kestrel =>
-            kestrel.ListenLocalhost(
-                builder.Configuration.GetValue("TaxiNow:Port", DefaultPort)));
+        {
+            var port =
+                builder.Configuration.GetValue("TaxiNow:Port", DefaultPort);
+            kestrel.ListenLocalhost(port);
+            foreach (var address in LocalNetworkAddresses.GetAddresses())
+            {
+                kestrel.Listen(address, port);
+            }
+        });
         builder.Services.Configure<JsonOptions>(json =>
         {
             json.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
@@ -118,18 +125,20 @@ public static class TaxiNowHost
         {
             var sample = telemetry.Latest;
             var port = configuration.GetValue("TaxiNow:Port", DefaultPort);
+            var localUrls = LocalNetworkAddresses.GetUrls(port);
             return Results.Ok(new
             {
                 product = "TaxiNow",
                 apiVersion = 1,
-                localUrl = $"http://localhost:{port}",
+                localUrl = localUrls[0],
+                localUrls,
                 port,
                 mode = "replay",
                 simulator = sample?.Simulator ?? SimulatorEdition.Replay,
                 state = sample?.State ?? TrackingState.Connecting,
                 connected = sample?.Connected ?? false,
                 selectedAirport = "CYYZ",
-                lanEnabled = false
+                lanEnabled = true
             });
         });
 
@@ -187,6 +196,10 @@ public static class TaxiNowHost
         app.MapGet(
             "/api/v1/downloads",
             (DownloadJobService jobs) => Results.Ok(jobs.List()));
+        app.MapDelete(
+            "/api/v1/downloads/completed",
+            (DownloadJobService jobs) =>
+                Results.Ok(new { removed = jobs.ClearFinished() }));
         app.MapGet(
             "/api/v1/downloads/{jobId:guid}",
             (Guid jobId, DownloadJobService jobs) =>

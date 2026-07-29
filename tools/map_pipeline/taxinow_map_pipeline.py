@@ -15,6 +15,7 @@ import pathlib
 import random
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -90,11 +91,23 @@ class Protocol:
         source: str | None,
         bytes_written: int = 0,
         warnings: list[str] | None = None,
+        stage_percentage: float | None = None,
+        estimated_remaining_seconds: float | None = None,
+        bytes_downloaded: int = 0,
+        download_bytes_total: int | None = None,
+        download_bytes_per_second: float | None = None,
     ) -> None:
         elapsed = time.monotonic() - self.started
-        percentage = 100.0 if total == 0 else completed * 100.0 / total
-        remaining = None
-        if completed > 0 and completed < total:
+        if total == 0:
+            percentage = stage_percentage or 0.0
+        elif stage_percentage is None:
+            percentage = completed * 100.0 / total
+        else:
+            percentage = (
+                completed + max(0.0, min(stage_percentage, 100.0)) / 100.0
+            ) * 100.0 / total
+        remaining = estimated_remaining_seconds
+        if remaining is None and completed > 0 and completed < total:
             remaining = elapsed / completed * (total - completed)
         self.emit(
             "progress",
@@ -102,6 +115,13 @@ class Protocol:
             airportsCompleted=completed,
             airportsTotal=total,
             bytesWritten=bytes_written,
+            bytesDownloaded=bytes_downloaded,
+            downloadBytesTotal=download_bytes_total,
+            downloadBytesPerSecond=(
+                None
+                if download_bytes_per_second is None
+                else round(download_bytes_per_second, 2)
+            ),
             currentIcao=current_icao,
             percentage=round(percentage, 2),
             elapsedSeconds=round(elapsed, 3),
@@ -166,6 +186,7 @@ def request_bytes(
     data: bytes | None = None,
     timeout: int = 90,
     attempts: int = 3,
+    progress_callback=None,
 ) -> bytes:
     delay = 1.0
     for attempt in range(attempts):
@@ -181,7 +202,32 @@ def request_bytes(
         )
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
-                return response.read()
+                total_header = response.headers.get("Content-Length")
+                try:
+                    total = int(total_header) if total_header else None
+                except (TypeError, ValueError):
+                    total = None
+                chunks = []
+                downloaded = 0
+                started = time.monotonic()
+                while True:
+                    chunk = response.read(64 * 1024)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    downloaded += len(chunk)
+                    elapsed = max(time.monotonic() - started, 0.001)
+                    speed = downloaded / elapsed
+                    if progress_callback:
+                        progress_callback(
+                            downloaded,
+                            total,
+                            speed,
+                            (total - downloaded) / speed
+                            if total and speed > 0
+                            else None,
+                        )
+                return b"".join(chunks)
         except (urllib.error.URLError, TimeoutError) as error:
             if attempt + 1 == attempts:
                 raise PipelineError(f"Source request failed: {error}") from error
@@ -190,11 +236,14 @@ def request_bytes(
     raise AssertionError("unreachable")
 
 
-def load_airports(cache: SourceCache) -> list[Airport]:
+def load_airports(cache: SourceCache, progress_callback=None) -> list[Airport]:
     key = SourceCache.key("ourairports", "airports.csv")
     raw = cache.read_bytes(key, timedelta(days=7))
     if raw is None:
-        raw = request_bytes(OURAIRPORTS_URL)
+        raw = request_bytes(
+            OURAIRPORTS_URL,
+            progress_callback=progress_callback,
+        )
         cache.write_bytes(key, raw)
     text = raw.decode("utf-8-sig")
     airports: list[Airport] = []
@@ -582,6 +631,7 @@ def download_airport(
     airport: Airport,
     output_directory: pathlib.Path,
     cache: SourceCache,
+    progress_callback=None,
 ) -> tuple[pathlib.Path, int]:
     # Reuse SkyCharts' mature source coordination and normalization. It issues
     # smaller OSM requests, reconstructs relations, and can fall back to the
@@ -591,6 +641,7 @@ def download_airport(
         source, _ = skycharts_map.build_airport_map(
             airport.icao,
             cache_dir=cache.root / "airport-map-cache",
+            progress=progress_callback,
         )
     except skycharts_map.AirportMapError as error:
         raise PipelineError(str(error)) from error
@@ -607,6 +658,88 @@ def download_airport(
     path = output_directory / f"{airport.icao}.json"
     atomic_write(path, encoded)
     return path, len(encoded)
+
+
+def download_airport_with_progress(
+    protocol: Protocol,
+    airport: Airport,
+    output_directory: pathlib.Path,
+    cache: SourceCache,
+    completed: int,
+    total: int,
+    bytes_written: int,
+    warnings: list[str],
+) -> tuple[pathlib.Path, int]:
+    state: dict[str, Any] = {
+        "phase": "acquiring",
+        "percentage": 0.0,
+        "source": "OpenStreetMap",
+        "bytes_downloaded": 0,
+        "download_bytes_total": None,
+        "download_bytes_per_second": 0.0,
+        "estimated_remaining_seconds": None,
+    }
+    state_lock = threading.Lock()
+    outcome: dict[str, Any] = {}
+
+    def update_progress(**values: Any) -> None:
+        with state_lock:
+            state.update(values)
+
+    def acquire() -> None:
+        try:
+            outcome["result"] = download_airport(
+                airport,
+                output_directory,
+                cache,
+                update_progress,
+            )
+        except BaseException as error:
+            outcome["error"] = error
+
+    worker = threading.Thread(
+        target=acquire,
+        name=f"TaxiNow-map-{airport.icao}",
+        daemon=True,
+    )
+    airport_started = time.monotonic()
+    worker.start()
+    while worker.is_alive():
+        worker.join(timeout=0.25)
+        with state_lock:
+            snapshot = dict(state)
+        airport_elapsed = time.monotonic() - airport_started
+        eta = snapshot.get("estimated_remaining_seconds")
+        if eta is None:
+            # Source APIs do not publish their server-side progress. Use a
+            # conservative rolling estimate until response bytes begin flowing.
+            eta = max(5.0, 55.0 - airport_elapsed)
+        stage_percentage = float(snapshot["percentage"])
+        if str(snapshot["phase"]).startswith("waiting_"):
+            # Overpass and Gateway expose no server-side completion counter.
+            # Move through a bounded estimated waiting range while keeping the
+            # phase explicit, then replace it with byte progress on response.
+            stage_percentage = min(
+                55.0,
+                stage_percentage + airport_elapsed * 0.8,
+            )
+        protocol.progress(
+            str(snapshot["phase"]),
+            completed,
+            total,
+            airport.icao,
+            str(snapshot["source"]),
+            bytes_written,
+            warnings,
+            stage_percentage=stage_percentage,
+            estimated_remaining_seconds=float(eta),
+            bytes_downloaded=int(snapshot["bytes_downloaded"]),
+            download_bytes_total=snapshot["download_bytes_total"],
+            download_bytes_per_second=snapshot["download_bytes_per_second"],
+        )
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome["result"]
 
 
 def download_runway_fallback(
@@ -669,7 +802,32 @@ def handle(request: dict[str, Any]) -> None:
     output = pathlib.Path(str(request["outputDirectory"])).resolve()
     cache = SourceCache(pathlib.Path(str(request["cacheDirectory"])).resolve())
     protocol.progress("catalog", 0, 0, None, "OurAirports")
-    catalog = load_airports(cache)
+
+    def catalog_progress(
+        downloaded: int,
+        total_bytes: int | None,
+        speed: float,
+        eta: float | None,
+    ) -> None:
+        percentage = (
+            min(7.0, downloaded * 7.0 / total_bytes)
+            if total_bytes
+            else 2.0
+        )
+        protocol.progress(
+            "downloading_catalog",
+            0,
+            0,
+            None,
+            "OurAirports",
+            stage_percentage=percentage,
+            estimated_remaining_seconds=eta,
+            bytes_downloaded=downloaded,
+            download_bytes_total=total_bytes,
+            download_bytes_per_second=speed,
+        )
+
+    catalog = load_airports(cache, catalog_progress)
     selected = select_airports(request, catalog)
     total = len(selected)
     completed = 0
@@ -687,7 +845,16 @@ def handle(request: dict[str, Any]) -> None:
             warnings,
         )
         try:
-            path, written = download_airport(airport, output, cache)
+            path, written = download_airport_with_progress(
+                protocol,
+                airport,
+                output,
+                cache,
+                completed,
+                total,
+                bytes_written,
+                warnings,
+            )
             outputs.append(str(path))
             bytes_written += written
         except PipelineError as error:

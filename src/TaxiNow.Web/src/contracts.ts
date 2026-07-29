@@ -75,6 +75,7 @@ export interface AppStatus {
   product: string;
   apiVersion: number;
   localUrl: string;
+  localUrls: string[];
   port: number;
   mode: string;
   connected: boolean;
@@ -114,8 +115,13 @@ export interface DownloadJob {
   airportsCompleted: number;
   airportsTotal: number;
   bytesWritten: number;
+  bytesDownloaded: number;
+  downloadBytesTotal: number | null;
+  downloadBytesPerSecond: number | null;
   currentIcao: string | null;
   percentage: number;
+  elapsed: string;
+  estimatedRemaining: string | null;
   currentSource: string | null;
   warnings: string[];
   error: string | null;

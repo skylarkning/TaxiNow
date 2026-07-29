@@ -9,16 +9,43 @@
   <body>
     <main id="app">
       <header>
-        <div>
+        <div class="header-primary">
           <span class="wordmark">TaxiNow</span>
-          <span id="airport-name">Loading airport…</span>
+          <div class="airport-switcher">
+            <button id="airport-picker-toggle"
+                    class="airport-picker-toggle"
+                    type="button"
+                    aria-expanded="false">
+              <strong id="airport-code">CYYZ</strong>
+              <span id="airport-name">Loading airport…</span>
+              <span aria-hidden="true">▾</span>
+            </button>
+            <div id="airport-picker-panel"
+                 class="airport-picker-panel"
+                 aria-label="Select airport map"
+                 hidden>
+              <label for="airport-search">Search airport ICAO</label>
+              <input id="airport-search"
+                     autocomplete="off"
+                     maxlength="5"
+                     placeholder="Enter ICAO, e.g. CYUL" />
+              <div id="airport-results" class="airport-results"></div>
+              <button id="quick-download"
+                      class="primary-button"
+                      type="button"
+                      hidden>Download map</button>
+              <p id="airport-picker-feedback"
+                 class="feedback"
+                 role="status"></p>
+            </div>
+          </div>
         </div>
         <div class="actions">
           <a id="server-url"
              class="server-url"
              href="http://localhost:8780"
              target="_blank"
-             rel="noreferrer">Local server: localhost:8780</a>
+             rel="noreferrer">Local network: finding address…</a>
           <span id="status" class="status">Connecting</span>
           <button id="open-assets" type="button">Maps &amp; storage</button>
           <button id="fit-airport" type="button">Fit airport</button>
@@ -98,9 +125,14 @@
         <section class="manager-section" aria-labelledby="download-heading">
           <div class="section-heading">
             <h2 id="download-heading">Download activity</h2>
-            <button id="refresh-assets" class="text-button" type="button">
-              Refresh
-            </button>
+            <div>
+              <button id="clear-downloads" class="text-button" type="button">
+                Clear finished
+              </button>
+              <button id="refresh-assets" class="text-button" type="button">
+                Refresh
+              </button>
+            </div>
           </div>
           <div id="download-jobs" class="job-list">
             <p class="empty-state">No downloads in this session.</p>

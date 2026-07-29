@@ -18,14 +18,19 @@ desktop WebView2 shell and in an optional browser view.
 - Smooth replay ownship animation through a SignalR telemetry stream.
 - Schema v2 validation and a schema v1 adapter.
 - Visible map downloader and asset manager for ICAO, country, and optional
-  region downloads, with live progress, installed-map sizes, free disk space,
-  and deletion.
+  region downloads, with byte-level progress, transfer speed, estimated time
+  remaining, installed-map sizes, free disk space, queue clearing, and deletion.
+- Header airport search switches among installed maps. Entering a missing
+  four-character ICAO code offers an immediate download beside the search.
+- Installed assets are grouped as country → region → airport, following the
+  SkyCharts asset hierarchy.
 - SQLite-backed asset catalog and atomic map replacement.
 - WPF/WebView2 desktop shell with deterministic Close/Quit behavior and
   minimize-to-tray support. Left-click the tray icon to restore it, or
   right-click it for Open and Quit commands.
-- The header shows the active local browser address (normally
-  `http://localhost:8780`).
+- The header shows the active private-network browser address, for example
+  `http://192.168.2.33:8780`, so a phone or tablet on the same trusted network
+  can open the map.
 - JSON-lines Python acquisition pipeline with the proven SkyCharts
   airport-geometry acquisition logic, country/ICAO jobs, caching, coordinated
   OpenStreetMap queries, X-Plane Scenery Gateway detail fallback, and an
@@ -61,6 +66,17 @@ dotnet run --project .\src\TaxiNow.App
 
 Closing the desktop window quits TaxiNow and releases the local server port.
 Minimizing hides the window in the Windows notification area instead.
+
+For another device, use the **Other devices** address shown in the TaxiNow
+header. Both devices must be on the same trusted LAN. If Windows Firewall asks,
+allow TaxiNow on **Private networks** only; do not expose port 8780 through a
+router or public-network firewall profile.
+
+The built Windows executable is:
+
+```text
+src\TaxiNow.App\bin\x64\Debug\net10.0-windows\win-x64\TaxiNow.App.exe
+```
 
 The replay fixture loops by default. Set `TaxiNow__ReplayPath` to another JSONL
 recording to override it.

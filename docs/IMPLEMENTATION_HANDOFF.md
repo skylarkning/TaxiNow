@@ -619,21 +619,23 @@ removed. Remove database rows and files transactionally where practical.
 
 ### 12.1 Correct terminology
 
-`localhost` works only on the Windows PC itself. To open TaxiNow on another
-device, the user must enable **Allow devices on my local network** and use the
-PC's private LAN address.
+`localhost` works only on the Windows PC itself. TaxiNow now also listens on
+the PC's active RFC 1918 private LAN interfaces and shows the preferred address
+in the header for another device on the same trusted network.
 
 ### 12.2 Default behavior
 
-- Bind to `127.0.0.1` only.
-- Choose a configurable port, for example 8780.
+- Bind to loopback and active RFC 1918 private interfaces only.
+- Use configurable port 8780 by default.
 - The embedded WebView uses this same local URL.
+- Show the routed private address first and list alternate private addresses in
+  status metadata.
 
 ### 12.3 LAN mode
 
-When explicitly enabled:
+For the current trusted-LAN vertical slice:
 
-- bind only to suitable private interfaces, not a public cloud interface;
+- bind only to suitable private interfaces, not a public or cloud interface;
 - show the usable URL and a QR code;
 - require a high-entropy session token;
 - prompt before creating a Windows Firewall rule;
@@ -642,6 +644,10 @@ When explicitly enabled:
 - do not expose SimConnect directly;
 - provide `Disable LAN access` and `Regenerate access token`;
 - document that LAN mode is for trusted networks.
+
+Session tokens, a QR-code pairing flow, and the LAN enable/disable control
+remain security-hardening follow-ups. Until those land, Windows Firewall access
+must be limited to the Private profile and users must not forward the port.
 
 Kestrel serves:
 
@@ -667,6 +673,7 @@ POST   /api/v1/downloads
 GET    /api/v1/downloads
 GET    /api/v1/downloads/{jobId}
 POST   /api/v1/downloads/{jobId}/cancel
+DELETE /api/v1/downloads/completed
 DELETE /api/v1/assets/{icao}
 GET    /api/v1/storage
 ```
@@ -1077,4 +1084,3 @@ future graph can be built without re-downloading every airport.
 - [OurAirports open data](https://ourairports.com/data/)
 - [X-Plane data development documentation](https://developer.x-plane.com/docs/data-development-documentation/)
 - [X-Plane Scenery Gateway upload terms](https://gateway.x-plane.com/docs/TermsAndConditionsForUploadOfAirportScenery.pdf)
-

@@ -18,6 +18,9 @@ public sealed record DownloadJob(
     int AirportsCompleted,
     int AirportsTotal,
     long BytesWritten,
+    long BytesDownloaded,
+    long? DownloadBytesTotal,
+    double? DownloadBytesPerSecond,
     string? CurrentIcao,
     double Percentage,
     TimeSpan Elapsed,
@@ -104,6 +107,9 @@ public sealed class DownloadJobService(
             0,
             request.Mode.Equals("icao", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
             0,
+            0,
+            null,
+            null,
             request.Icao,
             0,
             TimeSpan.Zero,
@@ -126,6 +132,20 @@ public sealed class DownloadJobService(
         _jobs.Values.OrderByDescending(static job => job.CreatedAt).ToArray();
 
     public DownloadJob? Get(Guid id) => _jobs.GetValueOrDefault(id);
+
+    public int ClearFinished()
+    {
+        var removed = 0;
+        foreach (var (id, job) in _jobs)
+        {
+            if (job.State is "completed" or "failed" or "cancelled" &&
+                _jobs.TryRemove(id, out _))
+            {
+                removed++;
+            }
+        }
+        return removed;
+    }
 
     public DownloadJob? Cancel(Guid id)
     {
@@ -228,6 +248,8 @@ public sealed class DownloadJobService(
                 State = "completed",
                 Phase = "completed",
                 Percentage = 100,
+                DownloadBytesPerSecond = 0,
+                EstimatedRemaining = null,
                 Warnings = completed.Warnings ?? job.Warnings,
                 UpdatedAt = DateTimeOffset.UtcNow
             });
@@ -270,13 +292,26 @@ public sealed class DownloadJobService(
                 pipelineEvent.AirportsCompleted ?? job.AirportsCompleted,
             AirportsTotal = pipelineEvent.AirportsTotal ?? job.AirportsTotal,
             BytesWritten = pipelineEvent.BytesWritten ?? job.BytesWritten,
+            BytesDownloaded =
+                pipelineEvent.BytesDownloaded ?? job.BytesDownloaded,
+            DownloadBytesTotal =
+                pipelineEvent.BytesDownloaded is not null
+                    ? pipelineEvent.DownloadBytesTotal
+                    : job.DownloadBytesTotal,
+            DownloadBytesPerSecond =
+                pipelineEvent.Event == "completed"
+                    ? 0
+                    : pipelineEvent.DownloadBytesPerSecond ??
+                      job.DownloadBytesPerSecond,
             CurrentIcao = pipelineEvent.CurrentIcao ?? job.CurrentIcao,
             Percentage = pipelineEvent.Percentage ?? job.Percentage,
             Elapsed = pipelineEvent.ElapsedSeconds is { } elapsed
                 ? TimeSpan.FromSeconds(elapsed)
                 : job.Elapsed,
             EstimatedRemaining =
-                pipelineEvent.EstimatedRemainingSeconds is { } remaining
+                pipelineEvent.Event == "completed"
+                    ? null
+                    : pipelineEvent.EstimatedRemainingSeconds is { } remaining
                     ? TimeSpan.FromSeconds(remaining)
                     : job.EstimatedRemaining,
             CurrentSource = pipelineEvent.CurrentSource ?? job.CurrentSource,

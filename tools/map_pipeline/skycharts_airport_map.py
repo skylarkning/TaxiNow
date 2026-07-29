@@ -87,7 +87,68 @@ _ENDPOINT_IN_FLIGHT = set()
 _XPLANE_RETRY_AFTER = 0
 
 
-def ensure_csv_dataset(url, path):
+def report_progress(callback, phase, percentage, source, **metrics):
+    if callback:
+        metrics.setdefault("bytes_downloaded", 0)
+        metrics.setdefault("download_bytes_total", None)
+        metrics.setdefault("download_bytes_per_second", 0.0)
+        metrics.setdefault("estimated_remaining_seconds", None)
+        callback(
+            phase=phase,
+            percentage=float(percentage),
+            source=source,
+            **metrics,
+        )
+
+
+def read_response(response, progress, phase, start_percentage, end_percentage, source):
+    total_header = response.headers.get("Content-Length")
+    try:
+        total = int(total_header) if total_header else None
+    except (TypeError, ValueError):
+        total = None
+    chunks = []
+    downloaded = 0
+    started = time.monotonic()
+    while True:
+        chunk = response.read(64 * 1024)
+        if not chunk:
+            break
+        chunks.append(chunk)
+        downloaded += len(chunk)
+        elapsed = max(time.monotonic() - started, 0.001)
+        speed = downloaded / elapsed
+        fraction = min(1.0, downloaded / total) if total else 0.0
+        percentage = start_percentage + (end_percentage - start_percentage) * fraction
+        eta = (total - downloaded) / speed if total and speed > 0 else None
+        report_progress(
+            progress,
+            phase,
+            percentage,
+            source,
+            bytes_downloaded=downloaded,
+            download_bytes_total=total,
+            download_bytes_per_second=speed,
+            estimated_remaining_seconds=eta,
+        )
+    report_progress(
+        progress,
+        phase,
+        end_percentage,
+        source,
+        bytes_downloaded=downloaded,
+        download_bytes_total=total or downloaded,
+        download_bytes_per_second=(
+            downloaded / max(time.monotonic() - started, 0.001)
+            if downloaded
+            else None
+        ),
+        estimated_remaining_seconds=0,
+    )
+    return b"".join(chunks)
+
+
+def ensure_csv_dataset(url, path, progress=None):
     path = pathlib.Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.is_file():
@@ -99,8 +160,11 @@ def ensure_csv_dataset(url, path):
             url,
             headers={"User-Agent": "TaxiNow/0.1 airport-map downloader"},
         )
+        report_progress(progress, "downloading_catalog", 2, "OurAirports")
         with urllib.request.urlopen(request, timeout=45) as response:
-            payload = response.read()
+            payload = read_response(
+                response, progress, "downloading_catalog", 2, 7, "OurAirports"
+            )
         descriptor, temporary_name = tempfile.mkstemp(
             prefix=path.stem + "-", suffix=".csv", dir=str(path.parent)
         )
@@ -114,8 +178,8 @@ def ensure_csv_dataset(url, path):
                 temporary.unlink()
 
 
-def ensure_airports_csv(path):
-    ensure_csv_dataset(AIRPORTS_CSV, path)
+def ensure_airports_csv(path, progress=None):
+    ensure_csv_dataset(AIRPORTS_CSV, path, progress)
 
 
 def ensure_runways_csv(path):
@@ -141,10 +205,10 @@ def csv_index(path, cache, keys):
         return indexed
 
 
-def airport_record(ident, airports_csv=None):
+def airport_record(ident, airports_csv=None, progress=None):
     ident = ident.strip().upper()
     airports_csv = pathlib.Path(airports_csv or ROOT / "work" / "ourairports-airports.csv")
-    ensure_airports_csv(airports_csv)
+    ensure_airports_csv(airports_csv, progress)
     index = csv_index(airports_csv, _AIRPORT_INDEX, lambda row: (row.get("gps_code"), row.get("ident")))
     for row in index.get(ident, []):
         try:
@@ -207,7 +271,7 @@ def short_network_error(error):
     return text if len(text) <= 72 else text[:69] + "..."
 
 
-def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT):
+def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT, progress=None):
     body = urllib.parse.urlencode({"data": query}).encode("utf-8")
     errors = []
     attempted = set()
@@ -238,8 +302,17 @@ def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT):
             "User-Agent": "TaxiNow/0.1 airport-map downloader",
         })
         try:
+            report_progress(progress, "waiting_for_map_source", 12, "OpenStreetMap")
             with urllib.request.urlopen(request, timeout=timeout) as response:
-                result = json.loads(response.read().decode("utf-8"))
+                payload = read_response(
+                    response,
+                    progress,
+                    "downloading_map",
+                    12,
+                    76,
+                    "OpenStreetMap",
+                )
+                result = json.loads(payload.decode("utf-8"))
             with _ENDPOINT_CONDITION:
                 _ENDPOINT_RETRY_AFTER.pop(candidate, None)
                 _ENDPOINT_IN_FLIGHT.discard(candidate)
@@ -257,9 +330,11 @@ def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT):
     raise OverpassUnavailableError("Overpass services remained busy for %d seconds or are in a short retry cooldown" % OVERPASS_BUSY_WAIT)
 
 
-def fetch_overpass(latitude, longitude, radius=5500, endpoint=None):
+def fetch_overpass(latitude, longitude, radius=5500, endpoint=None, progress=None):
     endpoints = (endpoint,) if endpoint else OVERPASS_ENDPOINTS
-    return request_overpass(overpass_query(latitude, longitude, radius), endpoints)
+    return request_overpass(
+        overpass_query(latitude, longitude, radius), endpoints, progress=progress
+    )
 
 
 def parse_osm_xml(payload, nodes, ways):
@@ -405,7 +480,7 @@ def ourairports_runway_raw(ident, airport, runways_csv=None):
     return {"elements": elements}
 
 
-def request_xplane_json(url):
+def request_xplane_json(url, progress=None):
     global _XPLANE_RETRY_AFTER
     with _ENDPOINT_LOCK:
         if _XPLANE_RETRY_AFTER > time.monotonic():
@@ -415,8 +490,18 @@ def request_xplane_json(url):
         "User-Agent": "TaxiNow/0.1 airport-map downloader",
     })
     try:
+        report_progress(progress, "waiting_for_fallback_source", 54, "X-Plane Gateway")
         with urllib.request.urlopen(request, timeout=XPLANE_REQUEST_TIMEOUT) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+            payload = json.loads(
+                read_response(
+                    response,
+                    progress,
+                    "downloading_fallback",
+                    54,
+                    76,
+                    "X-Plane Gateway",
+                ).decode("utf-8")
+            )
         with _ENDPOINT_LOCK:
             _XPLANE_RETRY_AFTER = 0
         return payload
@@ -495,8 +580,11 @@ def extract_xplane_dsf_text(zip_payload, ident):
     return None, None
 
 
-def fetch_xplane_gateway_apt(ident):
-    airport_response = request_xplane_json(XPLANE_GATEWAY_AIRPORT_URL.format(ident=urllib.parse.quote(ident)))
+def fetch_xplane_gateway_apt(ident, progress=None):
+    airport_response = request_xplane_json(
+        XPLANE_GATEWAY_AIRPORT_URL.format(ident=urllib.parse.quote(ident)),
+        progress,
+    )
     airport = airport_response.get("airport") if isinstance(airport_response, dict) else None
     airport = airport if isinstance(airport, dict) else airport_response
     if not isinstance(airport, dict):
@@ -504,7 +592,10 @@ def fetch_xplane_gateway_apt(ident):
     identifier = scenery_identifier(airport)
     if not identifier:
         raise XPlaneGatewayNoDataError("airport has no approved scenery in the X-Plane Scenery Gateway")
-    scenery_response = request_xplane_json(XPLANE_GATEWAY_SCENERY_URL.format(scenery_id=urllib.parse.quote(identifier)))
+    scenery_response = request_xplane_json(
+        XPLANE_GATEWAY_SCENERY_URL.format(scenery_id=urllib.parse.quote(identifier)),
+        progress,
+    )
     scenery = scenery_response.get("scenery") if isinstance(scenery_response, dict) else None
     scenery = scenery if isinstance(scenery, dict) else scenery_response
     if not isinstance(scenery, dict):
@@ -801,8 +892,8 @@ def parse_xplane_dsf_terminals(text, anchors=None):
     return {"elements": elements}
 
 
-def xplane_gateway_raw(ident):
-    apt_text, metadata = fetch_xplane_gateway_apt(ident)
+def xplane_gateway_raw(ident, progress=None):
+    apt_text, metadata = fetch_xplane_gateway_apt(ident, progress)
     raw = parse_xplane_apt(apt_text, ident)
     dsf_text = metadata.pop("dsfText", "")
     if dsf_text:
@@ -1034,7 +1125,14 @@ def write_unavailable_marker(path, reason, retry_seconds):
             temporary.unlink()
 
 
-def build_airport_map(ident, cache_dir=None, refresh=False, radius=5500, maximum_age_days=30):
+def build_airport_map(
+    ident,
+    cache_dir=None,
+    refresh=False,
+    radius=5500,
+    maximum_age_days=30,
+    progress=None,
+):
     ident = ident.strip().upper()
     if len(ident) != 4 or not ident.isalnum():
         raise AirportMapError("Enter a four-character ICAO airport code")
@@ -1059,18 +1157,23 @@ def build_airport_map(ident, cache_dir=None, refresh=False, radius=5500, maximum
         osm_outdated = ("OpenStreetMap" in source and osm_revision < OSM_SOURCE_REVISION)
         if not gateway_outdated and not osm_outdated and cache_is_fresh(cache_path, cache_days):
             cached["counts"] = feature_counts(cached.get("features", []))
+            report_progress(progress, "reading_cache", 88, source or "Map cache")
             return cached, True
     if not refresh:
         unavailable_reason = cached_unavailable_reason(unavailable_path)
         if unavailable_reason:
             raise AirportMapError(unavailable_reason + " (recent result reused)")
-    airport = airport_record(ident)
+    report_progress(progress, "catalog", 1, "OurAirports")
+    airport = airport_record(ident, progress=progress)
     raw, result, overpass_error, gateway_error, gateway_missing, runway_raw = None, None, None, None, None, None
     try:
-        raw = fetch_overpass(airport["latitude"], airport["longitude"], radius)
+        raw = fetch_overpass(
+            airport["latitude"], airport["longitude"], radius, progress=progress
+        )
     except OverpassUnavailableError as error:
         overpass_error = error
     if raw is not None:
+        report_progress(progress, "normalizing_map", 80, "OpenStreetMap")
         osm_elements = list(raw.get("elements", []))
         if osm_elements:
             has_runway = any(feature_kind((element.get("tags") or {})) == "runway" for element in osm_elements)
@@ -1093,7 +1196,7 @@ def build_airport_map(ident, cache_dir=None, refresh=False, radius=5500, maximum
                             or result_counts.get("parking_position", 0) + result_counts.get("gate", 0) == 0)
     if needs_gateway_detail:
         try:
-            gateway_raw = xplane_gateway_raw(ident)
+            gateway_raw = xplane_gateway_raw(ident, progress)
             gateway_elements = list(gateway_raw.get("elements", []))
             gateway_augmented = False
             osm_buildings = [element for element in (raw or {}).get("elements", [])
@@ -1164,6 +1267,7 @@ def build_airport_map(ident, cache_dir=None, refresh=False, radius=5500, maximum
             temporary.unlink()
     if unavailable_path.exists():
         unavailable_path.unlink()
+    report_progress(progress, "finalizing_map", 96, result.get("source") or "Map source")
     return result, False
 
 

@@ -91,6 +91,12 @@ finally {
 
 & $python -m py_compile $pipelineScript $pipelineModule
 Assert-NativeSuccess 'Python compilation'
+if (-not $SkipTests) {
+    & $python -m unittest discover `
+        -s (Join-Path $repositoryRoot 'tools\map_pipeline') `
+        -p 'test_*.py'
+    Assert-NativeSuccess 'Python tests'
+}
 
 if (-not $SkipPipelinePackage) {
     $pipelineInputs = @($pipelineScript, $pipelineModule, $pipelineSpec)

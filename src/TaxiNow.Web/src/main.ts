@@ -34,26 +34,55 @@ let airportBounds: LngLatBoundsLike;
 let ownshipAnimationStarted = false;
 let fallbackOwnship: SVGGElement | null = null;
 let assetRefreshTimer: number | null = null;
+let assetPanelOpen = false;
+let installedAssets: StoredMapAsset[] = [];
+let selectedAirportIcao = "";
+let pendingAirportIcao: string | null = null;
+let mapInitialized = false;
+let assetRefreshInFlight = false;
+let activeDownloads = false;
 
 async function start(): Promise<void> {
   setupAssetManager();
-  const [airport, appStatus] = await Promise.all([
-    getJson<AirportMap>("/api/v1/airports/CYYZ/map"),
-    getJson<AppStatus>("/api/v1/status")
-  ]);
+  setupAirportPicker();
+  const appStatus = await getJson<AppStatus>("/api/v1/status");
   const serverLink =
     document.querySelector<HTMLAnchorElement>("#server-url")!;
   serverLink.href = appStatus.localUrl;
   serverLink.textContent =
-    `Local server: ${appStatus.localUrl.replace(/^https?:\/\//, "")}`;
-  serverLink.title = `Open TaxiNow in a browser at ${appStatus.localUrl}`;
+    `Other devices: ${appStatus.localUrl.replace(/^https?:\/\//, "")}`;
+  serverLink.title =
+    `Open TaxiNow from another device on this network: ${
+      appStatus.localUrls.join(", ")
+    }`;
 
+  document
+    .querySelector("#fit-airport")!
+    .addEventListener("click", () => fitAirport());
+  await refreshAssetManager();
+  const initialIcao =
+    installedAssets.some((asset) => asset.icao === appStatus.selectedAirport)
+      ? appStatus.selectedAirport
+      : installedAssets[0]?.icao;
+  if (!initialIcao) {
+    throw new Error("No airport maps are installed.");
+  }
+  await loadAirport(initialIcao);
+  await connectTelemetry();
+}
+
+async function loadAirport(icao: string): Promise<void> {
+  const airport = await getJson<AirportMap>(
+    `/api/v1/airports/${encodeURIComponent(icao)}/map`
+  );
+  selectedAirportIcao = airport.airport.icao;
   airportBounds = [
     [airport.airport.bounds.minLon, airport.airport.bounds.minLat],
     [airport.airport.bounds.maxLon, airport.airport.bounds.maxLat]
   ];
+  document.querySelector("#airport-code")!.textContent = airport.airport.icao;
   document.querySelector("#airport-name")!.textContent =
-    `${airport.airport.icao} — ${airport.airport.name}`;
+    airport.airport.name;
   document.querySelector("#attribution")!.textContent = airport.sources
     .map((source) =>
       source.name.toLowerCase().includes("openstreetmap")
@@ -65,13 +94,176 @@ async function start(): Promise<void> {
     `Offline vector map · ${airport.counts.runways} runways · ` +
     `${airport.counts.taxiways} taxiways · ${airport.counts.stands} stands`;
 
+  if (mapInitialized) {
+    map.remove();
+    document.querySelector("#airport-fallback")?.remove();
+    fallbackOwnship = null;
+  }
   map = createMap(airport);
-  document
-    .querySelector("#fit-airport")!
-    .addEventListener("click", () => fitAirport());
+  mapInitialized = true;
+  renderAirportPicker(
+    document.querySelector<HTMLInputElement>("#airport-search")!.value
+  );
+}
 
-  await refreshAssetManager();
-  await connectTelemetry();
+function setupAirportPicker(): void {
+  const toggle =
+    document.querySelector<HTMLButtonElement>("#airport-picker-toggle")!;
+  const panel =
+    document.querySelector<HTMLElement>("#airport-picker-panel")!;
+  const search =
+    document.querySelector<HTMLInputElement>("#airport-search")!;
+  const quickDownload =
+    document.querySelector<HTMLButtonElement>("#quick-download")!;
+
+  const setOpen = (open: boolean): void => {
+    panel.hidden = !open;
+    toggle.setAttribute("aria-expanded", String(open));
+    if (open) {
+      search.focus();
+      search.select();
+      renderAirportPicker(search.value);
+    }
+  };
+
+  toggle.addEventListener("click", () => setOpen(panel.hidden));
+  search.addEventListener("input", () => {
+    search.value = search.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    renderAirportPicker(search.value);
+  });
+  quickDownload.addEventListener("click", () => {
+    const icao = search.value.trim().toUpperCase();
+    void queueIcaoDownload(
+      icao,
+      document.querySelector<HTMLElement>("#airport-picker-feedback")!
+    );
+  });
+  document.addEventListener("click", (event) => {
+    if (!panel.hidden &&
+        event.target instanceof Node &&
+        !document.querySelector(".airport-switcher")!.contains(event.target)) {
+      setOpen(false);
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !panel.hidden) {
+      setOpen(false);
+    }
+  });
+}
+
+function renderAirportPicker(query: string): void {
+  const normalized = query.trim().toUpperCase();
+  const results = document.querySelector<HTMLElement>("#airport-results")!;
+  const quickDownload =
+    document.querySelector<HTMLButtonElement>("#quick-download")!;
+  const feedback =
+    document.querySelector<HTMLElement>("#airport-picker-feedback")!;
+  const matches = installedAssets
+    .filter((asset) =>
+      !normalized ||
+      asset.icao.includes(normalized) ||
+      asset.name.toUpperCase().includes(normalized) ||
+      asset.municipality?.toUpperCase().includes(normalized)
+    )
+    .slice(0, 12);
+  results.replaceChildren();
+
+  for (const asset of matches) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className =
+      `airport-result${asset.icao === selectedAirportIcao ? " selected" : ""}`;
+    const code = document.createElement("strong");
+    code.textContent = asset.icao;
+    const name = document.createElement("span");
+    name.textContent = asset.name;
+    const location = document.createElement("small");
+    location.textContent =
+      [asset.municipality, asset.regionCode, asset.countryCode]
+        .filter(Boolean)
+        .join(" · ");
+    button.append(code, name, location);
+    button.addEventListener("click", async () => {
+      feedback.textContent = `Loading ${asset.icao}…`;
+      feedback.className = "feedback";
+      try {
+        await loadAirport(asset.icao);
+        document.querySelector<HTMLElement>("#airport-picker-panel")!.hidden =
+          true;
+        document
+          .querySelector("#airport-picker-toggle")!
+          .setAttribute("aria-expanded", "false");
+      } catch (error) {
+        feedback.textContent =
+          error instanceof Error ? error.message : String(error);
+        feedback.className = "feedback error";
+      }
+    });
+    results.append(button);
+  }
+
+  const exactInstalled = installedAssets.some(
+    (asset) => asset.icao === normalized
+  );
+  const downloadable = /^[A-Z0-9]{4}$/.test(normalized) && !exactInstalled;
+  quickDownload.hidden = !downloadable;
+  quickDownload.textContent = downloadable
+    ? `Download ${normalized} map`
+    : "Download map";
+  if (matches.length === 0 && !downloadable) {
+    results.append(createEmptyState(
+      normalized
+        ? "No installed map matches this search."
+        : "No airport maps are installed."
+    ));
+  }
+  if (!pendingAirportIcao) {
+    feedback.textContent = downloadable
+      ? `${normalized} is not installed. Download it here.`
+      : "";
+    feedback.className = "feedback";
+  }
+}
+
+async function queueIcaoDownload(
+  icao: string,
+  feedback: HTMLElement
+): Promise<void> {
+  if (!/^[A-Z0-9]{4}$/.test(icao)) {
+    feedback.textContent = "Enter a four-character ICAO code.";
+    feedback.className = "feedback error";
+    return;
+  }
+  const quickDownload =
+    document.querySelector<HTMLButtonElement>("#quick-download")!;
+  quickDownload.disabled = true;
+  feedback.textContent = `Starting ${icao} download…`;
+  feedback.className = "feedback";
+  try {
+    await requestJson<DownloadJob>("/api/v1/downloads", {
+      method: "POST",
+      body: JSON.stringify({
+        mode: "icao",
+        icao,
+        countryCode: null,
+        regionCode: null,
+        maximumCount: null
+      })
+    });
+    pendingAirportIcao = icao;
+    feedback.textContent =
+      `${icao} is downloading. It will open automatically when ready.`;
+    feedback.className = "feedback success";
+    ensureAssetPolling();
+    await refreshAssetManager();
+  } catch (error) {
+    feedback.textContent =
+      error instanceof Error ? error.message : String(error);
+    feedback.className = "feedback error";
+  } finally {
+    quickDownload.disabled = false;
+  }
 }
 
 function setupAssetManager(): void {
@@ -81,22 +273,21 @@ function setupAssetManager(): void {
   const form = document.querySelector<HTMLFormElement>("#download-form")!;
 
   const open = (): void => {
+    assetPanelOpen = true;
     panel.classList.add("open");
     panel.setAttribute("aria-hidden", "false");
     backdrop.hidden = false;
     void refreshAssetManager();
-    if (assetRefreshTimer === null) {
-      assetRefreshTimer = window.setInterval(
-        () => void refreshAssetManager(),
-        2000
-      );
-    }
+    ensureAssetPolling();
   };
   const close = (): void => {
+    assetPanelOpen = false;
     panel.classList.remove("open");
     panel.setAttribute("aria-hidden", "true");
     backdrop.hidden = true;
-    if (assetRefreshTimer !== null) {
+    if (assetRefreshTimer !== null &&
+        pendingAirportIcao === null &&
+        !activeDownloads) {
       window.clearInterval(assetRefreshTimer);
       assetRefreshTimer = null;
     }
@@ -114,12 +305,30 @@ function setupAssetManager(): void {
     "click",
     () => void refreshAssetManager()
   );
+  document.querySelector("#clear-downloads")!.addEventListener(
+    "click",
+    async () => {
+      await requestJson<{ removed: number }>("/api/v1/downloads/completed", {
+        method: "DELETE"
+      });
+      await refreshAssetManager();
+    }
+  );
   mode.addEventListener("change", updateDownloadMode);
   updateDownloadMode();
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     void submitDownload(form);
   });
+}
+
+function ensureAssetPolling(): void {
+  if (assetRefreshTimer === null) {
+    assetRefreshTimer = window.setInterval(
+      () => void refreshAssetManager(),
+      500
+    );
+  }
 }
 
 function updateDownloadMode(): void {
@@ -191,6 +400,7 @@ async function submitDownload(form: HTMLFormElement): Promise<void> {
     });
     feedback.textContent = "Download started. Progress appears below.";
     feedback.className = "feedback success";
+    ensureAssetPolling();
     await refreshAssetManager();
   } catch (error) {
     feedback.textContent =
@@ -202,13 +412,46 @@ async function submitDownload(form: HTMLFormElement): Promise<void> {
 }
 
 async function refreshAssetManager(): Promise<void> {
+  if (assetRefreshInFlight) {
+    return;
+  }
+  assetRefreshInFlight = true;
   try {
     const [storage, jobs] = await Promise.all([
       getJson<StorageSummary>("/api/v1/storage"),
       getJson<DownloadJob[]>("/api/v1/downloads")
     ]);
+    installedAssets = storage.assets;
     renderStorage(storage);
     renderDownloadJobs(jobs);
+    renderAirportPicker(
+      document.querySelector<HTMLInputElement>("#airport-search")!.value
+    );
+
+    if (pendingAirportIcao &&
+        installedAssets.some((asset) => asset.icao === pendingAirportIcao) &&
+        jobs.some((job) =>
+          job.currentIcao === pendingAirportIcao &&
+          job.state === "completed"
+        )) {
+      const downloadedIcao = pendingAirportIcao;
+      pendingAirportIcao = null;
+      await loadAirport(downloadedIcao);
+      const feedback =
+        document.querySelector<HTMLElement>("#airport-picker-feedback")!;
+      feedback.textContent = `${downloadedIcao} is installed and displayed.`;
+      feedback.className = "feedback success";
+    }
+
+    activeDownloads = jobs.some(
+      (job) => job.state === "queued" || job.state === "running"
+    );
+    if (activeDownloads || pendingAirportIcao || assetPanelOpen) {
+      ensureAssetPolling();
+    } else if (assetRefreshTimer !== null) {
+      window.clearInterval(assetRefreshTimer);
+      assetRefreshTimer = null;
+    }
   } catch (error) {
     const feedback =
       document.querySelector<HTMLElement>("#download-feedback");
@@ -219,6 +462,8 @@ async function refreshAssetManager(): Promise<void> {
         }`;
       feedback.className = "feedback error";
     }
+  } finally {
+    assetRefreshInFlight = false;
   }
 }
 
@@ -236,9 +481,69 @@ function renderStorage(storage: StorageSummary): void {
     list.append(createEmptyState("No offline maps installed."));
     return;
   }
-  for (const asset of storage.assets) {
-    list.append(createAssetRow(asset));
+
+  const countries = groupBy(
+    storage.assets,
+    (asset) => asset.countryCode || "ZZ"
+  );
+  for (const [countryCode, countryAssets] of [...countries].sort()) {
+    const country = document.createElement("details");
+    country.className = "asset-group asset-country";
+    country.open = true;
+    country.append(createAssetGroupSummary(countryCode, countryAssets));
+
+    const regions = groupBy(
+      countryAssets,
+      (asset) => asset.regionCode || "Other"
+    );
+    for (const [regionCode, regionAssets] of [...regions].sort()) {
+      const region = document.createElement("details");
+      region.className = "asset-group asset-region";
+      region.open = true;
+      region.append(createAssetGroupSummary(regionCode, regionAssets));
+      const airports = document.createElement("div");
+      airports.className = "asset-airports";
+      for (const asset of regionAssets.sort((left, right) =>
+        left.icao.localeCompare(right.icao))) {
+        airports.append(createAssetRow(asset));
+      }
+      region.append(airports);
+      country.append(region);
+    }
+    list.append(country);
   }
+}
+
+function createAssetGroupSummary(
+  label: string,
+  assets: StoredMapAsset[]
+): HTMLElement {
+  const summary = document.createElement("summary");
+  const name = document.createElement("strong");
+  name.textContent = label;
+  const metadata = document.createElement("span");
+  metadata.textContent =
+    `${assets.length} airport${assets.length === 1 ? "" : "s"} · ` +
+    formatBytes(assets.reduce((sum, asset) => sum + asset.sizeBytes, 0));
+  summary.append(name, metadata);
+  return summary;
+}
+
+function groupBy<T>(
+  values: T[],
+  keySelector: (value: T) => string
+): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const value of values) {
+    const key = keySelector(value);
+    const group = groups.get(key);
+    if (group) {
+      group.push(value);
+    } else {
+      groups.set(key, [value]);
+    }
+  }
+  return groups;
 }
 
 function createAssetRow(asset: StoredMapAsset): HTMLElement {
@@ -281,6 +586,13 @@ function createAssetRow(asset: StoredMapAsset): HTMLElement {
 
 function renderDownloadJobs(jobs: DownloadJob[]): void {
   const list = document.querySelector<HTMLElement>("#download-jobs")!;
+  const clear =
+    document.querySelector<HTMLButtonElement>("#clear-downloads")!;
+  clear.disabled = !jobs.some(
+    (job) => job.state === "completed" ||
+      job.state === "failed" ||
+      job.state === "cancelled"
+  );
   list.replaceChildren();
   if (jobs.length === 0) {
     list.append(createEmptyState("No downloads in this session."));
@@ -304,9 +616,37 @@ function renderDownloadJobs(jobs: DownloadJob[]): void {
     progress.value = Math.max(0, Math.min(100, job.percentage));
     const detail = document.createElement("small");
     detail.textContent = job.error ||
-      `${job.phase} · ${Math.round(job.percentage)}%` +
+      `${formatPhase(job.phase)} · ${Math.round(job.percentage)}%` +
       (job.currentSource ? ` · ${job.currentSource}` : "");
-    row.append(heading, progress, detail);
+    const metrics = document.createElement("small");
+    metrics.className = "job-metrics";
+    const metricParts: string[] = [];
+    if (job.state === "running") {
+      if (job.downloadBytesPerSecond && job.downloadBytesPerSecond > 0) {
+        metricParts.push(`${formatBytes(job.downloadBytesPerSecond)}/s`);
+      } else if (job.phase.includes("waiting") ||
+                 job.phase.includes("requesting")) {
+        metricParts.push("waiting for source");
+      }
+      if (job.bytesDownloaded > 0) {
+        metricParts.push(
+          job.downloadBytesTotal
+            ? `${formatBytes(job.bytesDownloaded)} / ${
+              formatBytes(job.downloadBytesTotal)
+            }`
+            : formatBytes(job.bytesDownloaded)
+        );
+      }
+      metricParts.push(
+        job.estimatedRemaining
+          ? `about ${formatTimeSpan(job.estimatedRemaining)} remaining`
+          : "estimating remaining time"
+      );
+    } else if (job.state === "completed") {
+      metricParts.push(`${formatBytes(job.bytesWritten)} installed`);
+    }
+    metrics.textContent = metricParts.join(" · ");
+    row.append(heading, progress, detail, metrics);
 
     if (job.state === "queued" || job.state === "running") {
       const cancel = document.createElement("button");
@@ -325,6 +665,31 @@ function renderDownloadJobs(jobs: DownloadJob[]): void {
     }
     list.append(row);
   }
+}
+
+function formatPhase(phase: string): string {
+  return phase.replace(/[_-]+/g, " ").replace(/\b\w/g, (value) =>
+    value.toUpperCase());
+}
+
+function formatTimeSpan(value: string): string {
+  const match = value.match(
+    /^(?:(\d+)\.)?(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?$/
+  );
+  if (!match) {
+    return value;
+  }
+  const days = Number(match[1] || 0);
+  const hours = Number(match[2] || 0) + days * 24;
+  const minutes = Number(match[3] || 0);
+  const seconds = Number(match[4] || 0);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${Math.max(1, seconds)}s`;
 }
 
 function createEmptyState(message: string): HTMLParagraphElement {
@@ -412,6 +777,7 @@ function createMap(airport: AirportMap): MapLibreMap {
       addAirportLayers(created);
       created.addImage("ownship-plane", createOwnshipImage(), { pixelRatio: 2 });
       addOwnshipLayer(created);
+      created.moveLayer("building-labels");
       fitAirport();
       created.once("idle", () => {
         publishMapDiagnostics(created);
@@ -605,7 +971,12 @@ function addAirportLayers(target: MapLibreMap): void {
       "text-field": ["get", "label"],
       "text-size": ["interpolate", ["linear"], ["zoom"], 10, 11, 16, 15],
       "text-font": ["Segoe UI", "Arial Unicode MS Regular"],
-      "text-max-width": 8
+      "text-max-width": 30,
+      "text-anchor": "center",
+      "text-allow-overlap": false,
+      "text-ignore-placement": false,
+      "text-padding": 7,
+      "symbol-avoid-edges": true
     },
     paint: {
       "text-color": "#eef4f8",
@@ -698,7 +1069,7 @@ async function connectTelemetry(): Promise<void> {
 function renderOwnship(): void {
   const ownship = interpolateOwnship(telemetrySamples, Date.now());
   if (ownship) {
-    if (map?.isStyleLoaded()) {
+    if (map?.isStyleLoaded() && map.getLayer("ownship")) {
       const source = map.getSource("ownship") as GeoJSONSource | undefined;
       source?.setData(
         ownshipFeature(
@@ -782,10 +1153,7 @@ function terminalLabelCollection(
         properties: { label: feature.name?.trim() || feature.ref?.trim() || "" },
         geometry: {
           type: "Point",
-          coordinates: [
-            points.reduce((sum, point) => sum + point[0], 0) / points.length,
-            points.reduce((sum, point) => sum + point[1], 0) / points.length
-          ]
+          coordinates: terminalLabelPoint(points)
         }
       };
     })
@@ -820,6 +1188,129 @@ function polygonArea(points: [number, number][]): number {
     area += current[0] * next[1] - next[0] * current[1];
   }
   return Math.abs(area) / 2;
+}
+
+function terminalLabelPoint(
+  points: [number, number][]
+): [number, number] {
+  if (points.length < 3) {
+    return points[0] ?? [0, 0];
+  }
+  const minLon = Math.min(...points.map((point) => point[0]));
+  const maxLon = Math.max(...points.map((point) => point[0]));
+  const minLat = Math.min(...points.map((point) => point[1]));
+  const maxLat = Math.max(...points.map((point) => point[1]));
+  const candidates: [number, number][] = [
+    polygonCentroid(points),
+    [(minLon + maxLon) / 2, (minLat + maxLat) / 2]
+  ];
+  for (let row = 1; row < 16; row++) {
+    for (let column = 1; column < 16; column++) {
+      candidates.push([
+        minLon + (maxLon - minLon) * column / 16,
+        minLat + (maxLat - minLat) * row / 16
+      ]);
+    }
+  }
+
+  let best = points[0]!;
+  let bestDistance = -1;
+  for (const candidate of candidates) {
+    if (!pointInPolygon(candidate, points)) {
+      continue;
+    }
+    const distance = distanceToPolygon(candidate, points);
+    if (distance > bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function polygonCentroid(points: [number, number][]): [number, number] {
+  let signedArea = 0;
+  let longitude = 0;
+  let latitude = 0;
+  for (let index = 0; index < points.length; index++) {
+    const current = points[index]!;
+    const next = points[(index + 1) % points.length]!;
+    const cross = current[0] * next[1] - next[0] * current[1];
+    signedArea += cross;
+    longitude += (current[0] + next[0]) * cross;
+    latitude += (current[1] + next[1]) * cross;
+  }
+  if (Math.abs(signedArea) < 1e-14) {
+    return [
+      points.reduce((sum, point) => sum + point[0], 0) / points.length,
+      points.reduce((sum, point) => sum + point[1], 0) / points.length
+    ];
+  }
+  return [
+    longitude / (3 * signedArea),
+    latitude / (3 * signedArea)
+  ];
+}
+
+function pointInPolygon(
+  point: [number, number],
+  polygon: [number, number][]
+): boolean {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1;
+       index < polygon.length;
+       previous = index++) {
+    const currentPoint = polygon[index]!;
+    const previousPoint = polygon[previous]!;
+    if ((currentPoint[1] > point[1]) !== (previousPoint[1] > point[1]) &&
+        point[0] <
+          (previousPoint[0] - currentPoint[0]) *
+          (point[1] - currentPoint[1]) /
+          (previousPoint[1] - currentPoint[1]) +
+          currentPoint[0]) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function distanceToPolygon(
+  point: [number, number],
+  polygon: [number, number][]
+): number {
+  let minimum = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < polygon.length; index++) {
+    minimum = Math.min(
+      minimum,
+      distanceToSegmentSquared(
+        point,
+        polygon[index]!,
+        polygon[(index + 1) % polygon.length]!
+      )
+    );
+  }
+  return minimum;
+}
+
+function distanceToSegmentSquared(
+  point: [number, number],
+  start: [number, number],
+  end: [number, number]
+): number {
+  const deltaLon = end[0] - start[0];
+  const deltaLat = end[1] - start[1];
+  const lengthSquared = deltaLon ** 2 + deltaLat ** 2;
+  if (lengthSquared === 0) {
+    return (point[0] - start[0]) ** 2 + (point[1] - start[1]) ** 2;
+  }
+  const fraction = Math.max(0, Math.min(
+    1,
+    ((point[0] - start[0]) * deltaLon +
+      (point[1] - start[1]) * deltaLat) / lengthSquared
+  ));
+  const nearestLon = start[0] + fraction * deltaLon;
+  const nearestLat = start[1] + fraction * deltaLat;
+  return (point[0] - nearestLon) ** 2 + (point[1] - nearestLat) ** 2;
 }
 
 function toGeometry(feature: AirportFeature): Geometry {
@@ -922,6 +1413,11 @@ function activateFallbackOverlay(
   svg.append(staticGroup);
   fallbackOwnship = createFallbackOwnship();
   svg.append(fallbackOwnship);
+  const terminalLabelGroup = document.createElementNS(
+    "http://www.w3.org/2000/svg",
+    "g"
+  );
+  svg.append(terminalLabelGroup);
   mapContainer.append(svg);
   const terminalLabelIds = new Set(
     selectTerminalLabelFeatures(features).map((feature) => feature.id)
@@ -930,6 +1426,7 @@ function activateFallbackOverlay(
 
   const redraw = () => {
     staticGroup.replaceChildren();
+    terminalLabelGroup.replaceChildren();
     renderedTerminalLabels.clear();
     const zoom = target.getZoom();
     for (const feature of features) {
@@ -953,8 +1450,13 @@ function activateFallbackOverlay(
         terminalLabelIds.has(feature.id) &&
         !renderedTerminalLabels.has(terminalName.toLowerCase())
       ) {
-        staticGroup.append(
-          createFallbackLabel(terminalName, projected, feature.kind)
+        const labelCoordinate = terminalLabelPoint(feature.points);
+        terminalLabelGroup.append(
+          createFallbackLabel(
+            terminalName,
+            [target.project(labelCoordinate)],
+            feature.kind
+          )
         );
         renderedTerminalLabels.add(terminalName.toLowerCase());
       }
