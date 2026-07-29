@@ -14,11 +14,111 @@
           <span id="airport-name">Loading airport…</span>
         </div>
         <div class="actions">
+          <a id="server-url"
+             class="server-url"
+             href="http://localhost:8780"
+             target="_blank"
+             rel="noreferrer">Local server: localhost:8780</a>
           <span id="status" class="status">Connecting</span>
+          <button id="open-assets" type="button">Maps &amp; storage</button>
           <button id="fit-airport" type="button">Fit airport</button>
         </div>
       </header>
       <div id="map" role="application" aria-label="TaxiNow airport map"></div>
+      <button id="asset-backdrop"
+              class="asset-backdrop"
+              type="button"
+              aria-label="Close map manager"
+              hidden></button>
+      <aside id="asset-panel"
+             class="asset-panel"
+             aria-label="Map downloader and asset manager"
+             aria-hidden="true">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">Offline maps</span>
+            <h1>Maps &amp; storage</h1>
+          </div>
+          <button id="close-assets" class="icon-button" type="button"
+                  aria-label="Close map manager">×</button>
+        </div>
+
+        <form id="download-form" class="download-form">
+          <label>
+            Download by
+            <select id="download-mode">
+              <option value="icao">Airport ICAO</option>
+              <option value="country">Country or region</option>
+            </select>
+          </label>
+          <div id="icao-fields">
+            <label>
+              ICAO code
+              <input id="download-icao"
+                     name="icao"
+                     autocomplete="off"
+                     maxlength="5"
+                     placeholder="CYYZ"
+                     required />
+            </label>
+          </div>
+          <div id="country-fields" class="form-grid" hidden>
+            <label>
+              Country
+              <input id="download-country"
+                     name="countryCode"
+                     autocomplete="off"
+                     maxlength="2"
+                     placeholder="CA" />
+            </label>
+            <label>
+              Region (optional)
+              <input id="download-region"
+                     name="regionCode"
+                     autocomplete="off"
+                     maxlength="7"
+                     placeholder="CA-ON" />
+            </label>
+            <label class="full-row">
+              Maximum airports
+              <input id="download-maximum"
+                     name="maximumCount"
+                     type="number"
+                     min="1"
+                     max="500"
+                     value="25" />
+            </label>
+          </div>
+          <button id="start-download" class="primary-button" type="submit">
+            Download map
+          </button>
+          <p id="download-feedback" class="feedback" role="status"></p>
+        </form>
+
+        <section class="manager-section" aria-labelledby="download-heading">
+          <div class="section-heading">
+            <h2 id="download-heading">Download activity</h2>
+            <button id="refresh-assets" class="text-button" type="button">
+              Refresh
+            </button>
+          </div>
+          <div id="download-jobs" class="job-list">
+            <p class="empty-state">No downloads in this session.</p>
+          </div>
+        </section>
+
+        <section class="manager-section" aria-labelledby="storage-heading">
+          <h2 id="storage-heading">Asset storage</h2>
+          <div class="storage-stats">
+            <div><strong id="storage-used">—</strong><span>TaxiNow maps</span></div>
+            <div><strong id="storage-free">—</strong><span>Disk free</span></div>
+            <div><strong id="storage-count">—</strong><span>Airports</span></div>
+          </div>
+          <div id="asset-list" class="asset-list">
+            <p class="empty-state">Loading installed maps…</p>
+          </div>
+        </section>
+      </aside>
       <footer>
         <span>Flight simulation use only — not for real-world navigation.</span>
         <span id="map-summary"></span>

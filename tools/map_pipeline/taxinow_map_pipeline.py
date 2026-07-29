@@ -636,7 +636,17 @@ def select_airports(request: dict[str, Any], catalog: list[Airport]) -> list[Air
         country = str(request.get("countryCode") or "").strip().upper()
         if len(country) != 2:
             raise PipelineError("Country code must be ISO 3166-1 alpha-2.")
+        region = str(request.get("regionCode") or "").strip().upper()
         matches = [airport for airport in catalog if airport.country_code == country]
+        if region:
+            matches = [
+                airport for airport in matches if airport.region_code == region
+            ]
+        if not matches:
+            scope = region or country
+            raise PipelineError(
+                f"No airports were found for country or region '{scope}'."
+            )
         preferred = sorted(
             matches,
             key=lambda airport: (

@@ -11,7 +11,8 @@ public sealed record PipelineRequest(
     string? CountryCode,
     int? MaximumCount,
     string OutputDirectory,
-    string CacheDirectory);
+    string CacheDirectory,
+    string? RegionCode);
 
 public sealed record PipelineEvent(
     string ProtocolVersion,

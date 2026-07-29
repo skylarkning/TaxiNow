@@ -14,6 +14,7 @@
 *.suo
 *.nupkg
 artifacts/
+tools/map_pipeline/build/
 logs/
 .env
 .env.*

@@ -17,10 +17,10 @@ public sealed record StorageSummary(
     long TotalBytes,
     long FreeBytes,
     int AirportCount,
-    IReadOnlyList<StorageGroupSummary> Countries);
+    IReadOnlyList<StorageGroupSummary> Countries,
+    IReadOnlyList<StoredMapAsset> Assets);
 
 public sealed record StorageGroupSummary(
     string Code,
     int AirportCount,
     long SizeBytes);
-

@@ -23,7 +23,7 @@ public partial class MainWindow : Window
         }
         catch (WebView2RuntimeNotFoundException)
         {
-            MessageBox.Show(
+            System.Windows.MessageBox.Show(
                 "Microsoft Edge WebView2 Runtime is required to display TaxiNow.",
                 "WebView2 Runtime missing",
                 MessageBoxButton.OK,
@@ -39,7 +39,7 @@ public partial class MainWindow : Window
         LoadingOverlay.Visibility = e.IsSuccess ? Visibility.Collapsed : Visibility.Visible;
         if (!e.IsSuccess)
         {
-            MessageBox.Show(
+            System.Windows.MessageBox.Show(
                 $"The local TaxiNow map could not be loaded ({e.WebErrorStatus}).",
                 "Map load failed",
                 MessageBoxButton.OK,

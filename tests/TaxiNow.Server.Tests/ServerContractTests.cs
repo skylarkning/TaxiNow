@@ -52,4 +52,24 @@ public sealed class ServerContractTests
             DownloadRequestValidator.NormalizeAndValidate(
                 new DownloadRequest("country", null, "CAN", null)));
     }
+
+    [Fact]
+    public void RegionDownload_IsNormalized()
+    {
+        var request = DownloadRequestValidator.NormalizeAndValidate(
+            new DownloadRequest(" country ", null, " ca ", 25, " ca-on "));
+
+        Assert.Equal("country", request.Mode);
+        Assert.Equal("CA", request.CountryCode);
+        Assert.Equal("CA-ON", request.RegionCode);
+        Assert.Equal(25, request.MaximumCount);
+    }
+
+    [Fact]
+    public void RegionMustBelongToCountry()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            DownloadRequestValidator.NormalizeAndValidate(
+                new DownloadRequest("country", null, "CA", 25, "US-NY")));
+    }
 }

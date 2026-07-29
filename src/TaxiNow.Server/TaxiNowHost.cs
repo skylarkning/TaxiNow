@@ -112,13 +112,18 @@ public static class TaxiNowHost
 
     private static void MapApi(WebApplication app)
     {
-        app.MapGet("/api/v1/status", (TelemetryState telemetry) =>
+        app.MapGet("/api/v1/status", (
+            TelemetryState telemetry,
+            IConfiguration configuration) =>
         {
             var sample = telemetry.Latest;
+            var port = configuration.GetValue("TaxiNow:Port", DefaultPort);
             return Results.Ok(new
             {
                 product = "TaxiNow",
                 apiVersion = 1,
+                localUrl = $"http://localhost:{port}",
+                port,
                 mode = "replay",
                 simulator = sample?.Simulator ?? SimulatorEdition.Replay,
                 state = sample?.State ?? TrackingState.Connecting,
@@ -167,8 +172,17 @@ public static class TaxiNowHost
             "/api/v1/downloads",
             (DownloadRequest request, DownloadJobService jobs) =>
             {
-                var job = jobs.Create(request);
-                return Results.Accepted($"/api/v1/downloads/{job.JobId}", job);
+                try
+                {
+                    var job = jobs.Create(request);
+                    return Results.Accepted(
+                        $"/api/v1/downloads/{job.JobId}",
+                        job);
+                }
+                catch (ArgumentException error)
+                {
+                    return Results.BadRequest(new { error = error.Message });
+                }
             });
         app.MapGet(
             "/api/v1/downloads",

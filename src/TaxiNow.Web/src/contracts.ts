@@ -70,3 +70,55 @@ export interface TelemetrySnapshot {
     | "groundTracking"
     | "reconnecting";
 }
+
+export interface AppStatus {
+  product: string;
+  apiVersion: number;
+  localUrl: string;
+  port: number;
+  mode: string;
+  connected: boolean;
+  selectedAirport: string;
+  lanEnabled: boolean;
+}
+
+export interface StoredMapAsset {
+  icao: string;
+  name: string;
+  countryCode: string;
+  regionCode: string | null;
+  municipality: string | null;
+  sizeBytes: number;
+  generatedAt: string;
+  importedAt: string;
+  sourceMix: string;
+  warning: string | null;
+}
+
+export interface StorageSummary {
+  totalBytes: number;
+  freeBytes: number;
+  airportCount: number;
+  countries: Array<{
+    code: string;
+    airportCount: number;
+    sizeBytes: number;
+  }>;
+  assets: StoredMapAsset[];
+}
+
+export interface DownloadJob {
+  jobId: string;
+  state: "queued" | "running" | "completed" | "failed" | "cancelled";
+  phase: string;
+  airportsCompleted: number;
+  airportsTotal: number;
+  bytesWritten: number;
+  currentIcao: string | null;
+  percentage: number;
+  currentSource: string | null;
+  warnings: string[];
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

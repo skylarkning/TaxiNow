@@ -17,8 +17,15 @@ desktop WebView2 shell and in an optional browser view.
   the proven SkyCharts map-drawing behavior.
 - Smooth replay ownship animation through a SignalR telemetry stream.
 - Schema v2 validation and a schema v1 adapter.
+- Visible map downloader and asset manager for ICAO, country, and optional
+  region downloads, with live progress, installed-map sizes, free disk space,
+  and deletion.
 - SQLite-backed asset catalog and atomic map replacement.
-- WPF/WebView2 desktop shell.
+- WPF/WebView2 desktop shell with deterministic Close/Quit behavior and
+  minimize-to-tray support. Left-click the tray icon to restore it, or
+  right-click it for Open and Quit commands.
+- The header shows the active local browser address (normally
+  `http://localhost:8780`).
 - JSON-lines Python acquisition pipeline with the proven SkyCharts
   airport-geometry acquisition logic, country/ICAO jobs, caching, coordinated
   OpenStreetMap queries, X-Plane Scenery Gateway detail fallback, and an
@@ -35,6 +42,11 @@ Live simulator compatibility is tracked in
 .\scripts\build.ps1
 ```
 
+The build packages the Python map pipeline as
+`pipeline\taxinow-map-pipeline.exe`, so the desktop downloader does not require
+a separate Python installation at runtime. PyInstaller is downloaded into the
+ignored `artifacts` directory when needed.
+
 Run the browser/server vertical slice:
 
 ```powershell
@@ -46,6 +58,9 @@ Then open <http://127.0.0.1:8780>. The WPF shell uses the same URL:
 ```powershell
 dotnet run --project .\src\TaxiNow.App
 ```
+
+Closing the desktop window quits TaxiNow and releases the local server port.
+Minimizing hides the window in the Windows notification area instead.
 
 The replay fixture loops by default. Set `TaxiNow__ReplayPath` to another JSONL
 recording to override it.

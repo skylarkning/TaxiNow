@@ -48,6 +48,9 @@ public sealed class MapAssetStoreTests : IAsyncLifetime
         Assert.True(File.Exists(Path.Combine(_paths.MapsPath, "CYYZ.json.gz")));
         Assert.Equal(1, summary.AirportCount);
         Assert.True(summary.TotalBytes > 0);
+        var stored = Assert.Single(summary.Assets);
+        Assert.Equal("CYYZ", stored.Icao);
+        Assert.Equal("CA", Assert.Single(summary.Countries).Code);
     }
 
     [Fact]

@@ -3,14 +3,19 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string] $Configuration = 'Debug',
     [switch] $SkipWebInstall,
+    [switch] $SkipPipelinePackage,
     [switch] $SkipTests
 )
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $webRoot = Join-Path $repositoryRoot 'src\TaxiNow.Web'
+$pipelineRoot = Join-Path $repositoryRoot 'tools\map_pipeline'
 $pipelineScript = Join-Path $repositoryRoot 'tools\map_pipeline\taxinow_map_pipeline.py'
 $pipelineModule = Join-Path $repositoryRoot 'tools\map_pipeline\skycharts_airport_map.py'
+$pipelineSpec = Join-Path $pipelineRoot 'taxinow_map_pipeline.spec'
+$pipelineExecutable = Join-Path $pipelineRoot 'dist\taxinow-map-pipeline.exe'
+$pyInstallerRoot = Join-Path $repositoryRoot 'artifacts\pyinstaller-runtime'
 
 function Resolve-Tool {
     param(
@@ -86,6 +91,45 @@ finally {
 
 & $python -m py_compile $pipelineScript $pipelineModule
 Assert-NativeSuccess 'Python compilation'
+
+if (-not $SkipPipelinePackage) {
+    $pipelineInputs = @($pipelineScript, $pipelineModule, $pipelineSpec)
+    $packageRequired =
+        -not (Test-Path -LiteralPath $pipelineExecutable) -or
+        ($pipelineInputs | Where-Object {
+            (Get-Item -LiteralPath $_).LastWriteTimeUtc -gt
+                (Get-Item -LiteralPath $pipelineExecutable).LastWriteTimeUtc
+        }).Count -gt 0
+    if ($packageRequired) {
+        $pyInstallerModule = Join-Path $pyInstallerRoot 'PyInstaller\__init__.py'
+        if (-not (Test-Path -LiteralPath $pyInstallerModule)) {
+            New-Item -ItemType Directory -Path $pyInstallerRoot -Force | Out-Null
+            & $python -m pip install `
+                --disable-pip-version-check `
+                --target $pyInstallerRoot `
+                'PyInstaller==6.21.0'
+            Assert-NativeSuccess 'PyInstaller installation'
+        }
+
+        $previousPythonPath = $env:PYTHONPATH
+        $env:PYTHONPATH = if ([string]::IsNullOrWhiteSpace($previousPythonPath)) {
+            $pyInstallerRoot
+        }
+        else {
+            "$pyInstallerRoot;$previousPythonPath"
+        }
+        Push-Location $pipelineRoot
+        try {
+            & $python -m PyInstaller --clean --noconfirm $pipelineSpec
+            Assert-NativeSuccess 'Pipeline packaging'
+        }
+        finally {
+            Pop-Location
+            $env:PYTHONPATH = $previousPythonPath
+        }
+    }
+}
+
 & dotnet restore (Join-Path $repositoryRoot 'TaxiNow.sln')
 Assert-NativeSuccess '.NET restore'
 & dotnet build (Join-Path $repositoryRoot 'TaxiNow.sln') `

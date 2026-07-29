@@ -26,6 +26,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    # The desktop host redirects stdin/stdout and starts the process without a
+    # window. Keep console streams in the binary for the JSON-lines protocol.
+    console=True,
 )
-

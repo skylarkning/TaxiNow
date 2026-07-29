@@ -8,7 +8,8 @@ public sealed record DownloadRequest(
     string Mode,
     string? Icao,
     string? CountryCode,
-    int? MaximumCount);
+    int? MaximumCount,
+    string? RegionCode = null);
 
 public sealed record DownloadJob(
     Guid JobId,
@@ -40,7 +41,8 @@ public static class DownloadRequestValidator
         {
             Mode = request.Mode.Trim().ToLowerInvariant(),
             Icao = request.Icao?.Trim().ToUpperInvariant(),
-            CountryCode = request.CountryCode?.Trim().ToUpperInvariant()
+            CountryCode = request.CountryCode?.Trim().ToUpperInvariant(),
+            RegionCode = request.RegionCode?.Trim().ToUpperInvariant()
         };
 
         if (normalized.Mode == "icao")
@@ -65,6 +67,15 @@ public static class DownloadRequestValidator
                 throw new ArgumentOutOfRangeException(
                     nameof(request),
                     "Maximum count must be positive when supplied.");
+            }
+            if (normalized.RegionCode is { Length: > 0 } regionCode &&
+                (!regionCode.StartsWith(
+                    $"{normalized.CountryCode}-",
+                    StringComparison.Ordinal) ||
+                 regionCode.Length is < 4 or > 7))
+            {
+                throw new ArgumentException(
+                    "Region code must match the country, for example CA-ON.");
             }
             return normalized;
         }
@@ -168,7 +179,8 @@ public sealed class DownloadJobService(
                 CountryCode: request.CountryCode,
                 MaximumCount: request.MaximumCount,
                 OutputDirectory: outputDirectory,
-                CacheDirectory: storagePaths.SourceCachePath);
+                CacheDirectory: storagePaths.SourceCachePath,
+                RegionCode: request.RegionCode);
 
             PipelineEvent? completed = null;
             await foreach (var pipelineEvent in client.RunAsync(
@@ -279,6 +291,15 @@ public sealed class DownloadJobService(
         if (!string.IsNullOrWhiteSpace(packaged))
         {
             return (Path.GetFullPath(packaged), []);
+        }
+
+        var bundled = Path.Combine(
+            AppContext.BaseDirectory,
+            "pipeline",
+            "taxinow-map-pipeline.exe");
+        if (File.Exists(bundled))
+        {
+            return (bundled, []);
         }
 
         var python = configuration["TaxiNow:PythonExecutable"] ?? "python";

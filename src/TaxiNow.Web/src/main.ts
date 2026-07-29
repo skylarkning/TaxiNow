@@ -17,8 +17,12 @@ import type {
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./styles.css";
 import type {
+  AppStatus,
   AirportFeature,
   AirportMap,
+  DownloadJob,
+  StorageSummary,
+  StoredMapAsset,
   TelemetrySnapshot
 } from "./contracts";
 import { interpolateOwnship } from "./interpolation";
@@ -29,9 +33,21 @@ let map: MapLibreMap;
 let airportBounds: LngLatBoundsLike;
 let ownshipAnimationStarted = false;
 let fallbackOwnship: SVGGElement | null = null;
+let assetRefreshTimer: number | null = null;
 
 async function start(): Promise<void> {
-  const airport = await getJson<AirportMap>("/api/v1/airports/CYYZ/map");
+  setupAssetManager();
+  const [airport, appStatus] = await Promise.all([
+    getJson<AirportMap>("/api/v1/airports/CYYZ/map"),
+    getJson<AppStatus>("/api/v1/status")
+  ]);
+  const serverLink =
+    document.querySelector<HTMLAnchorElement>("#server-url")!;
+  serverLink.href = appStatus.localUrl;
+  serverLink.textContent =
+    `Local server: ${appStatus.localUrl.replace(/^https?:\/\//, "")}`;
+  serverLink.title = `Open TaxiNow in a browser at ${appStatus.localUrl}`;
+
   airportBounds = [
     [airport.airport.bounds.minLon, airport.airport.bounds.minLat],
     [airport.airport.bounds.maxLon, airport.airport.bounds.maxLat]
@@ -54,7 +70,283 @@ async function start(): Promise<void> {
     .querySelector("#fit-airport")!
     .addEventListener("click", () => fitAirport());
 
+  await refreshAssetManager();
   await connectTelemetry();
+}
+
+function setupAssetManager(): void {
+  const panel = document.querySelector<HTMLElement>("#asset-panel")!;
+  const backdrop = document.querySelector<HTMLButtonElement>("#asset-backdrop")!;
+  const mode = document.querySelector<HTMLSelectElement>("#download-mode")!;
+  const form = document.querySelector<HTMLFormElement>("#download-form")!;
+
+  const open = (): void => {
+    panel.classList.add("open");
+    panel.setAttribute("aria-hidden", "false");
+    backdrop.hidden = false;
+    void refreshAssetManager();
+    if (assetRefreshTimer === null) {
+      assetRefreshTimer = window.setInterval(
+        () => void refreshAssetManager(),
+        2000
+      );
+    }
+  };
+  const close = (): void => {
+    panel.classList.remove("open");
+    panel.setAttribute("aria-hidden", "true");
+    backdrop.hidden = true;
+    if (assetRefreshTimer !== null) {
+      window.clearInterval(assetRefreshTimer);
+      assetRefreshTimer = null;
+    }
+  };
+
+  document.querySelector("#open-assets")!.addEventListener("click", open);
+  document.querySelector("#close-assets")!.addEventListener("click", close);
+  backdrop.addEventListener("click", close);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && panel.classList.contains("open")) {
+      close();
+    }
+  });
+  document.querySelector("#refresh-assets")!.addEventListener(
+    "click",
+    () => void refreshAssetManager()
+  );
+  mode.addEventListener("change", updateDownloadMode);
+  updateDownloadMode();
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void submitDownload(form);
+  });
+}
+
+function updateDownloadMode(): void {
+  const countryMode =
+    document.querySelector<HTMLSelectElement>("#download-mode")!.value ===
+    "country";
+  const icaoFields = document.querySelector<HTMLElement>("#icao-fields")!;
+  const countryFields =
+    document.querySelector<HTMLElement>("#country-fields")!;
+  const icao = document.querySelector<HTMLInputElement>("#download-icao")!;
+  const country =
+    document.querySelector<HTMLInputElement>("#download-country")!;
+  icaoFields.hidden = countryMode;
+  countryFields.hidden = !countryMode;
+  icao.required = !countryMode;
+  country.required = countryMode;
+}
+
+async function submitDownload(form: HTMLFormElement): Promise<void> {
+  const button =
+    document.querySelector<HTMLButtonElement>("#start-download")!;
+  const feedback = document.querySelector<HTMLElement>("#download-feedback")!;
+  const mode =
+    document.querySelector<HTMLSelectElement>("#download-mode")!.value;
+  const icao = document
+    .querySelector<HTMLInputElement>("#download-icao")!
+    .value.trim()
+    .toUpperCase();
+  const countryCode = document
+    .querySelector<HTMLInputElement>("#download-country")!
+    .value.trim()
+    .toUpperCase();
+  const regionCode = document
+    .querySelector<HTMLInputElement>("#download-region")!
+    .value.trim()
+    .toUpperCase();
+  const maximum = Number(
+    document.querySelector<HTMLInputElement>("#download-maximum")!.value
+  );
+
+  if (!form.reportValidity()) {
+    return;
+  }
+  if (mode === "country" &&
+      regionCode &&
+      !regionCode.startsWith(`${countryCode}-`)) {
+    feedback.textContent =
+      `Region must start with ${countryCode}-, for example ${countryCode}-ON.`;
+    feedback.className = "feedback error";
+    return;
+  }
+
+  button.disabled = true;
+  feedback.textContent =
+    mode === "icao"
+      ? `Queuing ${icao}…`
+      : `Queuing ${regionCode || countryCode}…`;
+  feedback.className = "feedback";
+  try {
+    await requestJson<DownloadJob>("/api/v1/downloads", {
+      method: "POST",
+      body: JSON.stringify({
+        mode,
+        icao: mode === "icao" ? icao : null,
+        countryCode: mode === "country" ? countryCode : null,
+        regionCode: mode === "country" && regionCode ? regionCode : null,
+        maximumCount: mode === "country" ? maximum : null
+      })
+    });
+    feedback.textContent = "Download started. Progress appears below.";
+    feedback.className = "feedback success";
+    await refreshAssetManager();
+  } catch (error) {
+    feedback.textContent =
+      error instanceof Error ? error.message : String(error);
+    feedback.className = "feedback error";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function refreshAssetManager(): Promise<void> {
+  try {
+    const [storage, jobs] = await Promise.all([
+      getJson<StorageSummary>("/api/v1/storage"),
+      getJson<DownloadJob[]>("/api/v1/downloads")
+    ]);
+    renderStorage(storage);
+    renderDownloadJobs(jobs);
+  } catch (error) {
+    const feedback =
+      document.querySelector<HTMLElement>("#download-feedback");
+    if (feedback) {
+      feedback.textContent =
+        `Could not refresh assets: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+      feedback.className = "feedback error";
+    }
+  }
+}
+
+function renderStorage(storage: StorageSummary): void {
+  document.querySelector("#storage-used")!.textContent =
+    formatBytes(storage.totalBytes);
+  document.querySelector("#storage-free")!.textContent =
+    formatBytes(storage.freeBytes);
+  document.querySelector("#storage-count")!.textContent =
+    String(storage.airportCount);
+
+  const list = document.querySelector<HTMLElement>("#asset-list")!;
+  list.replaceChildren();
+  if (storage.assets.length === 0) {
+    list.append(createEmptyState("No offline maps installed."));
+    return;
+  }
+  for (const asset of storage.assets) {
+    list.append(createAssetRow(asset));
+  }
+}
+
+function createAssetRow(asset: StoredMapAsset): HTMLElement {
+  const row = document.createElement("article");
+  row.className = "asset-row";
+  const details = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = asset.icao;
+  const name = document.createElement("span");
+  name.textContent = asset.name;
+  const metadata = document.createElement("small");
+  metadata.textContent =
+    `${asset.countryCode}${asset.regionCode ? ` · ${asset.regionCode}` : ""}` +
+    ` · ${formatBytes(asset.sizeBytes)} · ${asset.sourceMix}`;
+  details.append(title, name, metadata);
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "danger-button";
+  remove.textContent = "Delete";
+  remove.addEventListener("click", async () => {
+    if (!window.confirm(`Delete the offline ${asset.icao} map?`)) {
+      return;
+    }
+    remove.disabled = true;
+    try {
+      await requestJson<void>(
+        `/api/v1/assets/${encodeURIComponent(asset.icao)}`,
+        { method: "DELETE" }
+      );
+      await refreshAssetManager();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error));
+      remove.disabled = false;
+    }
+  });
+  row.append(details, remove);
+  return row;
+}
+
+function renderDownloadJobs(jobs: DownloadJob[]): void {
+  const list = document.querySelector<HTMLElement>("#download-jobs")!;
+  list.replaceChildren();
+  if (jobs.length === 0) {
+    list.append(createEmptyState("No downloads in this session."));
+    return;
+  }
+
+  for (const job of jobs) {
+    const row = document.createElement("article");
+    row.className = `job-row job-${job.state}`;
+    const heading = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent =
+      job.currentIcao || `${job.airportsCompleted}/${job.airportsTotal} airports`;
+    const state = document.createElement("span");
+    state.className = "job-state";
+    state.textContent = job.state;
+    heading.append(title, state);
+
+    const progress = document.createElement("progress");
+    progress.max = 100;
+    progress.value = Math.max(0, Math.min(100, job.percentage));
+    const detail = document.createElement("small");
+    detail.textContent = job.error ||
+      `${job.phase} · ${Math.round(job.percentage)}%` +
+      (job.currentSource ? ` · ${job.currentSource}` : "");
+    row.append(heading, progress, detail);
+
+    if (job.state === "queued" || job.state === "running") {
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "text-button";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", async () => {
+        cancel.disabled = true;
+        await requestJson<DownloadJob>(
+          `/api/v1/downloads/${encodeURIComponent(job.jobId)}/cancel`,
+          { method: "POST" }
+        );
+        await refreshAssetManager();
+      });
+      row.append(cancel);
+    }
+    list.append(row);
+  }
+}
+
+function createEmptyState(message: string): HTMLParagraphElement {
+  const empty = document.createElement("p");
+  empty.className = "empty-state";
+  empty.textContent = message;
+  return empty;
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const exponent = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1
+  );
+  const value = bytes / 1024 ** exponent;
+  return `${value.toFixed(value >= 10 || exponent === 0 ? 0 : 1)} ${
+    units[exponent]
+  }`;
 }
 
 function createMap(airport: AirportMap): MapLibreMap {
@@ -872,6 +1164,37 @@ async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { headers: { Accept: "application/json" } });
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
+  }
+  return (await response.json()) as T;
+}
+
+async function requestJson<T>(
+  url: string,
+  init: RequestInit
+): Promise<T> {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...init.headers
+    }
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    let message = detail;
+    try {
+      const problem = JSON.parse(detail) as { error?: string };
+      message = problem.error || detail;
+    } catch {
+      // Plain-text errors are already suitable for display.
+    }
+    throw new Error(
+      message || `${response.status} ${response.statusText}`
+    );
+  }
+  if (response.status === 204) {
+    return undefined as T;
   }
   return (await response.json()) as T;
 }

@@ -33,7 +33,8 @@ internal static class OpenApiDocument
             {
                 delete = Operation("Delete an installed map asset")
             },
-            ["/api/v1/storage"] = Get("Storage summary")
+            ["/api/v1/storage"] = Get(
+                "Storage summary and installed airport-map assets")
         }
     };
 
@@ -48,4 +49,3 @@ internal static class OpenApiDocument
         }
     };
 }
-

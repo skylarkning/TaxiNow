@@ -105,24 +105,63 @@ public sealed class MapAssetStore(TaxiNowDatabase database, StoragePaths paths)
         CancellationToken cancellationToken = default)
     {
         var countries = new List<StorageGroupSummary>();
+        var assets = new List<StoredMapAsset>();
         await using var connection = new SqliteConnection(database.ConnectionString);
         await connection.OpenAsync(cancellationToken);
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            """
-            SELECT a.country_code, COUNT(*), COALESCE(SUM(m.size_bytes), 0)
-            FROM map_assets m
-            JOIN airports a ON a.icao = m.icao
-            GROUP BY a.country_code
-            ORDER BY a.country_code;
-            """;
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
+        await using (var command = connection.CreateCommand())
         {
-            countries.Add(new StorageGroupSummary(
-                reader.GetString(0),
-                reader.GetInt32(1),
-                reader.GetInt64(2)));
+            command.CommandText =
+                """
+                SELECT a.country_code, COUNT(*), COALESCE(SUM(m.size_bytes), 0)
+                FROM map_assets m
+                JOIN airports a ON a.icao = m.icao
+                GROUP BY a.country_code
+                ORDER BY a.country_code;
+                """;
+            await using var reader =
+                await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                countries.Add(new StorageGroupSummary(
+                    reader.GetString(0),
+                    reader.GetInt32(1),
+                    reader.GetInt64(2)));
+            }
+        }
+
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                """
+                SELECT
+                    a.icao, a.name, a.country_code, a.region_code, a.municipality,
+                    m.relative_path, m.size_bytes, m.generated_at, m.imported_at,
+                    m.source_mix, m.warning
+                FROM map_assets m
+                JOIN airports a ON a.icao = m.icao
+                ORDER BY a.icao;
+                """;
+            await using var reader =
+                await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                assets.Add(new StoredMapAsset(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetString(3),
+                    reader.IsDBNull(4) ? null : reader.GetString(4),
+                    reader.GetString(5),
+                    reader.GetInt64(6),
+                    DateTimeOffset.Parse(
+                        reader.GetString(7),
+                        CultureInfo.InvariantCulture),
+                    DateTimeOffset.Parse(
+                        reader.GetString(8),
+                        CultureInfo.InvariantCulture),
+                    reader.GetString(9),
+                    reader.IsDBNull(10) ? null : reader.GetString(10)));
+            }
         }
 
         var drive = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(paths.Root))!);
@@ -130,7 +169,8 @@ public sealed class MapAssetStore(TaxiNowDatabase database, StoragePaths paths)
             countries.Sum(static group => group.SizeBytes),
             drive.AvailableFreeSpace,
             countries.Sum(static group => group.AirportCount),
-            countries);
+            countries,
+            assets);
     }
 
     private async Task<string?> GetAssetPathAsync(
