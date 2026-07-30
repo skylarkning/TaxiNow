@@ -44,7 +44,7 @@ AIRPORT_QUERY_MARGIN_METRES = 1200
 AIRPORT_FEATURE_DISTANCE_METRES = 1200
 NON_OSM_CACHE_MAX_AGE_DAYS = 1 / 48
 UNAVAILABLE_CACHE_REVISION = 3
-OSM_SOURCE_REVISION = 6
+OSM_SOURCE_REVISION = 7
 XPLANE_SOURCE_REVISION = 4
 XPLANE_GATEWAY_AIRPORT_URL = "https://gateway.x-plane.com/apiv1/airport/{ident}"
 XPLANE_GATEWAY_SCENERY_URL = "https://gateway.x-plane.com/apiv1/scenery/{scenery_id}"
@@ -93,6 +93,7 @@ _ENDPOINT_IN_FLIGHT = set()
 _ENDPOINT_FAILURE_COUNT = {}
 _ENDPOINT_LATENCY = {}
 _XPLANE_RETRY_AFTER = 0
+_OVERPASS_REQUEST_LOCK = threading.Lock()
 
 
 def report_progress(callback, phase, percentage, source, **metrics):
@@ -243,7 +244,19 @@ def overpass_query(latitude, longitude, radius=5500, bounds=None):
 (
   nwr["aeroway"]({bbox});
   nwr["building"~"^(terminal|hangar)$"]({bbox});
-  nwr["building"]["name"~"concourse|satellite",i]({bbox});
+  nwr["building"]["name"~"terminal|concourse|satellite",i]({bbox});
+);
+out tags geom;""".format(bbox=bbox)
+
+
+def overpass_terminal_query(bounds):
+    south, west, north, east = bounds
+    bbox = "{:.7f},{:.7f},{:.7f},{:.7f}".format(south, west, north, east)
+    return """[out:json][timeout:20];
+(
+  nwr["aeroway"="terminal"]({bbox});
+  nwr["building"="terminal"]({bbox});
+  nwr["building"]["name"~"terminal|concourse|satellite",i]({bbox});
 );
 out tags geom;""".format(bbox=bbox)
 
@@ -272,6 +285,27 @@ def short_network_error(error):
 
 
 def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT, progress=None):
+    """Serialize public Overpass work across airport download workers.
+
+    Public instances apply per-user slots and cooldowns. Sending several
+    expensive airport queries at once normally reduces aggregate throughput,
+    even when the requests are spread across public endpoints.
+    """
+    with _OVERPASS_REQUEST_LOCK:
+        return _request_overpass_unlocked(
+            query,
+            endpoints,
+            timeout=timeout,
+            progress=progress,
+        )
+
+
+def _request_overpass_unlocked(
+    query,
+    endpoints,
+    timeout=OVERPASS_REQUEST_TIMEOUT,
+    progress=None,
+):
     body = urllib.parse.urlencode({"data": query}).encode("utf-8")
     errors = []
     attempted = set()
@@ -592,6 +626,16 @@ def airport_query_bounds(
         max(fixed_west, west),
         min(fixed_north, north),
         min(fixed_east, east),
+    )
+
+
+def fetch_overpass_terminals(bounds, endpoint=None, progress=None):
+    endpoints = (endpoint,) if endpoint else OVERPASS_ENDPOINTS
+    return request_overpass(
+        overpass_terminal_query(bounds),
+        endpoints,
+        timeout=min(OVERPASS_REQUEST_TIMEOUT, 25),
+        progress=progress,
     )
 
 
@@ -1099,7 +1143,17 @@ def feature_kind(tags):
     if building in ("terminal", "hangar"):
         return building
     name = str(tags.get("name") or "")
-    if building and re.search(r"(?:concourse|satellite)", name, re.IGNORECASE):
+    excluded_building = re.search(
+        r"(?:parking|garage|hotel|station|rental|office)",
+        name,
+        re.IGNORECASE,
+    )
+    if (building and not excluded_building
+            and re.search(
+                r"(?:terminal|concourse|satellite)",
+                name,
+                re.IGNORECASE,
+            )):
         return "terminal"
     return None
 
@@ -1277,10 +1331,10 @@ def needs_terminal_supplement(result, maximum_gate_distance=180):
         return True
 
     latitude = float(result["center"][1])
-    covered = 0
+    anchor_coverage = []
     for anchor in anchors:
         point = anchor["points"][0]
-        if any(
+        anchor_coverage.append(any(
             point_inside_polygon(point, terminal["points"])
             or min(
                 point_segment_distance(point, start, end, latitude)
@@ -1291,9 +1345,88 @@ def needs_terminal_supplement(result, maximum_gate_distance=180):
             )
             <= maximum_gate_distance
             for terminal in terminals
+        ))
+    if sum(anchor_coverage) / len(anchors) < 0.72:
+        return True
+
+    # A large, well-covered terminal can otherwise hide a completely missing
+    # smaller terminal. Detect local gate groups independently.
+    unassigned = set(range(len(anchors)))
+    while unassigned:
+        cluster = {unassigned.pop()}
+        pending = list(cluster)
+        while pending:
+            current = pending.pop()
+            current_point = anchors[current]["points"][0]
+            neighbours = {
+                index for index in unassigned
+                if math.hypot(
+                    local_xy(anchors[index]["points"][0], latitude)[0]
+                    - local_xy(current_point, latitude)[0],
+                    local_xy(anchors[index]["points"][0], latitude)[1]
+                    - local_xy(current_point, latitude)[1],
+                )
+                <= 300
+            }
+            unassigned.difference_update(neighbours)
+            cluster.update(neighbours)
+            pending.extend(neighbours)
+        if (
+            len(cluster) >= 4
+            and sum(anchor_coverage[index] for index in cluster) / len(cluster)
+            < 0.60
         ):
-            covered += 1
-    return covered / len(anchors) < 0.72
+            return True
+    return False
+
+
+def uncovered_terminal_label_points(result, maximum_distance=180):
+    """Return named terminal points that have no terminal footprint nearby."""
+    features = list((result or {}).get("features") or [])
+    polygons = [
+        feature for feature in features
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) >= 3
+    ]
+    labels = [
+        feature for feature in features
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) == 1
+        and (feature.get("label") or feature.get("name") or feature.get("ref"))
+    ]
+    latitude = float((result or {}).get("center", [0, 0])[1])
+    uncovered = []
+    for label in labels:
+        point = label["points"][0]
+        if not any(
+            point_inside_polygon(point, polygon["points"])
+            or min(
+                point_segment_distance(point, start, end, latitude)
+                for start, end in zip(
+                    polygon["points"],
+                    polygon["points"][1:],
+                )
+            )
+            <= maximum_distance
+            for polygon in polygons
+        ):
+            uncovered.append(label)
+    return uncovered
+
+
+def merge_osm_elements(primary, supplements):
+    merged = list(primary or [])
+    seen = {
+        (element.get("type"), str(element.get("id")))
+        for element in merged
+    }
+    for element in supplements or []:
+        identity = (element.get("type"), str(element.get("id")))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        merged.append(element)
+    return merged
 
 
 def raw_point_inside_polygon(point, geometry):
@@ -1558,6 +1691,42 @@ def build_airport_map(
                 result["osmRevision"] = OSM_SOURCE_REVISION
             except AirportMapError:
                 result = None
+    if result is not None and uncovered_terminal_label_points(result):
+        # Broad airport queries can be expensive on a busy Overpass instance.
+        # If named terminal anchors survived but their building polygons did
+        # not, retry only terminal geometry before falling back to X-Plane.
+        try:
+            report_progress(
+                progress,
+                "waiting_for_map_source",
+                81,
+                "OpenStreetMap terminal detail",
+            )
+            terminal_raw = fetch_overpass_terminals(
+                query_bounds,
+                progress=None,
+            )
+            terminal_elements = list(terminal_raw.get("elements", []))
+            if terminal_elements:
+                osm_elements = merge_osm_elements(
+                    osm_elements,
+                    terminal_elements,
+                )
+                source = (
+                    "OpenStreetMap contributors + OurAirports"
+                    if runway_raw.get("elements")
+                    else "OpenStreetMap contributors"
+                )
+                result = normalize(
+                    {"elements": osm_elements},
+                    airport,
+                    source=source,
+                )
+                result["osmRevision"] = OSM_SOURCE_REVISION
+        except (OverpassUnavailableError, AirportMapError):
+            # The original map is still usable; the Gateway supplement below
+            # remains available if the focused OSM request also fails.
+            pass
     if result is not None and needs_terminal_supplement(result):
         try:
             report_progress(

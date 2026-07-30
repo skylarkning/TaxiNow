@@ -67,7 +67,7 @@ public sealed class ServerContractTests
         Assert.Equal("country", request.Mode);
         Assert.Equal("CA", request.CountryCode);
         Assert.Equal("CA-ON", request.RegionCode);
-        Assert.Equal(4, request.MaxParallel);
+        Assert.Equal(1, request.MaxParallel);
     }
 
     [Theory]

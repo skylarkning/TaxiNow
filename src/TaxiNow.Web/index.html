@@ -240,10 +240,11 @@
                   Already installed airports are skipped automatically.
                 </p>
                 <p>
-                  Typical range with 4 parallel downloads: US 8–40 hours;
+                  Typical planning range using public OSM: US 8–40 hours;
                   CA/AU 1–8 hours; DE/FR 30 minutes–3 hours; CN/GB
                   20 minutes–2 hours; JP 15–75 minutes. Actual time varies
                   with OSM load, airport complexity, and network conditions.
+                  One parallel task is normally fastest for OSM.
                 </p>
               </div>
               <div lang="zh-Hans">
@@ -253,9 +254,10 @@
                   已经安装的机场会自动跳过。
                 </p>
                 <p>
-                  4 个平行下载时的常见区间：美国 8–40 小时；加拿大/澳大利亚
+                  使用公共 OSM 时的常见规划区间：美国 8–40 小时；加拿大/澳大利亚
                   1–8 小时；德国/法国 30 分钟–3 小时；中国/英国 20 分钟–2 小时；
-                  日本 15–75 分钟。实际时间会随 OSM 负载、机场复杂度及网络环境变化。
+                  日本 15–75 分钟。实际时间会随 OSM 负载、机场复杂度及网络环境变化；
+                  对 OSM 而言通常选择 1 个并行任务反而最快。
                 </p>
               </div>
             </div>
@@ -318,26 +320,29 @@
                         class="info-tooltip"
                         role="tooltip">
                     <span lang="en">
-                      Downloads several airports at the same time. Higher
-                      values may finish large regions faster, but use more
-                      bandwidth, CPU, and memory and may trigger source rate
-                      limits. Four is recommended; reduce it if downloads are
-                      being throttled.
+                      Public OSM servers use per-user request slots and
+                      cooldowns, so several simultaneous OSM queries are often
+                      slower than one. TaxiNow now serializes OSM requests to
+                      avoid self-throttling. Higher values can still overlap
+                      cached work, conversion, and fallback sources, but use
+                      more CPU and memory. Use 1 unless you have a specific
+                      reason to increase it.
                     </span>
                     <span lang="zh-Hans">
-                      同时下载多个机场。较高数值可能加快大型地区下载，但会占用更多
-                      带宽、CPU 和内存，也可能触发数据源限流。推荐使用 4；
-                      如果遇到限流或超时请降低该数值。
+                      公共 OSM 服务器按用户分配请求槽位并设置冷却时间，因此多个 OSM
+                      请求同时运行往往比单个请求更慢。TaxiNow 现在会串行发送 OSM
+                      请求以避免自我限流。较高数值仍可并行处理缓存、数据转换和后备来源，
+                      但会占用更多 CPU 和内存；如无特殊需要，请选择 1。
                     </span>
                   </span>
                 </span>
               </span>
               <select id="download-parallel" name="maxParallel">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="4"
+                <option value="1"
                         data-i18n="download.parallelRecommended"
-                        selected>4 (recommended)</option>
+                        selected>1 (recommended)</option>
+                <option value="2">2</option>
+                <option value="4">4</option>
                 <option value="8">8</option>
                 <option value="16">16</option>
               </select>

@@ -72,10 +72,10 @@ their surrounding white canvas and create the required output sizes.
   optional province/state downloads, with byte-level progress, transfer speed,
   estimated time remaining, installed-map sizes, free disk space, queue
   clearing, and deletion. Country/region downloads can run 1, 2, 4, 8, or 16
-  airport acquisitions in parallel, with four as the balanced default and
-  source-aware throttling to avoid sending simultaneous requests to the same
-  Overpass endpoint. Inline guidance explains both country codes and the
-  bandwidth, resource, and source-rate-limit tradeoffs of higher concurrency.
+  airport acquisition workers. One is the default because public Overpass
+  instances apply per-user slots and cooldowns; all public OSM requests are
+  serialized across workers to prevent self-throttling. Higher worker counts
+  can still overlap cache work, normalization, and fallback sources.
   Source-side waits that expose no measurable byte progress use an animated
   active state and elapsed timer instead of a misleading `0%` and guessed ETA;
   percentages, speed, and ETA appear once progress becomes measurable. Beta 4
@@ -84,7 +84,10 @@ their surrounding white canvas and create the required output sizes.
 - OpenStreetMap remains the preferred detailed source. Runway-derived query
   bounds reduce unnecessary urban geometry, adaptive endpoint health avoids
   repeatedly selecting a slow service, and bundled/mirrored OurAirports
-  catalogs keep catalog connection resets from aborting downloads.
+  catalogs keep catalog connection resets from aborting downloads. Named
+  terminal anchors without a nearby footprint trigger a small OSM
+  terminal-only repair query, while per-gate-cluster coverage detects a
+  missing secondary terminal that a large main terminal would otherwise hide.
 - English and Simplified Chinese are selectable from the header. Download
   guidance, statuses, controls, dialogs, and the downloaded-asset hierarchy
   are localized.
@@ -119,6 +122,8 @@ their surrounding white canvas and create the required output sizes.
 
 Live simulator compatibility is tracked in
 [`docs/WINDOWS_ENVIRONMENT.md`](docs/WINDOWS_ENVIRONMENT.md).
+The map-source quality and regional-pack direction is documented in
+[`docs/architecture/ADR-0005-airport-map-source-strategy.md`](docs/architecture/ADR-0005-airport-map-source-strategy.md).
 
 ## Build
 

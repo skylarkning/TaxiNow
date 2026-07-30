@@ -9,7 +9,7 @@ public sealed record DownloadRequest(
     string? Icao,
     string? CountryCode,
     string? RegionCode = null,
-    int MaxParallel = 4);
+    int MaxParallel = 1);
 
 public sealed record DownloadJob(
     Guid JobId,

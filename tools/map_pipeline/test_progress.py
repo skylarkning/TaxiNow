@@ -322,8 +322,51 @@ class OpenStreetMapPriorityTests(unittest.TestCase):
         )
 
         self.assertIn(
-            'nwr["building"]["name"~"concourse|satellite",i]',
+            'nwr["building"]["name"~"terminal|concourse|satellite",i]',
             query,
+        )
+
+    def test_named_terminal_buildings_exclude_parking_garages(self):
+        self.assertEqual(
+            "terminal",
+            skycharts.feature_kind({
+                "building": "yes",
+                "name": "Terminal 1",
+            }),
+        )
+        self.assertIsNone(skycharts.feature_kind({
+            "building": "yes",
+            "name": "Terminal 1 Parking Garage",
+        }))
+
+    def test_uncovered_terminal_label_requests_focused_osm_detail(self):
+        result = {
+            "center": [-77.04, 38.85],
+            "features": [
+                {
+                    "kind": "terminal",
+                    "name": "Terminal 2",
+                    "points": [
+                        [-77.044, 38.853],
+                        [-77.041, 38.853],
+                        [-77.041, 38.858],
+                        [-77.044, 38.858],
+                        [-77.044, 38.853],
+                    ],
+                },
+                {
+                    "kind": "terminal",
+                    "name": "Terminal 1",
+                    "points": [[-77.042, 38.848]],
+                },
+            ],
+        }
+
+        uncovered = skycharts.uncovered_terminal_label_points(result)
+
+        self.assertEqual(
+            ["Terminal 1"],
+            [feature["name"] for feature in uncovered],
         )
 
     def test_missing_gate_coverage_requests_terminal_supplement(self):
@@ -346,6 +389,68 @@ class OpenStreetMapPriorityTests(unittest.TestCase):
         } for index in range(10))
 
         self.assertTrue(skycharts.needs_terminal_supplement(result))
+
+    def test_missing_small_gate_cluster_requests_terminal_supplement(self):
+        result = {
+            "center": [-73.87, 40.77],
+            "features": [{
+                "kind": "terminal",
+                "points": [
+                    [-73.872, 40.769],
+                    [-73.868, 40.769],
+                    [-73.868, 40.772],
+                    [-73.872, 40.772],
+                    [-73.872, 40.769],
+                ],
+            }],
+        }
+        result["features"].extend({
+            "kind": "gate",
+            "points": [[
+                -73.8705 + (index % 4) * 0.0002,
+                40.7700 + (index // 4) * 0.0002,
+            ]],
+        } for index in range(12))
+        result["features"].extend({
+            "kind": "gate",
+            "points": [[-73.8500 + index * 0.0002, 40.7700]],
+        } for index in range(4))
+
+        self.assertTrue(skycharts.needs_terminal_supplement(result))
+
+    def test_public_overpass_queries_are_serialized(self):
+        active = 0
+        maximum_active = 0
+        state_lock = threading.Lock()
+
+        def fake_request(*_args, **_kwargs):
+            nonlocal active, maximum_active
+            with state_lock:
+                active += 1
+                maximum_active = max(maximum_active, active)
+            time.sleep(0.03)
+            with state_lock:
+                active -= 1
+            return {"elements": []}
+
+        with mock.patch.object(
+            skycharts,
+            "_request_overpass_unlocked",
+            side_effect=fake_request,
+        ):
+            workers = [
+                threading.Thread(
+                    target=skycharts.request_overpass,
+                    args=("query", ("https://overpass.test",)),
+                )
+                for _ in range(3)
+            ]
+            for worker in workers:
+                worker.start()
+            for worker in workers:
+                worker.join()
+
+        self.assertEqual(1, maximum_active)
 
     def test_gateway_terminal_supplement_skips_osm_overlap(self):
         def terminal(element_id, west):

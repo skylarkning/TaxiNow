@@ -1140,7 +1140,7 @@ def handle(request: dict[str, Any]) -> None:
                 f"{'' if skipped == 1 else 's'}."
             )
     outputs: list[str] = []
-    requested_parallel = int(request.get("maxParallel") or 4)
+    requested_parallel = int(request.get("maxParallel") or 1)
     if requested_parallel not in ALLOWED_PARALLEL_DOWNLOADS:
         raise PipelineError(
             "maxParallel must be 1, 2, 4, 8, or 16."
