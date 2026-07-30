@@ -9,6 +9,14 @@ type DownloadProgressState = Pick<
   | "percentage"
 >;
 
+type DownloadEtaState = Pick<
+  DownloadJob,
+  | "state"
+  | "airportsCompleted"
+  | "airportsTotal"
+  | "estimatedRemaining"
+>;
+
 export function isIndeterminateDownload(
   job: DownloadProgressState
 ): boolean {
@@ -34,4 +42,20 @@ export function formatDownloadPercentage(percentage: number): string {
     return `${value.toFixed(1)}%`;
   }
   return `${Math.round(value)}%`;
+}
+
+export function shouldShowDownloadEta(job: DownloadEtaState): boolean {
+  if (job.state !== "running" || !job.estimatedRemaining) {
+    return false;
+  }
+  if (job.airportsTotal <= 1) {
+    return true;
+  }
+
+  // The first completed airport in a large country is not a representative
+  // throughput sample. Wait for up to four completions before showing an ETA
+  // so one unusually slow OSM response cannot be multiplied across the whole
+  // queue.
+  const requiredSamples = Math.min(4, job.airportsTotal);
+  return job.airportsCompleted >= requiredSamples;
 }

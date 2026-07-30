@@ -184,9 +184,67 @@ header > div {
   align-items: center;
 }
 
-#language-selector {
-  min-width: 48px;
-  font-weight: 750;
+.language-picker {
+  position: relative;
+}
+
+.language-selector {
+  display: grid;
+  width: 38px;
+  min-width: 38px;
+  height: 34px;
+  padding: 7px;
+  place-items: center;
+}
+
+.language-selector svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.language-menu {
+  position: absolute;
+  z-index: 24;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 152px;
+  padding: 6px;
+  border: 1px solid rgba(147, 181, 198, 0.34);
+  border-radius: 10px;
+  background: rgba(8, 22, 34, 0.99);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.48);
+}
+
+.language-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 9px;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+
+.language-menu button:hover,
+.language-menu button[aria-checked="true"] {
+  border-color: rgba(76, 240, 209, 0.28);
+  background: rgba(33, 79, 82, 0.56);
+}
+
+.language-check {
+  color: #4cf0d1;
+  font-weight: 900;
+  opacity: 0;
+}
+
+.language-menu button[aria-checked="true"] .language-check {
+  opacity: 1;
 }
 
 .server-url {
@@ -701,9 +759,7 @@ footer {
 }
 
 .about-chinese {
-  margin-top: 17px;
-  padding-top: 15px;
-  border-top: 1px solid rgba(147, 181, 198, 0.2);
+  margin-top: 0;
 }
 
 .about-chinese p {
@@ -752,6 +808,26 @@ footer {
   border: 1px solid rgba(147, 181, 198, 0.2);
   border-radius: 12px;
   background: rgba(18, 38, 53, 0.72);
+}
+
+.country-download-notice {
+  padding: 10px 11px;
+  border: 1px solid rgba(255, 199, 92, 0.34);
+  border-radius: 8px;
+  color: #d9c79f;
+  background: rgba(94, 65, 20, 0.22);
+}
+
+.country-download-notice strong {
+  color: #ffd38a;
+  font-size: 11px;
+}
+
+.country-download-notice p {
+  margin: 6px 0 0;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .manager-section {
@@ -832,6 +908,10 @@ footer {
   bottom: auto;
   left: -94px;
   width: min(360px, calc(100vw - 48px));
+  max-height: min(410px, calc(100vh - 150px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .download-speed-info .info-tooltip span,
@@ -1254,12 +1334,8 @@ footer {
   pointer-events: none;
 }
 
-html[data-locale] .welcome-languages {
-  grid-template-columns: 1fr;
-}
-
-html[data-locale] .welcome-languages section {
-  border: 0;
+html[data-locale] .welcome-languages section[lang] {
+  display: block !important;
 }
 
 @media (max-width: 640px) {

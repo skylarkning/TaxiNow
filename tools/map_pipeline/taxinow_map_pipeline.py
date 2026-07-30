@@ -124,7 +124,12 @@ class Protocol:
                 completed + max(0.0, min(stage_percentage, 100.0)) / 100.0
             ) * 100.0 / total
         remaining = estimated_remaining_seconds
-        if remaining is None and completed > 0 and completed < total:
+        eta_sample_minimum = min(4, total)
+        if (
+            remaining is None
+            and completed >= eta_sample_minimum
+            and completed < total
+        ):
             remaining = elapsed / completed * (total - completed)
         self.emit(
             "progress",
@@ -973,19 +978,14 @@ def download_airports_parallel(
                 if state.get("download_bytes_total") is not None
             ]
             elapsed = max(time.monotonic() - batch_started, 0.001)
-            if completed > 0 and completed < total:
+            eta_sample_minimum = min(4, total)
+            if (
+                completed >= eta_sample_minimum
+                and completed < total
+            ):
                 eta = elapsed / completed * (total - completed)
             else:
-                active_etas = [
-                    float(state["estimated_remaining_seconds"])
-                    for _, state in active
-                    if state.get("estimated_remaining_seconds") is not None
-                ]
-                eta = (
-                    max(active_etas) * math.ceil(total / worker_count)
-                    if active_etas
-                    else None
-                )
+                eta = None
             phases = {str(state["phase"]) for _, state in active}
             phase = (
                 "waiting_sources"

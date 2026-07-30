@@ -34,7 +34,8 @@ import {
 import { buildRunwayDecorations } from "./runwayGeometry";
 import {
   formatDownloadPercentage,
-  isIndeterminateDownload
+  isIndeterminateDownload,
+  shouldShowDownloadEta
 } from "./downloadPresentation";
 import {
   calculateFeatureBounds,
@@ -1014,9 +1015,9 @@ function renderDownloadJobs(jobs: DownloadJob[]): void {
       }
       if (!indeterminate) {
         metricParts.push(
-          job.estimatedRemaining
+          shouldShowDownloadEta(job)
             ? t("job.remaining", {
-              elapsed: formatTimeSpan(job.estimatedRemaining)
+              elapsed: formatTimeSpan(job.estimatedRemaining!)
             })
             : t("job.estimating")
         );

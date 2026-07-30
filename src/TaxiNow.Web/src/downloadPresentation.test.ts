@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   formatDownloadPercentage,
-  isIndeterminateDownload
+  isIndeterminateDownload,
+  shouldShowDownloadEta
 } from "./downloadPresentation";
 
 describe("download progress presentation", () => {
@@ -34,5 +35,23 @@ describe("download progress presentation", () => {
       bytesDownloaded: 4096,
       percentage: 12
     })).toBe(false);
+  });
+
+  it("does not show a country ETA from a single airport sample", () => {
+    expect(shouldShowDownloadEta({
+      state: "running",
+      airportsCompleted: 1,
+      airportsTotal: 500,
+      estimatedRemaining: "07:49:00"
+    })).toBe(false);
+  });
+
+  it("shows a country ETA after a stable warm-up sample", () => {
+    expect(shouldShowDownloadEta({
+      state: "running",
+      airportsCompleted: 4,
+      airportsTotal: 500,
+      estimatedRemaining: "01:12:00"
+    })).toBe(true);
   });
 });

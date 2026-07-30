@@ -20,6 +20,33 @@ class CapturingProtocol(pipeline.Protocol):
 
 
 class DownloadProgressTests(unittest.TestCase):
+    def test_country_eta_waits_for_multiple_completed_airports(self):
+        protocol = CapturingProtocol()
+
+        protocol.progress(
+            "waiting_sources",
+            completed=1,
+            total=500,
+            current_icao="CNC3",
+            source="OpenStreetMap",
+            overall_percentage=0.2,
+        )
+        protocol.progress(
+            "waiting_sources",
+            completed=4,
+            total=500,
+            current_icao="CYAG",
+            source="OpenStreetMap",
+            overall_percentage=0.8,
+        )
+
+        self.assertIsNone(
+            protocol.events[0]["estimatedRemainingSeconds"]
+        )
+        self.assertIsNotNone(
+            protocol.events[1]["estimatedRemainingSeconds"]
+        )
+
     def test_worker_reports_stage_bytes_speed_and_eta(self):
         airport = pipeline.Airport(
             "CYYZ",
@@ -286,6 +313,67 @@ class OpenStreetMapPriorityTests(unittest.TestCase):
         self.assertLess(compact_area, fixed_area)
         self.assertLessEqual(compact[0], 40.766)
         self.assertGreaterEqual(compact[2], 40.789)
+
+    def test_overpass_query_keeps_named_terminal_buildings(self):
+        query = skycharts.overpass_query(
+            40.7772,
+            -73.8726,
+            bounds=(40.76, -73.89, 40.79, -73.85),
+        )
+
+        self.assertIn(
+            'nwr["building"]["name"~"concourse|satellite",i]',
+            query,
+        )
+
+    def test_missing_gate_coverage_requests_terminal_supplement(self):
+        result = {
+            "center": [-73.87, 40.77],
+            "features": [{
+                "kind": "terminal",
+                "points": [
+                    [-73.871, 40.770],
+                    [-73.870, 40.770],
+                    [-73.870, 40.771],
+                    [-73.871, 40.771],
+                    [-73.871, 40.770],
+                ],
+            }],
+        }
+        result["features"].extend({
+            "kind": "gate",
+            "points": [[-73.8705 + index * 0.001, 40.7705]],
+        } for index in range(10))
+
+        self.assertTrue(skycharts.needs_terminal_supplement(result))
+
+    def test_gateway_terminal_supplement_skips_osm_overlap(self):
+        def terminal(element_id, west):
+            return {
+                "type": "way",
+                "id": element_id,
+                "tags": {"building": "terminal"},
+                "geometry": [
+                    {"lon": west, "lat": 40.77},
+                    {"lon": west + 0.001, "lat": 40.77},
+                    {"lon": west + 0.001, "lat": 40.771},
+                    {"lon": west, "lat": 40.771},
+                    {"lon": west, "lat": 40.77},
+                ],
+            }
+
+        selected = skycharts.gateway_terminal_supplements(
+            [terminal("osm", -73.87)],
+            [
+                terminal("gateway-overlap", -73.87),
+                terminal("gateway-missing", -73.85),
+            ],
+        )
+
+        self.assertEqual(
+            ["gateway-missing"],
+            [element["id"] for element in selected],
+        )
 
     def test_isolated_nearby_airport_geometry_is_removed(self):
         airport = {"latitude": 38.8512, "longitude": -77.0402}

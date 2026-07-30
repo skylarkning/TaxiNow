@@ -30,7 +30,8 @@ const translations: Record<AppLocale, Record<string, string>> = {
     "status.refreshFailed": "Unable to refresh aircraft position.",
     "actions.assets": "Maps & storage",
     "actions.language": "中文",
-    "actions.languageAria": "Switch to Simplified Chinese",
+    "actions.languageAria": "Choose language",
+    "actions.languageMenu": "Language",
     "actions.about": "About",
     "panel.offlineMaps": "Offline maps",
     "panel.title": "Maps & storage",
@@ -164,7 +165,8 @@ const translations: Record<AppLocale, Record<string, string>> = {
     "status.refreshFailed": "无法刷新飞机位置。",
     "actions.assets": "地图与存储",
     "actions.language": "EN",
-    "actions.languageAria": "切换到英文",
+    "actions.languageAria": "选择语言",
+    "actions.languageMenu": "语言",
     "actions.about": "关于",
     "panel.offlineMaps": "离线地图",
     "panel.title": "地图与存储",
@@ -343,17 +345,57 @@ export function setupLanguageSelector(): void {
   const button = document.querySelector<HTMLButtonElement>(
     "#language-selector"
   );
-  if (!button) {
+  const menu = document.querySelector<HTMLElement>("#language-menu");
+  const picker = document.querySelector<HTMLElement>(".language-picker");
+  if (!button || !menu || !picker) {
     return;
   }
+
+  const options = Array.from(
+    menu.querySelectorAll<HTMLButtonElement>("[data-language-option]")
+  );
+  const setOpen = (open: boolean): void => {
+    menu.hidden = !open;
+    button.setAttribute("aria-expanded", String(open));
+  };
+  for (const option of options) {
+    const locale = option.dataset.languageOption as AppLocale;
+    option.setAttribute("aria-checked", String(locale === currentLocale));
+    option.addEventListener("click", () => {
+      setOpen(false);
+      if (locale === currentLocale) {
+        button.focus();
+        return;
+      }
+      try {
+        window.localStorage.setItem(STORAGE_KEY, locale);
+      } catch {
+        // Reload still applies the selected language for this page below.
+      }
+      currentLocale = locale;
+      window.location.reload();
+    });
+  }
+
   button.addEventListener("click", () => {
-    const next: AppLocale = currentLocale === "en" ? "zh-Hans" : "en";
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // Reload still applies the selected language for this page below.
+    const open = menu.hidden;
+    setOpen(open);
+    if (open) {
+      options.find(
+        (option) => option.dataset.languageOption === currentLocale
+      )?.focus();
     }
-    currentLocale = next;
-    window.location.reload();
+  });
+  document.addEventListener("click", (event) => {
+    if (!picker.contains(event.target as Node)) {
+      setOpen(false);
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || menu.hidden) {
+      return;
+    }
+    setOpen(false);
+    button.focus();
   });
 }

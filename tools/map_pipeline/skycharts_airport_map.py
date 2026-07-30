@@ -44,7 +44,7 @@ AIRPORT_QUERY_MARGIN_METRES = 1200
 AIRPORT_FEATURE_DISTANCE_METRES = 1200
 NON_OSM_CACHE_MAX_AGE_DAYS = 1 / 48
 UNAVAILABLE_CACHE_REVISION = 3
-OSM_SOURCE_REVISION = 4
+OSM_SOURCE_REVISION = 6
 XPLANE_SOURCE_REVISION = 4
 XPLANE_GATEWAY_AIRPORT_URL = "https://gateway.x-plane.com/apiv1/airport/{ident}"
 XPLANE_GATEWAY_SCENERY_URL = "https://gateway.x-plane.com/apiv1/scenery/{scenery_id}"
@@ -243,6 +243,7 @@ def overpass_query(latitude, longitude, radius=5500, bounds=None):
 (
   nwr["aeroway"]({bbox});
   nwr["building"~"^(terminal|hangar)$"]({bbox});
+  nwr["building"]["name"~"concourse|satellite",i]({bbox});
 );
 out tags geom;""".format(bbox=bbox)
 
@@ -1223,6 +1224,139 @@ def filter_isolated_airport_features(
     return selected
 
 
+def point_inside_polygon(point, polygon):
+    if len(polygon) < 3:
+        return False
+    longitude, latitude = point
+    inside = False
+    previous = polygon[-1]
+    for current in polygon:
+        current_lon, current_lat = current
+        previous_lon, previous_lat = previous
+        latitude_delta = previous_lat - current_lat
+        crosses = (
+            (current_lat > latitude) != (previous_lat > latitude)
+            and abs(latitude_delta) > 1e-20
+            and longitude
+            < (
+                (previous_lon - current_lon)
+                * (latitude - current_lat)
+                / latitude_delta
+                + current_lon
+            )
+        )
+        if crosses:
+            inside = not inside
+        previous = current
+    return inside
+
+
+def needs_terminal_supplement(result, maximum_gate_distance=180):
+    """Detect gate clusters that are not represented by OSM terminals."""
+    features = list((result or {}).get("features") or [])
+    terminals = [
+        feature for feature in features
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) >= 3
+    ]
+    gates = [
+        feature for feature in features
+        if feature.get("kind") == "gate"
+        and feature.get("points")
+    ]
+    anchors = gates
+    if len(anchors) < 8:
+        anchors = [
+            feature for feature in features
+            if feature.get("kind") == "parking_position"
+            and feature.get("points")
+        ]
+    if len(anchors) < 8:
+        return False
+    if not terminals:
+        return True
+
+    latitude = float(result["center"][1])
+    covered = 0
+    for anchor in anchors:
+        point = anchor["points"][0]
+        if any(
+            point_inside_polygon(point, terminal["points"])
+            or min(
+                point_segment_distance(point, start, end, latitude)
+                for start, end in zip(
+                    terminal["points"],
+                    terminal["points"][1:],
+                )
+            )
+            <= maximum_gate_distance
+            for terminal in terminals
+        ):
+            covered += 1
+    return covered / len(anchors) < 0.72
+
+
+def raw_point_inside_polygon(point, geometry):
+    pairs = [
+        pair for pair in (point_pair(value) for value in geometry)
+        if pair
+    ]
+    pair = point_pair(point)
+    return bool(pair and point_inside_polygon(pair, pairs))
+
+
+def gateway_terminal_supplements(
+    osm_elements,
+    gateway_elements,
+    overlap_distance=40,
+):
+    """Return X-Plane terminal footprints not already covered by OSM."""
+    osm_terminals = [
+        element for element in expanded_osm_elements(osm_elements)
+        if feature_kind(element.get("tags") or {}) == "terminal"
+        and len(element.get("geometry") or []) >= 3
+    ]
+    supplements = []
+    for element in gateway_elements:
+        if feature_kind(element.get("tags") or {}) != "terminal":
+            continue
+        geometry = list(element.get("geometry") or [])
+        points = [value for value in geometry if point_pair(value)]
+        if len(points) < 3:
+            continue
+        centroid = {
+            "lon": sum(float(value["lon"]) for value in points) / len(points),
+            "lat": sum(float(value["lat"]) for value in points) / len(points),
+        }
+        covered = False
+        for terminal in osm_terminals:
+            terminal_geometry = list(terminal.get("geometry") or [])
+            if raw_point_inside_polygon(centroid, terminal_geometry):
+                covered = True
+                break
+            if len(terminal_geometry) < 2:
+                continue
+            latitude = float(centroid["lat"])
+            distance = min(
+                xplane_point_to_segment_metres(
+                    centroid,
+                    start,
+                    end,
+                    latitude,
+                )
+                for start, end in zip(
+                    terminal_geometry,
+                    terminal_geometry[1:],
+                )
+            )
+            if distance <= overlap_distance:
+                covered = True
+                break
+        if not covered:
+            supplements.append(element)
+    return supplements
+
+
 def normalize(raw, airport, source="OpenStreetMap contributors", source_url="https://www.openstreetmap.org/copyright"):
     features = []
     all_points = []
@@ -1382,13 +1516,15 @@ def build_airport_map(
             raise AirportMapError(unavailable_reason + " (recent result reused)")
     report_progress(progress, "catalog", 1, "OurAirports")
     airport = airport_record(ident, progress=progress)
-    raw, result, overpass_error, gateway_error, gateway_missing = (
+    raw, result, overpass_error, gateway_error, gateway_missing, gateway_raw = (
+        None,
         None,
         None,
         None,
         None,
         None,
     )
+    osm_elements = []
     try:
         runway_raw = ourairports_runway_raw(ident, airport)
     except Exception:
@@ -1422,13 +1558,44 @@ def build_airport_map(
                 result["osmRevision"] = OSM_SOURCE_REVISION
             except AirportMapError:
                 result = None
+    if result is not None and needs_terminal_supplement(result):
+        try:
+            report_progress(
+                progress,
+                "waiting_for_fallback_source",
+                82,
+                "X-Plane Scenery Gateway",
+            )
+            gateway_raw = xplane_gateway_raw(ident, progress)
+            supplements = gateway_terminal_supplements(
+                osm_elements,
+                gateway_raw.get("elements", []),
+            )
+            if supplements:
+                source_parts = ["OpenStreetMap contributors"]
+                if runway_raw.get("elements"):
+                    source_parts.append("OurAirports")
+                source_parts.append("X-Plane Scenery Gateway")
+                result = normalize(
+                    {"elements": osm_elements + supplements},
+                    airport,
+                    source=" + ".join(source_parts),
+                )
+                result["osmRevision"] = OSM_SOURCE_REVISION
+                result["sourceRevision"] = XPLANE_SOURCE_REVISION
+        except XPlaneGatewayNoDataError as error:
+            gateway_missing = error
+        except XPlaneGatewayUnavailableError as error:
+            gateway_error = error
+        except AirportMapError as error:
+            gateway_missing = error
     result_counts = (result or {}).get("counts") or {}
     needs_gateway_detail = (result is None
                             or result_counts.get("taxiway", 0) + result_counts.get("taxilane", 0) == 0
                             or result_counts.get("parking_position", 0) + result_counts.get("gate", 0) == 0)
     if needs_gateway_detail:
         try:
-            gateway_raw = xplane_gateway_raw(ident, progress)
+            gateway_raw = gateway_raw or xplane_gateway_raw(ident, progress)
             gateway_elements = list(gateway_raw.get("elements", []))
             gateway_augmented = False
             osm_buildings = [element for element in (raw or {}).get("elements", [])

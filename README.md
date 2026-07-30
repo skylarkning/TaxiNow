@@ -134,11 +134,14 @@ Create the self-contained Windows installer and portable ZIP:
 
 The installer displays [`EULA.txt`](EULA.txt), detects or installs Microsoft
 Edge WebView2 Evergreen, installs TaxiNow per user, and creates a matching
-uninstaller. Uninstalling removes the current user's downloaded maps, asset
-database, caches, settings, logs, WebView2 profile, and any custom TaxiNow data
-folder carrying TaxiNow's ownership marker. Custom storage selection accepts
-only an empty dedicated folder or an existing marked TaxiNow folder, preventing
-the uninstaller from deleting unrelated user content.
+uninstaller. During uninstall, TaxiNow asks whether to retain downloaded maps
+and user data for a later installation; retaining data is the recommended
+upgrade choice. If deletion is selected, the uninstaller removes the current
+user's downloaded maps, asset database, caches, settings, logs, WebView2
+profile, and any custom TaxiNow data folder carrying TaxiNow's ownership
+marker. Custom storage selection accepts only an empty dedicated folder or an
+existing marked TaxiNow folder, preventing the uninstaller from deleting
+unrelated user content.
 
 The build packages the Python map pipeline as
 `pipeline\taxinow-map-pipeline.exe`, so the desktop downloader does not require

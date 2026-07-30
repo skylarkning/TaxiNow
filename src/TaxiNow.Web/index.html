@@ -82,10 +82,42 @@
           <button id="open-assets"
                   type="button"
                   data-i18n="actions.assets">Maps &amp; storage</button>
-          <button id="language-selector"
-                  type="button"
-                  data-i18n="actions.language"
-                  data-i18n-aria-label="actions.languageAria">中文</button>
+          <div class="language-picker">
+            <button id="language-selector"
+                    class="language-selector"
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    aria-controls="language-menu"
+                    aria-label="Choose language"
+                    data-i18n-aria-label="actions.languageAria">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M3 12h18M12 3c2.7 2.5 4.1 5.5 4.1 9S14.7 18.5 12 21M12 3C9.3 5.5 7.9 8.5 7.9 12S9.3 18.5 12 21"></path>
+              </svg>
+            </button>
+            <div id="language-menu"
+                 class="language-menu"
+                 role="menu"
+                 aria-label="Language"
+                 data-i18n-aria-label="actions.languageMenu"
+                 hidden>
+              <button type="button"
+                      role="menuitemradio"
+                      data-language-option="en"
+                      aria-checked="false">
+                <span>English</span>
+                <span class="language-check" aria-hidden="true">✓</span>
+              </button>
+              <button type="button"
+                      role="menuitemradio"
+                      data-language-option="zh-Hans"
+                      aria-checked="false">
+                <span>简体中文</span>
+                <span class="language-check" aria-hidden="true">✓</span>
+              </button>
+            </div>
+          </div>
           <button id="open-about"
                   type="button"
                   data-i18n="actions.about">About</button>
@@ -199,6 +231,34 @@
             </label>
           </div>
           <div id="country-fields" class="form-grid" hidden>
+            <div class="country-download-notice full-row">
+              <div lang="en">
+                <strong>Whole-country downloads can take several hours.</strong>
+                <p>
+                  For normal use, downloading only the airports you need by
+                  ICAO is strongly recommended. Already installed airports are
+                  skipped automatically.
+                </p>
+                <p>
+                  Typical planning limits with 4 parallel downloads:
+                  US up to about 5 days; CA/AU 13 hours; DE 3.5 hours;
+                  FR 3 hours; CN 2 hours; GB 1.5 hours; JP 1 hour.
+                  These are estimates, not guarantees; repeated OSM timeouts
+                  can take longer.
+                </p>
+              </div>
+              <div lang="zh-Hans">
+                <strong>按国家/地区一次性下载通常需要数小时。</strong>
+                <p>
+                  日常使用强烈建议按 ICAO 仅下载实际需要的机场；已经安装的机场会自动跳过。
+                </p>
+                <p>
+                  4 个平行下载时的一般预计上限：美国约 5 天；加拿大/澳大利亚约 13 小时；
+                  德国约 3.5 小时；法国约 3 小时；中国约 2 小时；英国约 1.5 小时；
+                  日本约 1 小时。以上仅为估算而非保证；若 OSM 多次超时，实际时间可能更长。
+                </p>
+              </div>
+            </div>
             <div class="form-field">
               <span class="field-label-with-info">
                 <label for="download-country"
@@ -440,12 +500,11 @@
         <div class="welcome-actions">
           <label class="welcome-dismiss-option">
             <input id="welcome-do-not-show" type="checkbox" />
-            <span data-i18n="welcome.dismiss">Do not show again</span>
+            <span>Do not show again / 不再显示</span>
           </label>
           <button id="close-welcome"
                   class="primary-button"
-                  type="button"
-                  data-i18n="welcome.enter">Enter TaxiNow</button>
+                  type="button">Enter TaxiNow / 进入 TaxiNow</button>
         </div>
       </section>
       <button id="about-backdrop"
@@ -530,14 +589,44 @@
         </p>
         </div>
         <div class="about-chinese about-language" lang="zh-Hans">
-          <span class="eyebrow">中文</span>
           <p>
-            TaxiNow是由Sky Ning开发的免费软件，如果你是从任何地方（如闲鱼，QQ群）付费购买的本软件，你也是软件倒卖的受害者。
+            TaxiNow 由 Sky Ning 开发
+            （GitHub：
+            <a href="https://github.com/skylarkning"
+               target="_blank"
+               rel="noopener noreferrer">skylarkning</a>）。
           </p>
           <p>
-            官方版本仅由 skylarkning 在 flightsim.to 与 GitHub
-            TaxiNow-Release 发布。TaxiNow 按“现状”提供，不作任何形式的担保。
+            官方版本仅发布于
+            <a href="https://flightsim.to/"
+               target="_blank"
+               rel="noopener noreferrer">flightsim.to</a>
+            与
+            <a href="https://github.com/skylarkning/TaxiNow-Release"
+               target="_blank"
+               rel="noopener noreferrer">GitHub TaxiNow-Release</a>，
+            且仅限上述两处。
           </p>
+          <p>
+            项目介绍：
+            <a href="https://github.com/skylarkning/TaxiNow-Release#english"
+               target="_blank"
+               rel="noopener noreferrer">English</a>
+            /
+            <a href="https://github.com/skylarkning/TaxiNow-Release#中文"
+               target="_blank"
+               rel="noopener noreferrer">中文</a>
+          </p>
+          <p>
+            TaxiNow 是一款 100% 免费的应用，仅供个人飞行模拟器使用。
+          </p>
+          <div class="about-warning">
+            <strong>
+              严禁将 TaxiNow 用于商业用途或真实飞行/导航。
+            </strong>
+            <p>如果您为本软件付费，说明您已经上当受骗。</p>
+            <p>TaxiNow 按“现状”提供，不作任何形式的担保。</p>
+          </div>
           <p>
             源代码不公开；符合条件的独立安全或隐私专家，可仅以核验 TaxiNow
             安全与隐私为目的，向开发者申请有限审查访问。

@@ -18,7 +18,7 @@ The per-user installer:
 - creates Start menu entries, an optional desktop shortcut, and an uninstaller;
 - detects or installs the Microsoft Edge WebView2 Evergreen Runtime;
 - preserves application and map data during in-place upgrades; and
-- removes the application and TaxiNow-owned data during uninstall.
+- asks whether to retain TaxiNow-owned data during uninstall.
 
 The installer and executable should be code signed with a publicly trusted
 code-signing certificate before public distribution. The packaging script does
@@ -64,17 +64,16 @@ TaxiNow storage from an arbitrary user folder.
 
 ## Uninstall behavior
 
-Uninstalling TaxiNow permanently removes the following data for the current
-Windows user:
+Uninstalling always removes the installed application and shortcuts. The
+uninstaller then offers a bilingual choice:
 
-- the installed application and shortcuts;
-- downloaded airport maps and the asset database;
-- source caches, pipeline working data, web exports, and logs;
-- desktop settings and the WebView2 browser profile; and
-- TaxiNow content in the selected custom storage root when its ownership marker
-  is valid.
+- **Yes / Keep data** (the default and recommended upgrade choice) preserves
+  downloaded airport maps, the asset database, caches, settings, logs, the
+  WebView2 profile, and the selected custom-storage pointer.
+- **No / Delete data** permanently removes those TaxiNow-owned files for the
+  current Windows user.
 
-The default `%LocalAppData%\TaxiNow` directory is dedicated to TaxiNow and is
+When deletion is selected, the default `%LocalAppData%\TaxiNow` directory is
 removed recursively. For a marked custom root, the uninstaller deletes only
 known TaxiNow directories, database files, and the ownership marker. If
 unrelated files are present, it leaves those files and their parent directory

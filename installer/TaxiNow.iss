@@ -67,7 +67,7 @@ Uninstallable=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-ConfirmUninstall=Uninstall TaxiNow and permanently delete all downloaded airport maps, asset databases, caches, settings, logs, and TaxiNow browser data for this Windows user? This cannot be undone.%n%nUnrelated files in a marked custom storage folder will be preserved.
+ConfirmUninstall=Uninstall TaxiNow? You will be asked whether to keep downloaded maps and user data for a future installation.%n%n卸载 TaxiNow？下一步可选择为后续安装保留已下载地图和用户数据。
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
@@ -94,6 +94,9 @@ const
     'Software\Microsoft\EdgeUpdate\Clients\{#WebView2ClientId}';
   StorageMarkerName = '{#StorageMarker}';
   StorageMarkerValue = '{#StorageMarkerContents}';
+
+var
+  KeepTaxiNowData: Boolean;
 
 function HasWebView2AtRoot(RootKey: Integer): Boolean;
 var
@@ -193,6 +196,25 @@ var
 begin
   if CurUninstallStep <> usUninstall then
     exit;
+
+  KeepTaxiNowData := True;
+  if not UninstallSilent then
+    KeepTaxiNowData :=
+      MsgBox(
+        'Keep downloaded airport maps and TaxiNow user data?' + #13#10 + #13#10 +
+        'Choose Yes (recommended for upgrades) to reuse your maps and ' +
+        'settings after reinstalling.' + #13#10 +
+        'Choose No to permanently delete all TaxiNow data.' + #13#10 + #13#10 +
+        '是否保留已下载机场地图和 TaxiNow 用户数据？' + #13#10 +
+        '升级用户建议选择“是”，重新安装后可继续使用地图和设置；' +
+        '选择“否”将永久删除全部 TaxiNow 数据。',
+        mbConfirmation,
+        MB_YESNO or MB_DEFBUTTON1) = IDYES;
+  if KeepTaxiNowData then
+  begin
+    Log('Preserving TaxiNow maps and user data at user request.');
+    exit;
+  end;
 
   DefaultRoot := ExpandConstant('{#DefaultDataRoot}');
   PointerPath := AddBackslash(DefaultRoot) + 'desktop-storage-root.txt';
