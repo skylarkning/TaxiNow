@@ -139,6 +139,66 @@ class DownloadProgressTests(unittest.TestCase):
         self.assertEqual(800, written)
         self.assertEqual([], warnings)
 
+    def test_country_workers_skip_one_broken_airport(self):
+        airports = [
+            pipeline.Airport(
+                "ZBCZ", "Changzhi Wangcun Airport", "CN", "CN-14", "Changzhi",
+                36.2475, 113.1258, "medium_airport"
+            ),
+            pipeline.Airport(
+                "ZYYC", "Yichun Lindu Airport", "CN", "CN-23", "Yichun",
+                47.7521, 129.019, "medium_airport"
+            ),
+        ]
+        protocol = CapturingProtocol()
+
+        def fake_download(airport, output, _cache, _callback):
+            if airport.icao == "ZBCZ":
+                raise ValueError("malformed source metadata")
+            return output / f"{airport.icao}.json", 200
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            cache = pipeline.SourceCache(root / "cache")
+            with (
+                mock.patch.object(
+                    pipeline,
+                    "download_airport",
+                    side_effect=fake_download,
+                ),
+                mock.patch.object(
+                    pipeline,
+                    "download_runway_fallback",
+                    side_effect=pipeline.PipelineError(
+                        "fallback unavailable"
+                    ),
+                ),
+            ):
+                outputs, written, warnings = (
+                    pipeline.download_airports_parallel(
+                        protocol,
+                        airports,
+                        root / "output",
+                        cache,
+                        max_parallel=2,
+                        warnings=[],
+                    )
+                )
+
+        self.assertEqual(
+            [str(root / "output" / "ZYYC.json")],
+            outputs,
+        )
+        self.assertEqual(200, written)
+        self.assertTrue(
+            any("ZBCZ: malformed source metadata" in warning
+                for warning in warnings)
+        )
+        self.assertTrue(
+            any("ZBCZ: fallback failed: fallback unavailable" in warning
+                for warning in warnings)
+        )
+
 
 class AirportSelectionTests(unittest.TestCase):
     def setUp(self):
@@ -150,6 +210,10 @@ class AirportSelectionTests(unittest.TestCase):
             pipeline.Airport(
                 "CYYZ", "Toronto Pearson", "CA", "CA-ON", "Toronto",
                 43.6772, -79.6306, "large_airport"
+            ),
+            pipeline.Airport(
+                "CA-0001", "Local identifier only", "CA", "CA-ON", "Ottawa",
+                45.0, -75.0, "small_airport"
             ),
         ]
 
@@ -176,6 +240,49 @@ class AirportSelectionTests(unittest.TestCase):
         )
 
         self.assertEqual([], selected)
+
+    def test_country_download_skips_non_icao_catalog_identifiers(self):
+        selected = pipeline.select_airports(
+            {
+                "command": "download_country",
+                "countryCode": "CA",
+                "excludeIcaos": [],
+            },
+            self.catalog,
+        )
+
+        self.assertEqual(
+            ["CYUL", "CYYZ"],
+            [airport.icao for airport in selected],
+        )
+
+
+class SkyChartsUpgradeTests(unittest.TestCase):
+    def test_numeric_source_revision_is_normalized_to_string(self):
+        upgraded = pipeline.upgrade_skycharts_data(
+            {
+                "schemaVersion": 1,
+                "ident": "ZBCZ",
+                "name": "Changzhi Wangcun Airport",
+                "source": "X-Plane Scenery Gateway",
+                "sourceRevision": 4,
+                "center": [113.1258, 36.2475],
+                "features": [
+                    {
+                        "kind": "runway",
+                        "points": [
+                            [113.12, 36.24],
+                            [113.13, 36.25],
+                        ],
+                    }
+                ],
+            },
+            "CN",
+            "CN-14",
+            "Changzhi",
+        )
+
+        self.assertEqual("4", upgraded["sources"][0]["revision"])
 
 
 if __name__ == "__main__":

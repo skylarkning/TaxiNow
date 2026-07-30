@@ -262,7 +262,8 @@ def load_airports(cache: SourceCache, progress_callback=None) -> list[Airport]:
         except (KeyError, TypeError, ValueError):
             continue
         if (
-            len(ident) < 3
+            len(ident) != 4
+            or not ident.isalnum()
             or not math.isfinite(latitude)
             or not math.isfinite(longitude)
         ):
@@ -800,7 +801,7 @@ def download_airports_parallel(
             )
             update_progress(phase="normalizing", percentage=100.0)
             return path, written, local_warnings
-        except PipelineError as error:
+        except Exception as error:
             local_warnings.append(f"{airport.icao}: {error}")
             update_progress(
                 phase="runway_fallback",
@@ -820,7 +821,7 @@ def download_airports_parallel(
                 )
                 update_progress(phase="normalizing", percentage=100.0)
                 return path, written, local_warnings
-            except PipelineError as fallback_error:
+            except Exception as fallback_error:
                 local_warnings.append(
                     f"{airport.icao}: fallback failed: {fallback_error}"
                 )
@@ -961,7 +962,13 @@ def select_airports(request: dict[str, Any], catalog: list[Airport]) -> list[Air
         if len(country) != 2:
             raise PipelineError("Country code must be ISO 3166-1 alpha-2.")
         region = str(request.get("regionCode") or "").strip().upper()
-        matches = [airport for airport in catalog if airport.country_code == country]
+        matches = [
+            airport
+            for airport in catalog
+            if airport.country_code == country
+            and len(airport.icao) == 4
+            and airport.icao.isalnum()
+        ]
         if region:
             matches = [
                 airport for airport in matches if airport.region_code == region
@@ -1094,7 +1101,7 @@ def handle(request: dict[str, Any]) -> None:
                 )
                 outputs.append(str(path))
                 bytes_written += written
-            except PipelineError as error:
+            except Exception as error:
                 warnings.append(f"{airport.icao}: {error}")
                 try:
                     path, written = download_runway_fallback(
@@ -1107,7 +1114,7 @@ def handle(request: dict[str, Any]) -> None:
                     warnings.append(
                         f"{airport.icao}: using runway-only OurAirports fallback."
                     )
-                except PipelineError as fallback_error:
+                except Exception as fallback_error:
                     warnings.append(
                         f"{airport.icao}: fallback failed: {fallback_error}"
                     )
@@ -1256,6 +1263,7 @@ def upgrade_skycharts_data(
         "terminals": sum(feature["kind"] == "terminal" for feature in features),
     }
     generated_at = str(source.get("generatedAt") or iso_now())
+    source_revision = source.get("sourceRevision")
     result = {
         "schemaVersion": 2,
         "airport": {
@@ -1283,7 +1291,11 @@ def upgrade_skycharts_data(
                     else None
                 ),
                 "retrievedAt": generated_at,
-                "revision": source.get("sourceRevision"),
+                "revision": (
+                    None
+                    if source_revision is None
+                    else str(source_revision)
+                ),
             }
         ],
         "counts": counts,

@@ -849,13 +849,26 @@ function renderDownloadJobs(jobs: DownloadJob[]): void {
       );
     }
     const detail = document.createElement("small");
-    detail.textContent = job.error ||
+    const warningPreview = job.warnings.find(
+      (warning) =>
+        warning.includes("skipped") || warning.includes("fallback failed")
+    ) || job.warnings[0];
+    const completionWarning =
+      job.state === "completed" && job.warnings.length > 0
+        ? `Completed with ${job.warnings.length} warning${
+          job.warnings.length === 1 ? "" : "s"
+        }: ${warningPreview}`
+        : null;
+    detail.textContent = job.error || completionWarning ||
       formatPhase(job.phase) +
       (indeterminate
         ? " · active"
         : ` · ${formatDownloadPercentage(job.percentage)}`) +
       (job.currentSource ? ` · ${job.currentSource}` : "") +
       (job.maxParallel > 1 ? ` · ${job.maxParallel} parallel` : "");
+    if (job.warnings.length > 0) {
+      detail.title = job.warnings.join("\n");
+    }
     const metrics = document.createElement("small");
     metrics.className = "job-metrics";
     const metricParts: string[] = [];

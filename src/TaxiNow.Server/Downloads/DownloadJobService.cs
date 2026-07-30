@@ -237,18 +237,62 @@ public sealed class DownloadJobService(
             var outputPaths = completed.OutputPaths ??
                 (completed.OutputPath is null ? [] : [completed.OutputPath]);
             var imported = 0;
-            foreach (var outputPath in outputPaths.Where(File.Exists))
+            long importedBytes = 0;
+            var importWarnings = (completed.Warnings ?? []).ToList();
+            foreach (var outputPath in outputPaths)
             {
-                await using var stream = File.OpenRead(outputPath);
-                await assets.ImportAsync(stream, cancellationToken);
-                imported++;
+                var outputIcao = Path.GetFileNameWithoutExtension(outputPath);
+                if (!File.Exists(outputPath))
+                {
+                    importWarnings.Add(
+                        $"{outputIcao}: skipped because the map output was missing.");
+                    continue;
+                }
+                Update(jobId, job => job with
+                {
+                    CurrentIcao = outputIcao,
+                    Phase = "importing",
+                    UpdatedAt = DateTimeOffset.UtcNow
+                });
+                try
+                {
+                    await using var stream = File.OpenRead(outputPath);
+                    var importedAsset =
+                        await assets.ImportAsync(stream, cancellationToken);
+                    importedBytes += importedAsset.SizeBytes;
+                    imported++;
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    logger.LogWarning(
+                        exception,
+                        "Skipping invalid map output {OutputPath} in download job {JobId}.",
+                        outputPath,
+                        jobId);
+                    importWarnings.Add(
+                        $"{outputIcao}: skipped invalid map output " +
+                        $"({exception.Message})");
+                }
             }
 
             if (imported == 0 && completed.AirportsTotal != 0)
             {
+                var warningSummary = string.Join(
+                    "; ",
+                    importWarnings.Take(5));
+                if (importWarnings.Count > 5)
+                {
+                    warningSummary +=
+                        $"; and {importWarnings.Count - 5} more warning(s)";
+                }
                 throw new InvalidOperationException(
-                    completed.Warnings?.Count > 0
-                        ? string.Join("; ", completed.Warnings)
+                    importWarnings.Count > 0
+                        ? $"No valid airport maps were imported. {warningSummary}"
                         : "The pipeline produced no valid airport maps.");
             }
 
@@ -257,9 +301,11 @@ public sealed class DownloadJobService(
                 State = "completed",
                 Phase = "completed",
                 Percentage = 100,
+                BytesWritten = importedBytes,
                 DownloadBytesPerSecond = 0,
                 EstimatedRemaining = null,
-                Warnings = completed.Warnings ?? job.Warnings,
+                CurrentIcao = null,
+                Warnings = importWarnings,
                 UpdatedAt = DateTimeOffset.UtcNow
             });
         }
