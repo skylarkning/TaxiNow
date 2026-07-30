@@ -47,10 +47,10 @@ header > div {
 }
 
 .wordmark {
-  color: #4cf0d1;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  display: block;
+  width: 112px;
+  height: auto;
+  flex: 0 0 auto;
 }
 
 .header-primary {
@@ -625,9 +625,17 @@ footer {
 }
 
 .about-heading h1 {
-  margin: 3px 0 0;
+  margin: 7px 0 0;
   color: #f0f7f8;
-  font-size: 24px;
+  font-size: 18px;
+}
+
+.about-brand-logo {
+  display: block;
+  width: 210px;
+  max-width: 58vw;
+  height: auto;
+  margin-top: 8px;
 }
 
 .about-dialog p {

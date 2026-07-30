@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     role="img"
+     aria-labelledby="title description"
+     viewBox="0 0 720 220">
+  <title id="title">TaxiNow</title>
+  <desc id="description">
+    TAXI in white on a red airport sign, joined to NOW in yellow on black.
+  </desc>
+  <rect width="400" height="220" fill="#e3342f"/>
+  <rect x="400" width="320" height="220" fill="#050505"/>
+  <rect x="414"
+        y="14"
+        width="292"
+        height="192"
+        fill="none"
+        stroke="#ffd800"
+        stroke-width="8"/>
+  <text x="200"
+        y="166"
+        fill="#ffffff"
+        font-family="'DejaVu Sans Condensed','Arial Narrow',Arial,sans-serif"
+        font-size="150"
+        font-stretch="condensed"
+        font-weight="900"
+        letter-spacing="-3"
+        text-anchor="middle">TAXI</text>
+  <text x="560"
+        y="160"
+        fill="#ffd800"
+        font-family="'DejaVu Sans Condensed','Arial Narrow',Arial,sans-serif"
+        font-size="120"
+        font-stretch="condensed"
+        font-weight="900"
+        letter-spacing="-3"
+        text-anchor="middle">NOW</text>
+</svg>

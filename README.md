@@ -1,3 +1,9 @@
+<p align="center">
+  <img src="src/TaxiNow.Web/public/branding/taxinow-logo.svg"
+       width="540"
+       alt="TaxiNow" />
+</p>
+
 # TaxiNow
 
 TaxiNow is a Windows ground-navigation map for Microsoft Flight Simulator 2020
@@ -12,6 +18,14 @@ states that TaxiNow is free software for personal flight-simulator use only.
 On first launch, a bilingual English/Chinese welcome screen identifies the
 official distribution channel, warns against paid or unauthorized copies, and
 offers a per-device **Do not show again / 不再显示** option.
+
+Production branding assets live in
+[`src/TaxiNow.Web/public/branding`](src/TaxiNow.Web/public/branding). The wide
+taxiway-marker wordmark is used in the repository, app header, and About page;
+the square red-over-black mark is used for the Windows executable, window, and
+notification-area icon. Generated design concepts are retained under the
+`concepts` subdirectory, while the SVG/PNG/ICO files are deterministic
+production assets.
 
 ## Current vertical slice
 

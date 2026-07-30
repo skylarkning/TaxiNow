@@ -13,6 +13,7 @@ public partial class App : System.Windows.Application
     private Mutex? _instanceMutex;
     private MainWindow? _window;
     private Forms.NotifyIcon? _trayIcon;
+    private Icon? _applicationIcon;
     private bool _allowWindowClose;
     private bool _quitStarted;
 
@@ -95,10 +96,11 @@ public partial class App : System.Windows.Application
         var quit = menu.Items.Add("Quit");
         quit.Click += (_, _) => Dispatcher.BeginInvoke(() => _ = QuitAsync());
 
+        _applicationIcon = LoadApplicationIcon();
         _trayIcon = new Forms.NotifyIcon
         {
             ContextMenuStrip = menu,
-            Icon = SystemIcons.Application,
+            Icon = _applicationIcon,
             Text = "TaxiNow",
             Visible = false
         };
@@ -109,6 +111,32 @@ public partial class App : System.Windows.Application
                 Dispatcher.BeginInvoke(RestoreWindow);
             }
         };
+    }
+
+    private static Icon LoadApplicationIcon()
+    {
+        try
+        {
+            var resource = GetResourceStream(
+                new Uri(
+                    "pack://application:,,,/Assets/TaxiNow.ico",
+                    UriKind.Absolute));
+            if (resource is not null)
+            {
+                using (resource.Stream)
+                using (var icon = new Icon(resource.Stream))
+                {
+                    return (Icon)icon.Clone();
+                }
+            }
+        }
+        catch
+        {
+            // The executable still starts with a safe system icon if a
+            // packaged branding resource cannot be read.
+        }
+
+        return (Icon)SystemIcons.Application.Clone();
     }
 
     private void OnWindowStateChanged(object? sender, EventArgs e)
@@ -206,6 +234,8 @@ public partial class App : System.Windows.Application
 
         _trayIcon?.Dispose();
         _trayIcon = null;
+        _applicationIcon?.Dispose();
+        _applicationIcon = null;
         ReleaseInstanceMutex();
         Shutdown(exitCode);
     }
@@ -238,6 +268,8 @@ public partial class App : System.Windows.Application
             _trayIcon.Dispose();
             _trayIcon = null;
         }
+        _applicationIcon?.Dispose();
+        _applicationIcon = null;
         ReleaseInstanceMutex();
         base.OnExit(e);
     }
