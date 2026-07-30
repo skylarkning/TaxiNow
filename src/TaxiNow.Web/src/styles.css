@@ -811,6 +811,7 @@ footer {
 }
 
 .country-download-notice {
+  margin-bottom: 18px;
   padding: 10px 11px;
   border: 1px solid rgba(255, 199, 92, 0.34);
   border-radius: 8px;
@@ -904,11 +905,14 @@ footer {
 }
 
 .download-speed-info .info-tooltip {
-  top: calc(100% + 7px);
+  position: fixed;
+  top: 120px;
+  right: 16px;
   bottom: auto;
-  left: -94px;
-  width: min(360px, calc(100vw - 48px));
-  max-height: min(410px, calc(100vh - 150px));
+  left: 16px;
+  width: auto;
+  max-height: calc(100dvh - 136px);
+  box-sizing: border-box;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
