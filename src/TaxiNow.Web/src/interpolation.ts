@@ -8,6 +8,25 @@ export interface InterpolatedOwnship {
   stale: boolean;
 }
 
+export interface GeographicBounds {
+  minLon: number;
+  maxLon: number;
+  minLat: number;
+  maxLat: number;
+}
+
+export function isPointInsideBounds(
+  longitude: number,
+  latitude: number,
+  bounds: GeographicBounds | null
+): boolean {
+  return bounds !== null &&
+    longitude >= bounds.minLon &&
+    longitude <= bounds.maxLon &&
+    latitude >= bounds.minLat &&
+    latitude <= bounds.maxLat;
+}
+
 export function interpolateHeading(
   from: number,
   to: number,

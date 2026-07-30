@@ -27,6 +27,8 @@ import type {
 } from "./contracts";
 import {
   interpolateOwnship,
+  isPointInsideBounds,
+  type GeographicBounds,
   type InterpolatedOwnship
 } from "./interpolation";
 import { buildRunwayDecorations } from "./runwayGeometry";
@@ -37,6 +39,7 @@ let lastRenderedOwnship: InterpolatedOwnship | null = null;
 let ownshipVisible = false;
 let map: MapLibreMap;
 let airportBounds: LngLatBoundsLike;
+let airportPerimeter: GeographicBounds | null = null;
 let ownshipAnimationStarted = false;
 let fallbackOwnship: SVGGElement | null = null;
 let assetRefreshTimer: number | null = null;
@@ -60,7 +63,7 @@ async function start(): Promise<void> {
     document.querySelector<HTMLAnchorElement>("#server-url")!;
   serverLink.href = appStatus.localUrl;
   serverLink.textContent =
-    `Access Map on Other Device's Browser: ${
+    `Access at: ${
       appStatus.localUrl.replace(/^https?:\/\//, "")
     }`;
   serverLink.title =
@@ -172,6 +175,7 @@ async function loadAirport(icao: string): Promise<void> {
     [airport.airport.bounds.minLon, airport.airport.bounds.minLat],
     [airport.airport.bounds.maxLon, airport.airport.bounds.maxLat]
   ];
+  airportPerimeter = { ...airport.airport.bounds };
   document.querySelector("#airport-code")!.textContent = airport.airport.icao;
   document.querySelector("#airport-name")!.textContent =
     airport.airport.name;
@@ -899,6 +903,7 @@ function createMap(airport: AirportMap): MapLibreMap {
   });
 
   created.addControl(new maplibregl.NavigationControl(), "bottom-right");
+  created.addControl(new TelemetryRefreshControl(), "bottom-right");
   labelNavigationControls(created);
   created.once("load", () => {
     if (diagnostics) {
@@ -958,6 +963,65 @@ function createMap(airport: AirportMap): MapLibreMap {
     }
   });
   return created;
+}
+
+class TelemetryRefreshControl implements maplibregl.IControl {
+  private container?: HTMLDivElement;
+
+  onAdd(): HTMLElement {
+    const container = document.createElement("div");
+    container.className =
+      "maplibregl-ctrl maplibregl-ctrl-group telemetry-refresh-control";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.title = "Force refresh aircraft position";
+    button.setAttribute("aria-label", "Force refresh aircraft position");
+    button.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" ' +
+      'd="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.4-2.5L20 9M4 15l2.5 2.5A7 7 0 0 0 17.9 15" /></svg>';
+    button.addEventListener("click", () => {
+      void refreshAircraftPosition(container, button);
+    });
+    container.append(button);
+    this.container = container;
+    return container;
+  }
+
+  onRemove(): void {
+    this.container?.remove();
+    this.container = undefined;
+  }
+}
+
+async function refreshAircraftPosition(
+  container: HTMLElement,
+  button: HTMLButtonElement
+): Promise<void> {
+  if (button.disabled) {
+    return;
+  }
+
+  button.disabled = true;
+  container.classList.add("is-refreshing");
+  setStatus("Refreshing aircraft position…", "waiting");
+  try {
+    const response = await fetch("/api/v1/telemetry/refresh", {
+      method: "POST"
+    });
+    if (!response.ok) {
+      throw new Error(`Refresh request failed (${response.status}).`);
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+    const latest = await getJson<TelemetrySnapshot>("/api/v1/telemetry");
+    applyTelemetrySample(latest);
+  } catch {
+    setStatus("Unable to refresh aircraft position.", "error");
+  } finally {
+    container.classList.remove("is-refreshing");
+    button.disabled = false;
+  }
 }
 
 function labelNavigationControls(target: MapLibreMap): void {
@@ -1268,45 +1332,58 @@ function renderOwnship(frameTime = performance.now()): void {
   lastOwnshipFrameAt = frameTime;
   const ownship = interpolateOwnship(telemetrySamples, Date.now());
   if (ownship) {
+    const renderedOwnship: InterpolatedOwnship = {
+      ...ownship,
+      visible:
+        ownship.visible &&
+        isPointInsideBounds(
+          ownship.longitude,
+          ownship.latitude,
+          airportPerimeter
+        )
+    };
     if (
       lastRenderedOwnship &&
-      Math.abs(lastRenderedOwnship.longitude - ownship.longitude) < 1e-9 &&
-      Math.abs(lastRenderedOwnship.latitude - ownship.latitude) < 1e-9 &&
-      Math.abs(lastRenderedOwnship.heading - ownship.heading) < 0.05 &&
-      lastRenderedOwnship.visible === ownship.visible &&
-      lastRenderedOwnship.stale === ownship.stale
+      Math.abs(lastRenderedOwnship.longitude - renderedOwnship.longitude) < 1e-9 &&
+      Math.abs(lastRenderedOwnship.latitude - renderedOwnship.latitude) < 1e-9 &&
+      Math.abs(lastRenderedOwnship.heading - renderedOwnship.heading) < 0.05 &&
+      lastRenderedOwnship.visible === renderedOwnship.visible &&
+      lastRenderedOwnship.stale === renderedOwnship.stale
     ) {
       requestAnimationFrame(renderOwnship);
       return;
     }
-    lastRenderedOwnship = ownship;
+    lastRenderedOwnship = renderedOwnship;
     if (map?.isStyleLoaded() && map.getLayer("ownship")) {
       const source = map.getSource("ownship") as GeoJSONSource | undefined;
       source?.setData(
         ownshipFeature(
-          ownship.longitude,
-          ownship.latitude,
-          ownship.heading,
-          ownship.stale,
-          ownship.visible
+          renderedOwnship.longitude,
+          renderedOwnship.latitude,
+          renderedOwnship.heading,
+          renderedOwnship.stale,
+          renderedOwnship.visible
         )
       );
       map.setLayoutProperty(
         "ownship",
         "visibility",
-        ownship.visible ? "visible" : "none"
+        renderedOwnship.visible ? "visible" : "none"
       );
     }
     if (fallbackOwnship) {
-      const point = map.project([ownship.longitude, ownship.latitude]);
+      const point = map.project([
+        renderedOwnship.longitude,
+        renderedOwnship.latitude
+      ]);
       fallbackOwnship.setAttribute(
         "transform",
-        `translate(${point.x} ${point.y}) rotate(${ownship.heading})`
+        `translate(${point.x} ${point.y}) rotate(${renderedOwnship.heading})`
       );
-      fallbackOwnship.style.display = ownship.visible ? "" : "none";
-      fallbackOwnship.style.opacity = ownship.stale ? "0.45" : "1";
+      fallbackOwnship.style.display = renderedOwnship.visible ? "" : "none";
+      fallbackOwnship.style.opacity = renderedOwnship.stale ? "0.45" : "1";
     }
-    ownshipVisible = ownship.visible;
+    ownshipVisible = renderedOwnship.visible;
   } else if (ownshipVisible) {
     if (map?.isStyleLoaded() && map.getLayer("ownship")) {
       map.setLayoutProperty("ownship", "visibility", "none");

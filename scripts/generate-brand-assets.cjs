@@ -16,14 +16,39 @@ const appAssetsRoot = path.join(
   "TaxiNow.App",
   "Assets"
 );
-const wordmarkSource = path.join(brandingRoot, "taxinow-logo.svg");
-const iconSource = path.join(brandingRoot, "taxinow-app-icon.svg");
+const wordmarkSource = path.join(
+  brandingRoot,
+  "concepts",
+  "taxinow-logo-generated-concept.png"
+);
+const iconSource = path.join(
+  brandingRoot,
+  "concepts",
+  "taxinow-app-icon-generated-concept.png"
+);
 
 fs.mkdirSync(appAssetsRoot, { recursive: true });
 
-async function renderSvg(source, output, width, height) {
-  await sharp(source, { density: 384 })
-    .resize(width, height, { fit: "fill" })
+async function trimSource(source) {
+  return sharp(source)
+    .trim({ background: "#ffffff", threshold: 18 })
+    .png({ compressionLevel: 9 })
+    .toBuffer();
+}
+
+async function renderPicture(source, output, width, height) {
+  await sharp(source)
+    .resize(width, height, {
+      fit: "contain",
+      background: { r: 255, g: 255, b: 255, alpha: 1 }
+    })
+    .png({ compressionLevel: 9 })
+    .toFile(output);
+}
+
+async function renderWordmark(source, output) {
+  await sharp(source)
+    .resize({ width: 1440 })
     .png({ compressionLevel: 9 })
     .toFile(output);
 }
@@ -53,20 +78,20 @@ function buildIco(images) {
 }
 
 async function main() {
-  await renderSvg(
-    wordmarkSource,
-    path.join(brandingRoot, "taxinow-logo.png"),
-    1440,
-    440
+  const wordmarkPicture = await trimSource(wordmarkSource);
+  const iconPicture = await trimSource(iconSource);
+  await renderWordmark(
+    wordmarkPicture,
+    path.join(brandingRoot, "taxinow-logo.png")
   );
-  await renderSvg(
-    iconSource,
+  await renderPicture(
+    iconPicture,
     path.join(brandingRoot, "taxinow-app-icon.png"),
     512,
     512
   );
-  await renderSvg(
-    iconSource,
+  await renderPicture(
+    iconPicture,
     path.join(appAssetsRoot, "TaxiNow.png"),
     512,
     512
@@ -77,8 +102,11 @@ async function main() {
   for (const size of sizes) {
     images.push({
       size,
-      data: await sharp(iconSource, { density: 384 })
-        .resize(size, size, { fit: "fill" })
+      data: await sharp(iconPicture)
+        .resize(size, size, {
+          fit: "contain",
+          background: { r: 255, g: 255, b: 255, alpha: 1 }
+        })
         .png({ compressionLevel: 9 })
         .toBuffer()
     });

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Windows;
 using Microsoft.AspNetCore.Builder;
 using TaxiNow.Server;
@@ -9,6 +10,9 @@ namespace TaxiNow.App;
 
 public partial class App : System.Windows.Application
 {
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool DestroyIcon(IntPtr handle);
+
     private WebApplication? _server;
     private Mutex? _instanceMutex;
     private MainWindow? _window;
@@ -119,14 +123,23 @@ public partial class App : System.Windows.Application
         {
             var resource = GetResourceStream(
                 new Uri(
-                    "pack://application:,,,/Assets/TaxiNow.ico",
+                    "pack://application:,,,/Assets/TaxiNow.png",
                     UriKind.Absolute));
             if (resource is not null)
             {
                 using (resource.Stream)
-                using (var icon = new Icon(resource.Stream))
+                using (var bitmap = new Bitmap(resource.Stream))
                 {
-                    return (Icon)icon.Clone();
+                    var handle = bitmap.GetHicon();
+                    try
+                    {
+                        using var icon = Icon.FromHandle(handle);
+                        return (Icon)icon.Clone();
+                    }
+                    finally
+                    {
+                        DestroyIcon(handle);
+                    }
                 }
             }
         }

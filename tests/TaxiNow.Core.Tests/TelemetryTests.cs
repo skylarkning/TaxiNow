@@ -51,6 +51,17 @@ public sealed class TelemetryTests
             Sample(3, true) with { Latitude = 44.6 }));
     }
 
+    [Fact]
+    public void RefreshSignal_IsAutoReset()
+    {
+        using var signal = new TelemetryRefreshSignal();
+
+        signal.Request();
+
+        Assert.True(signal.WaitHandle.WaitOne(0));
+        Assert.False(signal.WaitHandle.WaitOne(0));
+    }
+
     private static TelemetrySnapshot Sample(long sequence, bool onGround)
     {
         var now = DateTimeOffset.UtcNow;

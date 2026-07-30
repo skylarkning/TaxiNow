@@ -15,6 +15,13 @@ namespace TaxiNow.SimConnect.Managed;
 
 public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
 {
+    private readonly TelemetryRefreshSignal refreshSignal;
+
+    public ManagedSimConnectTelemetrySource(TelemetryRefreshSignal refreshSignal)
+    {
+        this.refreshSignal = refreshSignal;
+    }
+
 #if TAXINOW_MANAGED_SIMCONNECT
     public static bool IsRuntimeAvailable => true;
 
@@ -80,7 +87,7 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
         }
     }
 
-    private static void RunOwner(
+    private void RunOwner(
         ChannelWriter<TelemetrySnapshot> writer,
         ManualResetEvent stop)
     {
@@ -156,7 +163,8 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
 
     private enum DataRequest
     {
-        UserAircraft = 1
+        UserAircraft = 1,
+        UserAircraftRefresh = 2
     }
 
     private enum SystemEvent
@@ -174,7 +182,7 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
         public double GroundSpeedKnots;
     }
 
-    private static void RunManagedOwner(
+    private void RunManagedOwner(
         ChannelWriter<TelemetrySnapshot> writer,
         ManualResetEvent stop)
     {
@@ -225,6 +233,8 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                 var simulationRunning = false;
                 UserAircraftData? lastPublished = null;
                 var lastPublishedAt = -1L;
+                var lastDataReceivedAt = -1L;
+                var positionHealthy = false;
 
                 connection.OnRecvOpen += (_, _) =>
                     PublishStatus(
@@ -249,6 +259,8 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     if (!simulationRunning)
                     {
                         lastPublished = null;
+                        lastDataReceivedAt = -1;
+                        positionHealthy = false;
                         PublishStatus(
                             "flight-not-started",
                             connected: true,
@@ -257,7 +269,12 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                 };
                 connection.OnRecvSimobjectData += (_, message) =>
                 {
-                    if (message.dwRequestID != (uint)DataRequest.UserAircraft ||
+                    var forced =
+                        message.dwRequestID ==
+                        (uint)DataRequest.UserAircraftRefresh;
+                    if ((!forced &&
+                         message.dwRequestID !=
+                         (uint)DataRequest.UserAircraft) ||
                         message.dwData.Length == 0 ||
                         message.dwData[0] is not UserAircraftData data ||
                         !simulationRunning)
@@ -266,7 +283,10 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     }
 
                     var sampleTime = clock.ElapsedMilliseconds;
+                    lastDataReceivedAt = sampleTime;
+                    positionHealthy = true;
                     if (lastPublished is { } previous &&
+                        !forced &&
                         sampleTime - lastPublishedAt < 1_000 &&
                         !HasMeaningfulChange(previous, data))
                     {
@@ -304,24 +324,54 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     DataDefinition.UserAircraft,
                     FlightSimConnect.SIMCONNECT_OBJECT_ID_USER,
                     SIMCONNECT_PERIOD.VISUAL_FRAME,
-                    SIMCONNECT_DATA_REQUEST_FLAG.CHANGED,
+                    SIMCONNECT_DATA_REQUEST_FLAG.DEFAULT,
                     0,
                     4,
                     0);
 
-                var handles = new WaitHandle[] { notification, stop };
+                var handles = new[]
+                {
+                    notification,
+                    refreshSignal.WaitHandle,
+                    stop
+                };
                 while (!quitReceived && IsMsfs2024Running())
                 {
                     var signaled = WaitHandle.WaitAny(
                         handles,
                         TimeSpan.FromSeconds(1));
-                    if (signaled == 1)
+                    if (signaled == 2)
                     {
                         return;
                     }
                     if (signaled == 0)
                     {
                         connection.ReceiveMessage();
+                    }
+                    else if (signaled == 1)
+                    {
+                        connection.RequestDataOnSimObject(
+                            DataRequest.UserAircraftRefresh,
+                            DataDefinition.UserAircraft,
+                            FlightSimConnect.SIMCONNECT_OBJECT_ID_USER,
+                            SIMCONNECT_PERIOD.ONCE,
+                            SIMCONNECT_DATA_REQUEST_FLAG.DEFAULT,
+                            0,
+                            0,
+                            0);
+                    }
+
+                    if (simulationRunning &&
+                        positionHealthy &&
+                        lastDataReceivedAt >= 0 &&
+                        clock.ElapsedMilliseconds - lastDataReceivedAt > 4_000)
+                    {
+                        lastPublished = null;
+                        positionHealthy = false;
+                        PublishStatus(
+                            "flight-not-started",
+                            connected: true,
+                            TrackingState.Connecting);
                     }
                 }
             }
@@ -347,7 +397,17 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     TrackingState.Connecting);
             }
 
-            stop.WaitOne(TimeSpan.FromSeconds(1));
+            PublishStatus(
+                IsMsfs2024Running()
+                    ? "waiting-for-flight"
+                    : "simulator-not-running",
+                connected: false,
+                IsMsfs2024Running()
+                    ? TrackingState.Connecting
+                    : TrackingState.Disconnected);
+            WaitHandle.WaitAny(
+                new[] { refreshSignal.WaitHandle, stop },
+                TimeSpan.FromSeconds(1));
         }
     }
 
@@ -409,7 +469,7 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                (current.OnGround != 0) != (previous.OnGround != 0);
     }
 #endif
-    private static void RunWithoutRuntime(
+    private void RunWithoutRuntime(
         ChannelWriter<TelemetrySnapshot> writer,
         ManualResetEvent stop)
     {
@@ -424,7 +484,9 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     ? TrackingState.Connecting
                     : TrackingState.Disconnected,
                 clock));
-            stop.WaitOne(TimeSpan.FromSeconds(1));
+            WaitHandle.WaitAny(
+                new[] { refreshSignal.WaitHandle, stop },
+                TimeSpan.FromSeconds(1));
         }
     }
 }

@@ -60,6 +60,7 @@ public static class TaxiNowHost
         builder.Services.AddSingleton<MapAssetStore>();
         builder.Services.AddSingleton<AirportFixtureService>();
         builder.Services.AddSingleton<TelemetryState>();
+        builder.Services.AddSingleton<TelemetryRefreshSignal>();
         builder.Services.AddSingleton<DownloadJobService>();
         builder.Services.AddSingleton<ITelemetrySource>(services =>
         {
@@ -68,7 +69,8 @@ public static class TaxiNowHost
             var mode = ResolveTelemetryMode(configuration);
             if (mode != "replay")
             {
-                return new ManagedSimConnectTelemetrySource();
+                return new ManagedSimConnectTelemetrySource(
+                    services.GetRequiredService<TelemetryRefreshSignal>());
             }
 
             if (string.IsNullOrWhiteSpace(replayPath))
@@ -162,6 +164,15 @@ public static class TaxiNowHost
                 : Results.Json(
                     new { error = "Telemetry has not produced a sample yet." },
                     statusCode: StatusCodes.Status503ServiceUnavailable));
+        app.MapPost(
+            "/api/v1/telemetry/refresh",
+            (TelemetryRefreshSignal refreshSignal) =>
+            {
+                refreshSignal.Request();
+                return Results.Accepted(
+                    "/api/v1/telemetry",
+                    new { requested = true });
+            });
 
         app.MapGet(
             "/api/v1/airports",

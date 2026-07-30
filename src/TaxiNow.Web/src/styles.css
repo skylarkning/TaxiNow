@@ -41,7 +41,7 @@ header {
 
 header > div {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
   min-width: 0;
 }
@@ -189,6 +189,20 @@ header > div {
 .server-url:hover {
   color: #4cf0d1;
   text-decoration: underline;
+}
+
+.network-access {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.network-info .info-tooltip {
+  top: calc(100% + 8px);
+  right: 0;
+  bottom: auto;
+  left: auto;
+  width: 300px;
 }
 
 .status {
@@ -807,6 +821,34 @@ footer {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
+}
+
+.telemetry-refresh-control button {
+  position: relative;
+  width: 29px;
+  height: 29px;
+  color: #17313a;
+  background: #f4f8f8;
+}
+
+.telemetry-refresh-control button:hover {
+  background: #dce9e9;
+}
+
+.telemetry-refresh-control svg {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+
+.telemetry-refresh-control.is-refreshing svg {
+  animation: telemetry-refresh-spin 650ms linear infinite;
+}
+
+@keyframes telemetry-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .download-form input,

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { TelemetrySnapshot } from "./contracts";
-import { interpolateHeading, interpolateOwnship } from "./interpolation";
+import {
+  interpolateHeading,
+  interpolateOwnship,
+  isPointInsideBounds
+} from "./interpolation";
 
 describe("interpolateHeading", () => {
   it("uses the shortest arc across north", () => {
@@ -38,6 +42,20 @@ describe("interpolateOwnship", () => {
       heading: 136.56,
       visible: true
     });
+  });
+});
+
+describe("isPointInsideBounds", () => {
+  const cyyz = {
+    minLon: -79.6677,
+    maxLon: -79.5936,
+    minLat: 43.657,
+    maxLat: 43.6964
+  };
+
+  it("includes the airport perimeter and rejects positions beyond it", () => {
+    expect(isPointInsideBounds(-79.62, 43.68, cyyz)).toBe(true);
+    expect(isPointInsideBounds(-79.58, 43.68, cyyz)).toBe(false);
   });
 });
 

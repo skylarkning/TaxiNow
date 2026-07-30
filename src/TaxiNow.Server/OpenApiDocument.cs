@@ -16,6 +16,8 @@ internal static class OpenApiDocument
         {
             ["/api/v1/status"] = Get("Application and simulator status"),
             ["/api/v1/telemetry"] = Get("Latest telemetry snapshot"),
+            ["/api/v1/telemetry/refresh"] =
+                Post("Request an immediate aircraft position refresh"),
             ["/api/v1/airports"] = Get("Search installed airports"),
             ["/api/v1/airports/{icao}"] = Get("Airport metadata"),
             ["/api/v1/airports/{icao}/map"] = Get("Normalized airport map"),
@@ -43,6 +45,9 @@ internal static class OpenApiDocument
     };
 
     private static object Get(string summary) => new { get = Operation(summary) };
+
+    private static object Post(string summary) =>
+        new { post = Operation(summary) };
 
     private static object Operation(string summary) => new
     {

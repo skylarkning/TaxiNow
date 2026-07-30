@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/TaxiNow.Web/public/branding/taxinow-logo.svg"
+  <img src="src/TaxiNow.Web/public/branding/taxinow-logo.png"
        width="540"
        alt="TaxiNow" />
 </p>
@@ -23,9 +23,9 @@ Production branding assets live in
 [`src/TaxiNow.Web/public/branding`](src/TaxiNow.Web/public/branding). The wide
 taxiway-marker wordmark is used in the repository, app header, and About page;
 the square red-over-black mark is used for the Windows executable, window, and
-notification-area icon. Generated design concepts are retained under the
-`concepts` subdirectory, while the SVG/PNG/ICO files are deterministic
-production assets.
+notification-area icon. The two generated pictures under the `concepts`
+subdirectory are the source artwork; the production PNG/ICO files only crop
+their surrounding white canvas and create the required output sizes.
 
 ## Current vertical slice
 
@@ -40,12 +40,15 @@ production assets.
   remain continuous above it. Long taxiway references repeat at collision-aware
   intervals using the SkyCharts marker-density convention.
 - Live MSFS 2024 ground-position tracking through SimConnect, with a
-  heading-oriented ownship icon and smooth SignalR/WebView animation.
+  heading-oriented ownship icon and smooth SignalR/WebView animation. The icon
+  is hidden when the aircraft leaves the selected airport's map perimeter.
 - Simulator status is visible in the header: red when MSFS is not running,
   orange while no flight is active, and green when position is synchronized.
+  Ending a flight or closing MSFS clears the last position, and the map's
+  refresh control can request an immediate one-shot SimConnect position sample.
 - Performance-aware telemetry uses event-driven SimConnect callbacks, bounded
-  buffers, change filtering, and a one-second parked heartbeat rather than a
-  high-rate polling loop.
+  buffers, change filtering, a low-frequency health watchdog, and a one-second
+  parked publish heartbeat rather than a high-rate web polling loop.
 - Schema v2 validation and a schema v1 adapter.
 - Visible map downloader and asset manager for ICAO, country/region, and
   optional province/state downloads, with byte-level progress, transfer speed,
@@ -109,10 +112,11 @@ dotnet run --project .\src\TaxiNow.App
 Closing the desktop window quits TaxiNow and releases the local server port.
 Minimizing hides the window in the Windows notification area instead.
 
-For another device, use the **Access Map on Other Device's Browser** address
-shown in the TaxiNow header. Both devices must be on the same trusted LAN. If
-Windows Firewall asks, allow TaxiNow on **Private networks** only; do not expose
-port 8780 through a router or public-network firewall profile.
+For another device, use the **Access at:** address shown in the TaxiNow header.
+Enter that local IP address in a phone or iPad browser; Firefox is recommended.
+Both devices must be on the same trusted LAN. If Windows Firewall asks, allow
+TaxiNow on **Private networks** only; do not expose port 8780 through a router
+or public-network firewall profile.
 
 The built Windows executable is:
 

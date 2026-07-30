@@ -18,6 +18,7 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\TaxiNow.ico" />
+    <Resource Include="Assets\TaxiNow.png" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\..\tests\fixtures\airport-maps\CYYZ.v2.json"

@@ -11,7 +11,7 @@
       <header>
         <div class="header-primary">
           <img class="wordmark"
-               src="/branding/taxinow-logo.svg"
+               src="/branding/taxinow-logo.png"
                alt="TaxiNow" />
           <div class="airport-switcher">
             <button id="airport-picker-toggle"
@@ -43,11 +43,26 @@
           </div>
         </div>
         <div class="actions">
-          <a id="server-url"
-             class="server-url"
-             href="http://localhost:8780"
-             target="_blank"
-             rel="noreferrer">Access Map on Other Device's Browser: finding address…</a>
+          <span class="network-access">
+            <a id="server-url"
+               class="server-url"
+               href="http://localhost:8780"
+               target="_blank"
+               rel="noreferrer">Access at: finding address…</a>
+            <span class="info-bubble network-info">
+              <button class="info-trigger"
+                      type="button"
+                      aria-label="How to access TaxiNow on another device"
+                      aria-describedby="network-access-help">i</button>
+              <span id="network-access-help"
+                    class="info-tooltip"
+                    role="tooltip">
+                On another device connected to the same network, such as a
+                phone or iPad, enter this local IP address in its browser.
+                Firefox is the recommended browser for TaxiNow.
+              </span>
+            </span>
+          </span>
           <span id="status" class="status">Connecting</span>
           <button id="open-assets" type="button">Maps &amp; storage</button>
           <button id="fit-airport" type="button">Fit airport</button>
@@ -254,7 +269,7 @@
           <div>
             <span class="eyebrow">Application information</span>
             <img class="about-brand-logo"
-                 src="/branding/taxinow-logo.svg"
+                 src="/branding/taxinow-logo.png"
                  alt="TaxiNow" />
             <h1 id="about-heading">About</h1>
           </div>
