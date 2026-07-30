@@ -5,6 +5,11 @@ TaxiNow V1.0 Beta ships in two forms:
 1. A Windows installer is the primary release for most users.
 2. A portable ZIP is a secondary release for advanced users and troubleshooting.
 
+Official public binaries are published only by `skylarkning` through the
+TaxiNow page on flightsim.to and the
+[TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release).
+The private development repository is not a public distribution channel.
+
 The per-user installer:
 
 - displays and requires acceptance of `EULA.txt`;

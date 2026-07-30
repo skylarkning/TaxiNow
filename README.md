@@ -18,9 +18,10 @@ TaxiNow is free of charge for personal, non-commercial flight-simulation use,
 but it is **not open-source or public-domain software**. Commercial use,
 real-world aviation/navigation use, modification, derivative works, resale,
 and redistribution are prohibited unless Sky Ning provides prior express
-written permission. See the [TaxiNow Personal Non-Commercial License](LICENSE)
-for the complete terms. Third-party software and map data remain subject to
-their own licenses as documented in [NOTICE](NOTICE).
+written permission. Public binaries and release documents are available from
+the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release).
+The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
+third-party notices.
 
 Current release: **V1.0 Beta** (build date: July 29, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
@@ -29,6 +30,12 @@ flight-simulator use only.
 On first launch, a bilingual English/Chinese welcome screen identifies the
 official distribution channel, warns against paid or unauthorized copies, and
 offers a per-device **Do not show again / 不再显示** option.
+
+Official binaries are published only by `skylarkning` through flightsim.to and
+the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release).
+TaxiNow is provided **“AS IS”**, without warranties of any kind. Source code is
+not publicly available; qualified independent security or privacy experts may
+request limited review access solely to verify TaxiNow's security and privacy.
 
 Production branding assets live in
 [`src/TaxiNow.Web/public/branding`](src/TaxiNow.Web/public/branding). The wide

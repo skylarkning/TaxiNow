@@ -32,9 +32,9 @@ AppName={#ProductName}
 AppVerName={#ProductDisplayName}
 AppVersion={#ProductVersion}
 AppPublisher={#ProductPublisher}
-AppPublisherURL=https://github.com/skylarkning
-AppSupportURL=https://github.com/skylarkning/TaxiNow
-AppUpdatesURL=https://flightsim.to/
+AppPublisherURL=https://github.com/skylarkning/TaxiNow-Release
+AppSupportURL=https://github.com/skylarkning/TaxiNow-Release/issues
+AppUpdatesURL=https://github.com/skylarkning/TaxiNow-Release/releases
 DefaultDirName={localappdata}\Programs\TaxiNow
 DefaultGroupName=TaxiNow
 DisableProgramGroupPage=yes
@@ -81,6 +81,7 @@ Name: "{group}\TaxiNow"; Filename: "{app}\{#ProductExeName}"; WorkingDir: "{app}
 Name: "{group}\TaxiNow EULA"; Filename: "{app}\EULA.txt"
 Name: "{group}\TaxiNow License"; Filename: "{app}\LICENSE.txt"
 Name: "{group}\Third-party notices"; Filename: "{app}\NOTICE"
+Name: "{group}\TaxiNow official releases"; Filename: "https://github.com/skylarkning/TaxiNow-Release"
 Name: "{group}\Uninstall TaxiNow"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\TaxiNow"; Filename: "{app}\{#ProductExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 

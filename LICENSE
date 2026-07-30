@@ -21,9 +21,10 @@ identified in NOTICE or accompanied by their own license terms.
 
 "Official Copy" means an unmodified copy obtained from:
 
-  a. the TaxiNow source repository published by Sky Ning; or
-  b. the official TaxiNow binary distribution page operated by Sky Ning on
-     flightsim.to.
+  a. the TaxiNow page on flightsim.to published by the account
+     "skylarkning"; or
+  b. the TaxiNow-Release repository or its Releases page at
+     https://github.com/skylarkning/TaxiNow-Release.
 
 "Personal Non-Commercial Use" means use by an individual solely for that
 individual's private flight-simulation activity, without payment, revenue,
@@ -40,10 +41,6 @@ non-exclusive, non-transferable, and non-sublicensable permission to:
      Non-Commercial Use with a consumer flight simulator; and
   c. make reasonable backup copies solely for your own permitted use, provided
      those copies are not shared with any other person.
-
-You may view the published source code and compile an unmodified copy solely
-for the use permitted above. Publication of source code does not grant
-permission to modify it or create derivative works.
 
 3. RESTRICTIONS
 
@@ -69,19 +66,25 @@ Unless Sky Ning gives you prior express written permission, you may not:
   h. reverse engineer, decompile, or disassemble TaxiNow except to the limited
      extent that applicable law expressly prohibits this restriction.
 
-4. PUBLIC REPOSITORY PLATFORM RIGHTS
+4. OFFICIAL RELEASE REPOSITORY AND SOURCE REVIEW
 
-If the TaxiNow source repository is public on GitHub, GitHub's Terms of Service
-may separately permit users to view and fork public repository content through
-GitHub's own functionality. Those platform rights are not an additional
-license from Sky Ning and do not grant permission to modify TaxiNow, prepare
-derivative works, use it commercially, or distribute it outside the permissions
-expressly stated in this license.
+The public TaxiNow-Release repository provides official binaries, release
+information, this license, the EULA, and third-party notices. It does not
+contain the TaxiNow source code and is not a grant of open-source rights.
+
+TaxiNow source code is not publicly available. Qualified independent security
+or privacy experts may request limited review access from Sky Ning for the sole
+purpose of verifying TaxiNow's security or privacy behavior. Approval and
+review conditions are at Sky Ning's discretion. Review access grants no right
+to copy, modify, compile, publish, disclose, or redistribute source code or
+TaxiNow Materials.
 
 5. OFFICIAL DISTRIBUTION AND PAYMENT WARNING
 
-TaxiNow is provided free of charge. The official public binary distribution
-channel is Sky Ning's TaxiNow page on flightsim.to. No reseller, marketplace,
+TaxiNow is provided free of charge. Official public binaries are distributed
+only by "skylarkning" through the TaxiNow page on flightsim.to and the
+TaxiNow-Release repository at
+https://github.com/skylarkning/TaxiNow-Release. No reseller, marketplace,
 group, individual, or other platform is authorized to sell or redistribute
 TaxiNow. If you paid for TaxiNow, the seller was not authorized by Sky Ning.
 

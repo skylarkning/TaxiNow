@@ -139,7 +139,7 @@ function setupAboutDialog(): void {
 }
 
 function setupWelcomeDialog(): void {
-  const storageKey = "taxinow.welcome.v1.dismissed";
+  const storageKey = "taxinow.welcome.v2.dismissed";
   const dialog = document.querySelector<HTMLElement>("#welcome-dialog")!;
   const backdrop =
     document.querySelector<HTMLButtonElement>("#welcome-backdrop")!;

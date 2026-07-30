@@ -12,10 +12,11 @@ YOU DO NOT AGREE, DO NOT INSTALL OR USE TAXINOW.
 
 TaxiNow is a Windows airport ground-map application developed by Sky Ning for
 personal use with consumer flight simulators. TaxiNow is provided free of
-charge. The official binary distribution channel is Sky Ning's TaxiNow page on
-flightsim.to. No reseller, marketplace, group, individual, or other platform is
-authorized to sell or redistribute TaxiNow. If you paid for TaxiNow, the seller
-was not authorized by Sky Ning.
+charge. Official binaries are published only by the account "skylarkning"
+through the TaxiNow page on flightsim.to and the TaxiNow-Release repository at
+https://github.com/skylarkning/TaxiNow-Release. No reseller, marketplace,
+group, individual, or other platform is authorized to sell or redistribute
+TaxiNow. If you paid for TaxiNow, the seller was not authorized by Sky Ning.
 
 2. LIMITED PERSONAL LICENSE
 
@@ -88,9 +89,16 @@ directories.
 
 TaxiNow and its original source code, executable files, user interface,
 artwork, logos, documentation, and other original materials are copyrighted by
-Sky Ning. All rights not expressly granted are reserved. Publication of source
-code does not grant permission to modify it, create derivative works, use it
+Sky Ning. All rights not expressly granted are reserved. Availability of
+release materials, license documents, or any limited source-review access does
+not grant permission to modify TaxiNow, create derivative works, use it
 commercially, or redistribute it.
+
+TaxiNow source code is not publicly available. Qualified independent security
+or privacy experts may request limited review access from Sky Ning for the sole
+purpose of verifying TaxiNow's security or privacy behavior. Approval and
+review conditions are at Sky Ning's discretion. Review access grants no right
+to copy, modify, compile, publish, disclose, or redistribute source code.
 
 9. TERMINATION
 
