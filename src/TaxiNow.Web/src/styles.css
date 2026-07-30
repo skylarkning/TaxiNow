@@ -317,9 +317,10 @@ button:disabled {
 
 .fallback-gate,
 .fallback-parking_position {
-  fill: #60d3c0;
-  stroke: #0c1720;
-  stroke-width: 1;
+  fill: none;
+  stroke: #8cb89e;
+  stroke-width: 0.65;
+  opacity: 0.58;
 }
 
 .fallback-label {
@@ -602,6 +603,22 @@ footer {
 .asset-group summary span {
   color: #78919e;
   font-size: 9px;
+}
+
+.asset-group-metadata {
+  white-space: nowrap;
+}
+
+.asset-group-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.asset-group-delete {
+  flex: 0 0 auto;
+  padding: 3px 5px;
+  cursor: pointer;
 }
 
 .asset-region {

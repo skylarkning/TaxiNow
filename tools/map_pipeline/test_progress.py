@@ -77,5 +77,44 @@ class DownloadProgressTests(unittest.TestCase):
         self.assertEqual(2, latest["estimatedRemainingSeconds"])
 
 
+class AirportSelectionTests(unittest.TestCase):
+    def setUp(self):
+        self.catalog = [
+            pipeline.Airport(
+                "CYUL", "Montréal-Trudeau", "CA", "CA-QC", "Montréal",
+                45.4706, -73.7408, "large_airport"
+            ),
+            pipeline.Airport(
+                "CYYZ", "Toronto Pearson", "CA", "CA-ON", "Toronto",
+                43.6772, -79.6306, "large_airport"
+            ),
+        ]
+
+    def test_country_download_excludes_installed_airports_before_limit(self):
+        selected = pipeline.select_airports(
+            {
+                "command": "download_country",
+                "countryCode": "CA",
+                "maximumCount": 1,
+                "excludeIcaos": ["CYUL"],
+            },
+            self.catalog,
+        )
+
+        self.assertEqual(["CYYZ"], [airport.icao for airport in selected])
+
+    def test_country_download_can_complete_when_every_airport_is_installed(self):
+        selected = pipeline.select_airports(
+            {
+                "command": "download_country",
+                "countryCode": "CA",
+                "excludeIcaos": ["CYUL", "CYYZ"],
+            },
+            self.catalog,
+        )
+
+        self.assertEqual([], selected)
+
+
 if __name__ == "__main__":
     unittest.main()

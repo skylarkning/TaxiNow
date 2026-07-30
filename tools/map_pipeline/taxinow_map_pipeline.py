@@ -780,6 +780,12 @@ def select_airports(request: dict[str, Any], catalog: list[Airport]) -> list[Air
             raise PipelineError(
                 f"No airports were found for country or region '{scope}'."
             )
+        excluded = {
+            str(icao).strip().upper()
+            for icao in request.get("excludeIcaos") or []
+            if str(icao).strip()
+        }
+        matches = [airport for airport in matches if airport.icao not in excluded]
         preferred = sorted(
             matches,
             key=lambda airport: (
@@ -833,6 +839,26 @@ def handle(request: dict[str, Any]) -> None:
     completed = 0
     bytes_written = 0
     warnings: list[str] = []
+    if request.get("command") == "download_country":
+        country = str(request.get("countryCode") or "").strip().upper()
+        region = str(request.get("regionCode") or "").strip().upper()
+        excluded = {
+            str(icao).strip().upper()
+            for icao in request.get("excludeIcaos") or []
+            if str(icao).strip()
+        }
+        skipped = sum(
+            1
+            for airport in catalog
+            if airport.country_code == country
+            and (not region or airport.region_code == region)
+            and airport.icao in excluded
+        )
+        if skipped:
+            warnings.append(
+                f"Skipped {skipped} already installed airport"
+                f"{'' if skipped == 1 else 's'}."
+            )
     outputs: list[str] = []
     for airport in selected:
         protocol.progress(

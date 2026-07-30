@@ -27,7 +27,8 @@ desktop WebView2 shell and in an optional browser view.
   four-character ICAO code offers an immediate download beside the search.
 - Installed assets are grouped as country → region → airport, following the
   SkyCharts asset hierarchy, and folded groups retain their state during live
-  download refreshes.
+  download refreshes. Country and region rows can delete every map beneath
+  them after confirmation.
 - SQLite-backed asset catalog and atomic map replacement.
 - WPF/WebView2 desktop shell with deterministic Close/Quit behavior and
   minimize-to-tray support. Left-click the tray icon to restore it, or
@@ -38,7 +39,8 @@ desktop WebView2 shell and in an optional browser view.
 - JSON-lines Python acquisition pipeline with the proven SkyCharts
   airport-geometry acquisition logic, country/ICAO jobs, caching, coordinated
   OpenStreetMap queries, X-Plane Scenery Gateway detail fallback, and an
-  OurAirports runway fallback.
+  OurAirports runway fallback. Country and region downloads skip ICAOs that are
+  already installed, applying the requested download limit only to new maps.
 - Native x64 SimConnect C ABI spike, managed wrapper, JSONL recorder, and replay
   source.
 

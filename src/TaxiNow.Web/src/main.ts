@@ -503,7 +503,9 @@ function renderStorage(storage: StorageSummary): void {
     country.addEventListener("toggle", () => {
       assetGroupOpenState.set(countryKey, country.open);
     });
-    country.append(createAssetGroupSummary(countryCode, countryAssets));
+    country.append(
+      createAssetGroupSummary(countryCode, countryAssets, "country")
+    );
 
     const regions = groupBy(
       countryAssets,
@@ -518,7 +520,9 @@ function renderStorage(storage: StorageSummary): void {
       region.addEventListener("toggle", () => {
         assetGroupOpenState.set(regionKey, region.open);
       });
-      region.append(createAssetGroupSummary(regionCode, regionAssets));
+      region.append(
+        createAssetGroupSummary(regionCode, regionAssets, "region")
+      );
       const airports = document.createElement("div");
       airports.className = "asset-airports";
       for (const asset of regionAssets.sort((left, right) =>
@@ -534,17 +538,65 @@ function renderStorage(storage: StorageSummary): void {
 
 function createAssetGroupSummary(
   label: string,
-  assets: StoredMapAsset[]
+  assets: StoredMapAsset[],
+  groupType: "country" | "region"
 ): HTMLElement {
   const summary = document.createElement("summary");
   const name = document.createElement("strong");
   name.textContent = label;
   const metadata = document.createElement("span");
+  metadata.className = "asset-group-metadata";
   metadata.textContent =
     `${assets.length} airport${assets.length === 1 ? "" : "s"} · ` +
     formatBytes(assets.reduce((sum, asset) => sum + asset.sizeBytes, 0));
-  summary.append(name, metadata);
+  const actions = document.createElement("span");
+  actions.className = "asset-group-actions";
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "danger-button asset-group-delete";
+  remove.textContent = "Delete all";
+  remove.title = `Delete every installed map in this ${groupType}`;
+  remove.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    void deleteAssetGroup(label, groupType, assets, remove);
+  });
+  actions.append(metadata, remove);
+  summary.append(name, actions);
   return summary;
+}
+
+async function deleteAssetGroup(
+  label: string,
+  groupType: "country" | "region",
+  assets: StoredMapAsset[],
+  button: HTMLButtonElement
+): Promise<void> {
+  const size = assets.reduce((sum, asset) => sum + asset.sizeBytes, 0);
+  const confirmed = window.confirm(
+    `Delete all ${assets.length} installed map` +
+    `${assets.length === 1 ? "" : "s"} in ${groupType} ${label}? ` +
+    `This will remove ${formatBytes(size)}.`
+  );
+  if (!confirmed) {
+    return;
+  }
+  button.disabled = true;
+  const failures: string[] = [];
+  for (const asset of assets) {
+    try {
+      await requestJson<void>(
+        `/api/v1/assets/${encodeURIComponent(asset.icao)}`,
+        { method: "DELETE" }
+      );
+    } catch {
+      failures.push(asset.icao);
+    }
+  }
+  await refreshAssetManager();
+  if (failures.length > 0) {
+    window.alert(`Could not delete: ${failures.join(", ")}.`);
+  }
 }
 
 function groupBy<T>(
@@ -1004,19 +1056,6 @@ function addAirportLayers(target: MapLibreMap): void {
       "text-color": "#eef4f8",
       "text-halo-color": "#263442",
       "text-halo-width": 2
-    }
-  });
-  target.addLayer({
-    id: "stands",
-    type: "circle",
-    source: "airport",
-    filter: ["in", ["get", "kind"], ["literal", ["gate", "parking_position"]]],
-    minzoom: 14.5,
-    paint: {
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 14.5, 2, 18, 5],
-      "circle-color": "#60d3c0",
-      "circle-stroke-color": "#0c1720",
-      "circle-stroke-width": 1
     }
   });
   target.addLayer({
@@ -1501,6 +1540,13 @@ function activateFallbackOverlay(
         ["apron", "terminal", "hangar", "pavement"].includes(feature.kind)
       ) {
         backgroundGroup.append(createFallbackGeometry(feature, points, zoom));
+      } else if (feature.kind === "holding_position") {
+        continue;
+      } else if (
+        (feature.kind === "gate" || feature.kind === "parking_position") &&
+        points.length === 1
+      ) {
+        continue;
       } else {
         foregroundGroup.append(createFallbackGeometry(feature, points, zoom));
       }

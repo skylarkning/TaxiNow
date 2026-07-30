@@ -189,6 +189,12 @@ public sealed class DownloadJobService(
                 "jobs",
                 jobId.ToString("N"));
             Directory.CreateDirectory(outputDirectory);
+            var excludedIcaos = request.Mode == "country"
+                ? (await assets.GetSummaryAsync(cancellationToken))
+                    .Assets
+                    .Select(static asset => asset.Icao)
+                    .ToArray()
+                : null;
             var pipelineRequest = new PipelineRequest(
                 ProtocolVersion: "1",
                 RequestId: jobId.ToString("N"),
@@ -200,7 +206,8 @@ public sealed class DownloadJobService(
                 MaximumCount: request.MaximumCount,
                 OutputDirectory: outputDirectory,
                 CacheDirectory: storagePaths.SourceCachePath,
-                RegionCode: request.RegionCode);
+                RegionCode: request.RegionCode,
+                ExcludeIcaos: excludedIcaos);
 
             PipelineEvent? completed = null;
             await foreach (var pipelineEvent in client.RunAsync(
@@ -235,7 +242,7 @@ public sealed class DownloadJobService(
                 imported++;
             }
 
-            if (imported == 0)
+            if (imported == 0 && completed.AirportsTotal != 0)
             {
                 throw new InvalidOperationException(
                     completed.Warnings?.Count > 0
