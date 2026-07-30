@@ -9,7 +9,6 @@ public sealed record PipelineRequest(
     string Command,
     string? Icao,
     string? CountryCode,
-    int? MaximumCount,
     string OutputDirectory,
     string CacheDirectory,
     string? RegionCode,

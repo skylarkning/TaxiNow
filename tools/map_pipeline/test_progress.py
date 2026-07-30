@@ -90,12 +90,11 @@ class AirportSelectionTests(unittest.TestCase):
             ),
         ]
 
-    def test_country_download_excludes_installed_airports_before_limit(self):
+    def test_country_download_excludes_installed_airports(self):
         selected = pipeline.select_airports(
             {
                 "command": "download_country",
                 "countryCode": "CA",
-                "maximumCount": 1,
                 "excludeIcaos": ["CYUL"],
             },
             self.catalog,

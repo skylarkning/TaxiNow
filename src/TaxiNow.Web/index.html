@@ -75,11 +75,11 @@
             Download by
             <select id="download-mode">
               <option value="icao">Airport ICAO</option>
-              <option value="country">Country or region</option>
+              <option value="country">Country/region or province/state</option>
             </select>
           </label>
           <div id="icao-fields">
-            <label>
+            <label for="download-icao">
               ICAO code
               <input id="download-icao"
                      name="icao"
@@ -90,30 +90,38 @@
             </label>
           </div>
           <div id="country-fields" class="form-grid" hidden>
-            <label>
-              Country
+            <div class="form-field">
+              <span class="field-label-with-info">
+                <label for="download-country">Country/Region</label>
+                <span class="info-bubble">
+                  <button class="info-trigger"
+                          type="button"
+                          aria-label="Where to find two-letter country or region codes"
+                          aria-describedby="country-code-help">i</button>
+                  <span id="country-code-help"
+                        class="info-tooltip"
+                        role="tooltip">
+                    Use the ISO 3166-1 two-letter country/region code, such as
+                    CA, US, or GB.
+                    <a href="https://www.iso.org/iso-3166-country-codes.html"
+                       target="_blank"
+                       rel="noopener noreferrer">Find a code at ISO</a>.
+                  </span>
+                </span>
+              </span>
               <input id="download-country"
                      name="countryCode"
                      autocomplete="off"
                      maxlength="2"
                      placeholder="CA" />
-            </label>
-            <label>
-              Region (optional)
+            </div>
+            <label for="download-region">
+              Province/State (optional)
               <input id="download-region"
                      name="regionCode"
                      autocomplete="off"
                      maxlength="7"
                      placeholder="CA-ON" />
-            </label>
-            <label class="full-row">
-              Maximum airports
-              <input id="download-maximum"
-                     name="maximumCount"
-                     type="number"
-                     min="1"
-                     max="500"
-                     value="25" />
             </label>
           </div>
           <button id="start-download" class="primary-button" type="submit">

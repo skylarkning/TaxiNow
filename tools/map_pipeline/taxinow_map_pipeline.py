@@ -793,8 +793,7 @@ def select_airports(request: dict[str, Any], catalog: list[Airport]) -> list[Air
                 airport.icao,
             ),
         )
-        maximum = request.get("maximumCount")
-        return preferred if maximum is None else preferred[: max(0, int(maximum))]
+        return preferred
     raise PipelineError("Command must be download_icao or download_country.")
 
 

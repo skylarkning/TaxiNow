@@ -20,15 +20,17 @@ desktop WebView2 shell and in an optional browser view.
   intervals using the SkyCharts marker-density convention.
 - Smooth replay ownship animation through a SignalR telemetry stream.
 - Schema v2 validation and a schema v1 adapter.
-- Visible map downloader and asset manager for ICAO, country, and optional
-  region downloads, with byte-level progress, transfer speed, estimated time
-  remaining, installed-map sizes, free disk space, queue clearing, and deletion.
+- Visible map downloader and asset manager for ICAO, country/region, and
+  optional province/state downloads, with byte-level progress, transfer speed,
+  estimated time remaining, installed-map sizes, free disk space, queue
+  clearing, and deletion. Country/region downloads include inline guidance and
+  a link to the official ISO 3166-1 two-letter code list.
 - Header airport search switches among installed maps. Entering a missing
   four-character ICAO code offers an immediate download beside the search.
-- Installed assets are grouped as country → region → airport, following the
-  SkyCharts asset hierarchy, and folded groups retain their state during live
-  download refreshes. Country and region rows can delete every map beneath
-  them after confirmation.
+- Installed assets are grouped as country/region → province/state → airport,
+  following the SkyCharts asset hierarchy, and folded groups retain their state
+  during live download refreshes. Country/region and province/state rows can
+  delete every map beneath them after confirmation.
 - SQLite-backed asset catalog and atomic map replacement.
 - WPF/WebView2 desktop shell with deterministic Close/Quit behavior and
   minimize-to-tray support. Left-click the tray icon to restore it, or
@@ -39,8 +41,9 @@ desktop WebView2 shell and in an optional browser view.
 - JSON-lines Python acquisition pipeline with the proven SkyCharts
   airport-geometry acquisition logic, country/ICAO jobs, caching, coordinated
   OpenStreetMap queries, X-Plane Scenery Gateway detail fallback, and an
-  OurAirports runway fallback. Country and region downloads skip ICAOs that are
-  already installed, applying the requested download limit only to new maps.
+  OurAirports runway fallback. Country/region and province/state downloads skip
+  ICAOs that are already installed and acquire every remaining airport in the
+  selected scope.
 - Native x64 SimConnect C ABI spike, managed wrapper, JSONL recorder, and replay
   source.
 

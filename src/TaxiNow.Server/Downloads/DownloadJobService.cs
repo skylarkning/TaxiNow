@@ -8,7 +8,6 @@ public sealed record DownloadRequest(
     string Mode,
     string? Icao,
     string? CountryCode,
-    int? MaximumCount,
     string? RegionCode = null);
 
 public sealed record DownloadJob(
@@ -63,13 +62,7 @@ public static class DownloadRequestValidator
             if (normalized.CountryCode?.Length != 2)
             {
                 throw new ArgumentException(
-                    "Country mode requires an ISO 3166-1 alpha-2 country code.");
-            }
-            if (normalized.MaximumCount is <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(request),
-                    "Maximum count must be positive when supplied.");
+                    "Country/region mode requires an ISO 3166-1 alpha-2 code.");
             }
             if (normalized.RegionCode is { Length: > 0 } regionCode &&
                 (!regionCode.StartsWith(
@@ -78,7 +71,8 @@ public static class DownloadRequestValidator
                  regionCode.Length is < 4 or > 7))
             {
                 throw new ArgumentException(
-                    "Region code must match the country, for example CA-ON.");
+                    "Province/state code must match the country/region, " +
+                    "for example CA-ON.");
             }
             return normalized;
         }
@@ -203,7 +197,6 @@ public sealed class DownloadJobService(
                     : "download_country",
                 Icao: request.Icao,
                 CountryCode: request.CountryCode,
-                MaximumCount: request.MaximumCount,
                 OutputDirectory: outputDirectory,
                 CacheDirectory: storagePaths.SourceCachePath,
                 RegionCode: request.RegionCode,

@@ -39,7 +39,7 @@ public sealed class ServerContractTests
     public void IcaoDownload_IsNormalized()
     {
         var request = DownloadRequestValidator.NormalizeAndValidate(
-            new DownloadRequest(" ICAO ", " cyyz ", null, null));
+            new DownloadRequest(" ICAO ", " cyyz ", null));
 
         Assert.Equal("icao", request.Mode);
         Assert.Equal("CYYZ", request.Icao);
@@ -50,19 +50,18 @@ public sealed class ServerContractTests
     {
         Assert.Throws<ArgumentException>(() =>
             DownloadRequestValidator.NormalizeAndValidate(
-                new DownloadRequest("country", null, "CAN", null)));
+                new DownloadRequest("country", null, "CAN")));
     }
 
     [Fact]
     public void RegionDownload_IsNormalized()
     {
         var request = DownloadRequestValidator.NormalizeAndValidate(
-            new DownloadRequest(" country ", null, " ca ", 25, " ca-on "));
+            new DownloadRequest(" country ", null, " ca ", " ca-on "));
 
         Assert.Equal("country", request.Mode);
         Assert.Equal("CA", request.CountryCode);
         Assert.Equal("CA-ON", request.RegionCode);
-        Assert.Equal(25, request.MaximumCount);
     }
 
     [Fact]
@@ -70,6 +69,6 @@ public sealed class ServerContractTests
     {
         Assert.Throws<ArgumentException>(() =>
             DownloadRequestValidator.NormalizeAndValidate(
-                new DownloadRequest("country", null, "CA", 25, "US-NY")));
+                new DownloadRequest("country", null, "CA", "US-NY")));
     }
 }

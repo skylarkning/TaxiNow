@@ -250,8 +250,7 @@ async function queueIcaoDownload(
         mode: "icao",
         icao,
         countryCode: null,
-        regionCode: null,
-        maximumCount: null
+        regionCode: null
       })
     });
     pendingAirportIcao = icao;
@@ -368,9 +367,6 @@ async function submitDownload(form: HTMLFormElement): Promise<void> {
     .querySelector<HTMLInputElement>("#download-region")!
     .value.trim()
     .toUpperCase();
-  const maximum = Number(
-    document.querySelector<HTMLInputElement>("#download-maximum")!.value
-  );
 
   if (!form.reportValidity()) {
     return;
@@ -379,7 +375,8 @@ async function submitDownload(form: HTMLFormElement): Promise<void> {
       regionCode &&
       !regionCode.startsWith(`${countryCode}-`)) {
     feedback.textContent =
-      `Region must start with ${countryCode}-, for example ${countryCode}-ON.`;
+      `Province/state must start with ${countryCode}-, ` +
+      `for example ${countryCode}-ON.`;
     feedback.className = "feedback error";
     return;
   }
@@ -397,8 +394,7 @@ async function submitDownload(form: HTMLFormElement): Promise<void> {
         mode,
         icao: mode === "icao" ? icao : null,
         countryCode: mode === "country" ? countryCode : null,
-        regionCode: mode === "country" && regionCode ? regionCode : null,
-        maximumCount: mode === "country" ? maximum : null
+        regionCode: mode === "country" && regionCode ? regionCode : null
       })
     });
     feedback.textContent = "Download started. Progress appears below.";

@@ -475,13 +475,71 @@ footer {
   margin: 0;
 }
 
-.download-form label {
+.download-form > label,
+#icao-fields > label,
+.form-grid > label,
+.download-form .form-field {
   display: grid;
   gap: 6px;
   margin-bottom: 12px;
   color: #a9bec8;
   font-size: 11px;
   font-weight: 650;
+}
+
+.field-label-with-info {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.info-bubble {
+  position: relative;
+  display: inline-flex;
+}
+
+.info-trigger {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid rgba(76, 240, 209, 0.55);
+  border-radius: 50%;
+  color: #4cf0d1;
+  background: rgba(7, 17, 29, 0.8);
+  font: 800 10px/14px "Segoe UI", sans-serif;
+  cursor: help;
+}
+
+.info-tooltip {
+  position: absolute;
+  z-index: 30;
+  bottom: calc(100% + 7px);
+  left: -8px;
+  width: 240px;
+  padding: 9px 10px;
+  border: 1px solid rgba(147, 181, 198, 0.35);
+  border-radius: 7px;
+  color: #c9d8de;
+  background: #07131f;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.info-tooltip a {
+  color: #4cf0d1;
+}
+
+.info-bubble:hover .info-tooltip,
+.info-bubble:focus-within .info-tooltip {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .download-form input,
