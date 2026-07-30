@@ -23,7 +23,7 @@ the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release)
 The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
 third-party notices.
 
-Current release: **V1.0 Beta 3** (build date: July 30, 2026). The About dialog
+Current release: **V1.0 Beta 4** (build date: July 30, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is a free-of-charge application for personal
 flight-simulator use only.
@@ -78,13 +78,26 @@ their surrounding white canvas and create the required output sizes.
   bandwidth, resource, and source-rate-limit tradeoffs of higher concurrency.
   Source-side waits that expose no measurable byte progress use an animated
   active state and elapsed timer instead of a misleading `0%` and guessed ETA;
-  percentages, speed, and ETA appear once progress becomes measurable.
+  percentages, speed, and ETA appear once progress becomes measurable. Beta 4
+  additionally marks a source wait as visibly stalled after 45 seconds and
+  limits the complete OSM attempt to 120 seconds.
+- OpenStreetMap remains the preferred detailed source. Runway-derived query
+  bounds reduce unnecessary urban geometry, adaptive endpoint health avoids
+  repeatedly selecting a slow service, and bundled/mirrored OurAirports
+  catalogs keep catalog connection resets from aborting downloads.
+- English and Simplified Chinese are selectable from the header. Download
+  guidance, statuses, controls, dialogs, and the downloaded-asset hierarchy
+  are localized.
 - Header airport search switches among installed maps. Entering a missing
   four-character ICAO code offers an immediate download beside the search.
 - Installed assets are grouped as country/region → province/state → airport,
   following the SkyCharts asset hierarchy, and folded groups retain their state
   during live download refreshes. Country/region and province/state rows can
-  delete every map beneath them after confirmation.
+  delete every map beneath them after confirmation. Chinese provinces and
+  Japanese prefectures use human-readable localized names instead of raw ISO
+  subdivision codes.
+- Isolated nearby-airport or heliport geometry is excluded from rendering and
+  map bounds, so **Fit airport** frames the selected airport correctly.
 - SQLite-backed asset catalog and atomic map replacement.
 - Desktop users can choose the downloaded-map and asset-catalog folder from
   **Maps & storage**. The per-user choice persists across launches; changing it

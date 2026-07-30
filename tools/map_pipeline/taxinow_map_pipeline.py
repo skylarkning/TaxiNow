@@ -8,6 +8,7 @@ import concurrent.futures
 import csv
 import gzip
 import hashlib
+import http.client
 import io
 import json
 import math
@@ -28,8 +29,14 @@ from typing import Any, Iterable
 import skycharts_airport_map as skycharts_map
 
 PROTOCOL_VERSION = "1"
-OURAIRPORTS_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
-RUNWAYS_URL = "https://davidmegginson.github.io/ourairports-data/runways.csv"
+OURAIRPORTS_URLS = (
+    "https://davidmegginson.github.io/ourairports-data/airports.csv",
+    "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv",
+)
+RUNWAYS_URLS = (
+    "https://davidmegginson.github.io/ourairports-data/runways.csv",
+    "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/runways.csv",
+)
 OVERPASS_URLS = (
     "https://overpass.private.coffee/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
@@ -51,6 +58,9 @@ SUPPORTED_KINDS = {
     "pavement",
 }
 ALLOWED_PARALLEL_DOWNLOADS = {1, 2, 4, 8, 16}
+CATALOG_MAXIMUM_AGE = timedelta(days=7)
+CATALOG_REQUEST_TIMEOUT = 30
+CATALOG_ATTEMPTS_PER_URL = 2
 
 
 @dataclass(frozen=True)
@@ -160,6 +170,10 @@ class SourceCache:
             return None
         return path.read_bytes()
 
+    def read_bytes_stale(self, key: str) -> bytes | None:
+        path = self.positive / key
+        return path.read_bytes() if path.exists() else None
+
     def write_bytes(self, key: str, data: bytes) -> None:
         atomic_write(self.positive / key, data)
 
@@ -235,7 +249,15 @@ def request_bytes(
                             else None,
                         )
                 return b"".join(chunks)
-        except (urllib.error.URLError, TimeoutError) as error:
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            ConnectionResetError,
+            ConnectionAbortedError,
+            BrokenPipeError,
+            http.client.IncompleteRead,
+            OSError,
+        ) as error:
             if attempt + 1 == attempts:
                 raise PipelineError(f"Source request failed: {error}") from error
             time.sleep(delay + random.random() * 0.25)
@@ -243,15 +265,72 @@ def request_bytes(
     raise AssertionError("unreachable")
 
 
-def load_airports(cache: SourceCache, progress_callback=None) -> list[Airport]:
-    key = SourceCache.key("ourairports", "airports.csv")
-    raw = cache.read_bytes(key, timedelta(days=7))
-    if raw is None:
-        raw = request_bytes(
-            OURAIRPORTS_URL,
-            progress_callback=progress_callback,
-        )
+def bundled_catalog(name: str) -> bytes | None:
+    base = pathlib.Path(
+        getattr(sys, "_MEIPASS", pathlib.Path(__file__).resolve().parent)
+    )
+    path = base / "data" / f"{name}.gz"
+    if not path.exists():
+        return None
+    try:
+        return gzip.decompress(path.read_bytes())
+    except (OSError, EOFError):
+        return None
+
+
+def load_catalog_dataset(
+    cache: SourceCache,
+    name: str,
+    urls: tuple[str, ...],
+    progress_callback=None,
+) -> bytes:
+    key = SourceCache.key("ourairports", name)
+    fresh = cache.read_bytes(key, CATALOG_MAXIMUM_AGE)
+    if fresh is not None:
+        raw = fresh
+    else:
+        stale = cache.read_bytes_stale(key)
+        seed = bundled_catalog(name)
+        if stale is None and seed is not None:
+            raw = seed
+        else:
+            errors: list[str] = []
+            raw = None
+            for url in urls:
+                try:
+                    raw = request_bytes(
+                        url,
+                        timeout=CATALOG_REQUEST_TIMEOUT,
+                        attempts=CATALOG_ATTEMPTS_PER_URL,
+                        progress_callback=progress_callback,
+                    )
+                    break
+                except PipelineError as error:
+                    errors.append(
+                        f"{urllib.parse.urlparse(url).netloc}: {error}"
+                    )
+            if raw is None:
+                raw = stale or seed
+            if raw is None:
+                raise PipelineError(
+                    f"Unable to obtain {name}: " + "; ".join(errors)
+                )
         cache.write_bytes(key, raw)
+
+    work_name = f"ourairports-{name}"
+    work_path = cache.root / "work" / work_name
+    if not work_path.exists() or work_path.stat().st_size != len(raw):
+        atomic_write(work_path, raw)
+    return raw
+
+
+def load_airports(cache: SourceCache, progress_callback=None) -> list[Airport]:
+    raw = load_catalog_dataset(
+        cache,
+        "airports.csv",
+        OURAIRPORTS_URLS,
+        progress_callback,
+    )
     text = raw.decode("utf-8-sig")
     airports: list[Airport] = []
     for row in csv.DictReader(io.StringIO(text)):
@@ -334,11 +413,11 @@ def load_runway_fallback(
     airport: Airport,
     cache: SourceCache,
 ) -> dict[str, Any]:
-    key = SourceCache.key("ourairports", "runways.csv")
-    raw = cache.read_bytes(key, timedelta(days=7))
-    if raw is None:
-        raw = request_bytes(RUNWAYS_URL)
-        cache.write_bytes(key, raw)
+    raw = load_catalog_dataset(
+        cache,
+        "runways.csv",
+        RUNWAYS_URLS,
+    )
     features: list[dict[str, Any]] = []
     points: list[list[float]] = []
     for row in csv.DictReader(io.StringIO(raw.decode("utf-8-sig"))):
@@ -1031,6 +1110,10 @@ def handle(request: dict[str, Any]) -> None:
         )
 
     catalog = load_airports(cache, catalog_progress)
+    # Seed the shared SkyCharts-compatible work cache before any parallel
+    # workers start. This avoids duplicate catalog downloads and gives every
+    # airport a runway-derived OSM query boundary.
+    load_catalog_dataset(cache, "runways.csv", RUNWAYS_URLS)
     selected = select_airports(request, catalog)
     total = len(selected)
     completed = 0

@@ -78,11 +78,26 @@ try {
             Assert-NativeSuccess 'pnpm install'
         }
     }
-    & $pnpm run build
-    Assert-NativeSuccess 'Web build'
-    if (-not $SkipTests) {
-        & $pnpm run test
-        Assert-NativeSuccess 'Web tests'
+    if ($SkipWebInstall) {
+        & $node (Join-Path $webRoot 'node_modules\typescript\bin\tsc') `
+            --noEmit
+        Assert-NativeSuccess 'TypeScript check'
+        & $node (Join-Path $webRoot 'node_modules\vite\bin\vite.js') `
+            build --configLoader runner
+        Assert-NativeSuccess 'Web build'
+        if (-not $SkipTests) {
+            & $node (Join-Path $webRoot 'node_modules\vitest\vitest.mjs') `
+                run --configLoader runner
+            Assert-NativeSuccess 'Web tests'
+        }
+    }
+    else {
+        & $pnpm run build
+        Assert-NativeSuccess 'Web build'
+        if (-not $SkipTests) {
+            & $pnpm run test
+            Assert-NativeSuccess 'Web tests'
+        }
     }
 }
 finally {
@@ -99,7 +114,13 @@ if (-not $SkipTests) {
 }
 
 if (-not $SkipPipelinePackage) {
-    $pipelineInputs = @($pipelineScript, $pipelineModule, $pipelineSpec)
+$pipelineInputs = @(
+    $pipelineScript,
+    $pipelineModule,
+    $pipelineSpec,
+    (Join-Path $pipelineRoot 'data\airports.csv.gz'),
+    (Join-Path $pipelineRoot 'data\runways.csv.gz')
+)
     $packageRequired =
         -not (Test-Path -LiteralPath $pipelineExecutable) -or
         ($pipelineInputs | Where-Object {

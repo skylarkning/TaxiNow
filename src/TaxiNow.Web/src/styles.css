@@ -15,6 +15,11 @@
   display: none !important;
 }
 
+html[data-locale="en"] [lang="zh-Hans"],
+html[data-locale="zh-Hans"] [lang="en"] {
+  display: none !important;
+}
+
 html,
 body,
 #app {
@@ -177,6 +182,11 @@ header > div {
 .actions {
   flex-shrink: 0;
   align-items: center;
+}
+
+#language-selector {
+  min-width: 48px;
+  font-weight: 750;
 }
 
 .server-url {
@@ -817,6 +827,29 @@ footer {
   color: #4cf0d1;
 }
 
+.download-speed-info .info-tooltip {
+  top: calc(100% + 7px);
+  bottom: auto;
+  left: -94px;
+  width: min(360px, calc(100vw - 48px));
+}
+
+.download-speed-info .info-tooltip span,
+.download-speed-info .info-tooltip strong {
+  display: block;
+}
+
+.download-speed-info .info-tooltip span + span {
+  margin-top: 5px;
+}
+
+.download-speed-info .china-network-note {
+  margin-top: 8px !important;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 199, 92, 0.28);
+  color: #ffd38a;
+}
+
 .info-bubble:hover .info-tooltip,
 .info-bubble:focus-within .info-tooltip {
   opacity: 1;
@@ -824,7 +857,8 @@ footer {
   transform: translateY(0);
 }
 
-.telemetry-refresh-control button {
+.telemetry-refresh-control button,
+.fit-airport-control button {
   position: relative;
   width: 29px;
   height: 29px;
@@ -832,11 +866,13 @@ footer {
   background: #f4f8f8;
 }
 
-.telemetry-refresh-control button:hover {
+.telemetry-refresh-control button:hover,
+.fit-airport-control button:hover {
   background: #dce9e9;
 }
 
-.telemetry-refresh-control svg {
+.telemetry-refresh-control svg,
+.fit-airport-control svg {
   width: 18px;
   height: 18px;
   vertical-align: middle;
@@ -1141,8 +1177,13 @@ footer {
 }
 
 .job-failed .job-state,
-.job-cancelled .job-state {
+.job-cancelled .job-state,
+.job-stalled .job-state {
   color: #ff8a99;
+}
+
+.job-stalled {
+  border-color: rgba(255, 138, 153, 0.42);
 }
 
 .text-button,
@@ -1211,6 +1252,14 @@ footer {
   font-weight: 900;
   line-height: 1;
   pointer-events: none;
+}
+
+html[data-locale] .welcome-languages {
+  grid-template-columns: 1fr;
+}
+
+html[data-locale] .welcome-languages section {
+  border: 0;
 }
 
 @media (max-width: 640px) {

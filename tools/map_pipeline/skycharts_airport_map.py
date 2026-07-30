@@ -31,16 +31,20 @@ AIRPORTS_CSV = "https://davidmegginson.github.io/ourairports-data/airports.csv"
 RUNWAYS_CSV = "https://davidmegginson.github.io/ourairports-data/runways.csv"
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 OVERPASS_ENDPOINTS = (
-    "https://overpass.private.coffee/api/interpreter",
     "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
     OVERPASS_URL,
+    "https://overpass.private.coffee/api/interpreter",
 )
 OVERPASS_REQUEST_TIMEOUT = 35
-OVERPASS_FAILURE_COOLDOWN = 45
-OVERPASS_BUSY_WAIT = 180
+OVERPASS_TOTAL_TIMEOUT = 120
+OVERPASS_FAILURE_COOLDOWN = 60
+OVERPASS_MAX_FAILURE_COOLDOWN = 15 * 60
+OVERPASS_BUSY_WAIT = 120
+AIRPORT_QUERY_MARGIN_METRES = 1200
+AIRPORT_FEATURE_DISTANCE_METRES = 1200
 NON_OSM_CACHE_MAX_AGE_DAYS = 1 / 48
-UNAVAILABLE_CACHE_REVISION = 2
-OSM_SOURCE_REVISION = 3
+UNAVAILABLE_CACHE_REVISION = 3
+OSM_SOURCE_REVISION = 4
 XPLANE_SOURCE_REVISION = 4
 XPLANE_GATEWAY_AIRPORT_URL = "https://gateway.x-plane.com/apiv1/airport/{ident}"
 XPLANE_GATEWAY_SCENERY_URL = "https://gateway.x-plane.com/apiv1/scenery/{scenery_id}"
@@ -86,6 +90,8 @@ _AIRPORT_INDEX = {}
 _RUNWAY_INDEX = {}
 _ENDPOINT_RETRY_AFTER = {}
 _ENDPOINT_IN_FLIGHT = set()
+_ENDPOINT_FAILURE_COUNT = {}
+_ENDPOINT_LATENCY = {}
 _XPLANE_RETRY_AFTER = 0
 
 
@@ -227,27 +233,18 @@ def airport_record(ident, airports_csv=None, progress=None):
     raise AirportMapError("Airport %s was not found in the airport index" % ident)
 
 
-def overpass_query(latitude, longitude, radius=5500):
-    south, west, north, east = coordinate_bounds(latitude, longitude, radius)
+def overpass_query(latitude, longitude, radius=5500, bounds=None):
+    south, west, north, east = (
+        bounds if bounds is not None
+        else coordinate_bounds(latitude, longitude, radius)
+    )
     bbox = "{:.7f},{:.7f},{:.7f},{:.7f}".format(south, west, north, east)
-    ways = "\n".join('  way["aeroway"="%s"](%s);' % (kind, bbox) for kind in MAP_KINDS)
     return """[out:json][timeout:25];
 (
-{ways}
-  way["building"="terminal"]({bbox});
-  relation["building"="terminal"]({bbox});
-  relation["aeroway"="terminal"]({bbox});
-  way["building"]["name"~"concourse|satellite",i]({bbox});
-  relation["building"]["name"~"concourse|satellite",i]({bbox});
-  way["building"="hangar"]({bbox});
-  relation["building"="hangar"]({bbox});
-  relation["aeroway"="hangar"]({bbox});
-  relation["aeroway"="apron"]({bbox});
-  node[\"aeroway\"=\"parking_position\"]({bbox});
-  node[\"aeroway\"=\"gate\"]({bbox});
-  node[\"aeroway\"=\"holding_position\"]({bbox});
+  nwr["aeroway"]({bbox});
+  nwr["building"~"^(terminal|hangar)$"]({bbox});
 );
-out body geom;""".format(ways=ways, bbox=bbox)
+out tags geom;""".format(bbox=bbox)
 
 
 def coordinate_bounds(latitude, longitude, radius):
@@ -277,16 +274,28 @@ def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT, progres
     body = urllib.parse.urlencode({"data": query}).encode("utf-8")
     errors = []
     attempted = set()
-    busy_deadline = time.monotonic() + OVERPASS_BUSY_WAIT
+    started = time.monotonic()
+    request_deadline = started + OVERPASS_TOTAL_TIMEOUT
+    busy_deadline = min(
+        request_deadline,
+        started + OVERPASS_BUSY_WAIT,
+    )
     report_progress(progress, "waiting_for_map_source", 8, "OpenStreetMap")
     while True:
         candidate = None
         with _ENDPOINT_CONDITION:
             while candidate is None:
                 now = time.monotonic()
-                eligible = [
+                eligible = sorted(
+                    [
                     value for value in endpoints if value not in attempted
-                ]
+                    ],
+                    key=lambda value: (
+                        _ENDPOINT_FAILURE_COUNT.get(value, 0),
+                        _ENDPOINT_LATENCY.get(value, float("inf")),
+                        endpoints.index(value),
+                    ),
+                )
                 candidate = next(
                     (
                         value
@@ -299,7 +308,7 @@ def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT, progres
                 if candidate:
                     _ENDPOINT_IN_FLIGHT.add(candidate)
                     break
-                remaining = busy_deadline - now
+                remaining = min(busy_deadline, request_deadline) - now
                 if not eligible or remaining <= 0:
                     break
                 retry_delays = [
@@ -326,7 +335,14 @@ def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT, progres
         })
         try:
             report_progress(progress, "waiting_for_map_source", 12, "OpenStreetMap")
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            attempt_started = time.monotonic()
+            remaining = request_deadline - attempt_started
+            if remaining <= 0:
+                break
+            with urllib.request.urlopen(
+                request,
+                timeout=max(1, min(timeout, remaining)),
+            ) as response:
                 payload = read_response(
                     response,
                     progress,
@@ -337,6 +353,14 @@ def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT, progres
                 )
                 result = json.loads(payload.decode("utf-8"))
             with _ENDPOINT_CONDITION:
+                duration = time.monotonic() - attempt_started
+                previous_latency = _ENDPOINT_LATENCY.get(candidate)
+                _ENDPOINT_LATENCY[candidate] = (
+                    duration
+                    if previous_latency is None
+                    else previous_latency * 0.65 + duration * 0.35
+                )
+                _ENDPOINT_FAILURE_COUNT[candidate] = 0
                 _ENDPOINT_RETRY_AFTER.pop(candidate, None)
                 _ENDPOINT_IN_FLIGHT.discard(candidate)
                 _ENDPOINT_CONDITION.notify_all()
@@ -345,18 +369,38 @@ def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT, progres
             host = urllib.parse.urlparse(candidate).netloc
             errors.append("%s: %s" % (host, short_network_error(error)))
             with _ENDPOINT_CONDITION:
-                _ENDPOINT_RETRY_AFTER[candidate] = time.monotonic() + OVERPASS_FAILURE_COOLDOWN
+                failures = _ENDPOINT_FAILURE_COUNT.get(candidate, 0) + 1
+                _ENDPOINT_FAILURE_COUNT[candidate] = failures
+                cooldown = min(
+                    OVERPASS_MAX_FAILURE_COOLDOWN,
+                    OVERPASS_FAILURE_COOLDOWN * (2 ** (failures - 1)),
+                )
+                _ENDPOINT_RETRY_AFTER[candidate] = time.monotonic() + cooldown
                 _ENDPOINT_IN_FLIGHT.discard(candidate)
                 _ENDPOINT_CONDITION.notify_all()
+        if time.monotonic() >= request_deadline:
+            break
     if errors:
         raise OverpassUnavailableError("all available Overpass services failed (%s)" % "; ".join(errors))
-    raise OverpassUnavailableError("Overpass services remained busy for %d seconds or are in a short retry cooldown" % OVERPASS_BUSY_WAIT)
+    raise OverpassUnavailableError(
+        "OpenStreetMap did not respond within %d seconds"
+        % OVERPASS_TOTAL_TIMEOUT
+    )
 
 
-def fetch_overpass(latitude, longitude, radius=5500, endpoint=None, progress=None):
+def fetch_overpass(
+    latitude,
+    longitude,
+    radius=5500,
+    endpoint=None,
+    progress=None,
+    bounds=None,
+):
     endpoints = (endpoint,) if endpoint else OVERPASS_ENDPOINTS
     return request_overpass(
-        overpass_query(latitude, longitude, radius), endpoints, progress=progress
+        overpass_query(latitude, longitude, radius, bounds),
+        endpoints,
+        progress=progress,
     )
 
 
@@ -501,6 +545,53 @@ def ourairports_runway_raw(ident, airport, runways_csv=None):
             ],
         })
     return {"elements": elements}
+
+
+def airport_query_bounds(
+    airport,
+    runway_raw,
+    maximum_radius=5500,
+    margin_metres=AIRPORT_QUERY_MARGIN_METRES,
+):
+    """Build a compact airport bbox from known runway endpoints.
+
+    The fixed-radius query remains the safety envelope. Runway data normally
+    cuts out nearby heliports and unrelated airport facilities while retaining
+    enough room for terminals, aprons, hangars, and connecting taxiways.
+    """
+    fixed = coordinate_bounds(
+        airport["latitude"],
+        airport["longitude"],
+        maximum_radius,
+    )
+    points = [
+        pair
+        for element in (runway_raw or {}).get("elements", [])
+        for pair in (
+            point_pair(value)
+            for value in element.get("geometry", [])
+        )
+        if pair
+    ]
+    if not points:
+        return fixed
+    center_latitude = airport["latitude"]
+    latitude_padding = margin_metres / 111320.0
+    longitude_padding = margin_metres / (
+        111320.0
+        * max(0.2, math.cos(math.radians(center_latitude)))
+    )
+    south = min(point[1] for point in points) - latitude_padding
+    west = min(point[0] for point in points) - longitude_padding
+    north = max(point[1] for point in points) + latitude_padding
+    east = max(point[0] for point in points) + longitude_padding
+    fixed_south, fixed_west, fixed_north, fixed_east = fixed
+    return (
+        max(fixed_south, south),
+        max(fixed_west, west),
+        min(fixed_north, north),
+        min(fixed_east, east),
+    )
 
 
 def request_xplane_json(url, progress=None):
@@ -1046,6 +1137,92 @@ def terminal_label(tags):
     return "Terminal " + value
 
 
+def local_xy(point, latitude):
+    return (
+        point[0] * 111320.0 * math.cos(math.radians(latitude)),
+        point[1] * 111320.0,
+    )
+
+
+def point_segment_distance(point, start, end, latitude):
+    point_x, point_y = local_xy(point, latitude)
+    start_x, start_y = local_xy(start, latitude)
+    end_x, end_y = local_xy(end, latitude)
+    delta_x, delta_y = end_x - start_x, end_y - start_y
+    length_squared = delta_x * delta_x + delta_y * delta_y
+    if length_squared <= 0:
+        return math.hypot(point_x - start_x, point_y - start_y)
+    fraction = max(
+        0.0,
+        min(
+            1.0,
+            (
+                (point_x - start_x) * delta_x
+                + (point_y - start_y) * delta_y
+            )
+            / length_squared,
+        ),
+    )
+    return math.hypot(
+        point_x - (start_x + fraction * delta_x),
+        point_y - (start_y + fraction * delta_y),
+    )
+
+
+def filter_isolated_airport_features(
+    features,
+    airport,
+    maximum_distance=AIRPORT_FEATURE_DISTANCE_METRES,
+):
+    """Remove facilities belonging to nearby airports or heliports.
+
+    Airport downloads are centered using a catalog point, so dense cities can
+    contain unrelated aeroway features. Keep the runway cluster closest to the
+    selected airport and any feature within the configured operational buffer.
+    """
+    latitude = airport["latitude"]
+    center = [airport["longitude"], latitude]
+    runways = [feature for feature in features if feature["kind"] == "runway"]
+    if not runways:
+        return features
+    primary_runways = [
+        feature
+        for feature in runways
+        if min(
+            math.hypot(
+                local_xy(point, latitude)[0] - local_xy(center, latitude)[0],
+                local_xy(point, latitude)[1] - local_xy(center, latitude)[1],
+            )
+            for point in feature["points"]
+        )
+        <= 5000
+    ] or runways
+    runway_segments = [
+        (start, end)
+        for runway in primary_runways
+        for start, end in zip(runway["points"], runway["points"][1:])
+    ]
+    if not runway_segments:
+        return features
+
+    selected = []
+    primary_ids = {id(feature) for feature in primary_runways}
+    for feature in features:
+        if id(feature) in primary_ids:
+            selected.append(feature)
+            continue
+        if not feature["points"]:
+            continue
+        distance = min(
+            point_segment_distance(point, start, end, latitude)
+            for point in feature["points"]
+            for start, end in runway_segments
+        )
+        if distance <= maximum_distance:
+            selected.append(feature)
+    return selected
+
+
 def normalize(raw, airport, source="OpenStreetMap contributors", source_url="https://www.openstreetmap.org/copyright"):
     features = []
     all_points = []
@@ -1081,9 +1258,19 @@ def normalize(raw, airport, source="OpenStreetMap contributors", source_url="htt
         if len(geometry) > 2 and geometry[0] == geometry[-1]:
             feature["closed"] = True
         features.append(feature)
-        all_points.extend(geometry)
     if not features:
         raise AirportMapError("No runway, taxiway, apron, or stand geometry was found for %s" % airport["ident"])
+    features = filter_isolated_airport_features(features, airport)
+    all_points = [
+        point
+        for feature in features
+        for point in feature["points"]
+    ]
+    if not all_points:
+        raise AirportMapError(
+            "No airport geometry remained after filtering isolated features for %s"
+            % airport["ident"]
+        )
     minimum_lon = min(point[0] for point in all_points)
     maximum_lon = max(point[0] for point in all_points)
     minimum_lat = min(point[1] for point in all_points)
@@ -1195,10 +1382,29 @@ def build_airport_map(
             raise AirportMapError(unavailable_reason + " (recent result reused)")
     report_progress(progress, "catalog", 1, "OurAirports")
     airport = airport_record(ident, progress=progress)
-    raw, result, overpass_error, gateway_error, gateway_missing, runway_raw = None, None, None, None, None, None
+    raw, result, overpass_error, gateway_error, gateway_missing = (
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    try:
+        runway_raw = ourairports_runway_raw(ident, airport)
+    except Exception:
+        runway_raw = {"elements": []}
+    query_bounds = airport_query_bounds(
+        airport,
+        runway_raw,
+        maximum_radius=radius,
+    )
     try:
         raw = fetch_overpass(
-            airport["latitude"], airport["longitude"], radius, progress=progress
+            airport["latitude"],
+            airport["longitude"],
+            radius,
+            progress=progress,
+            bounds=query_bounds,
         )
     except OverpassUnavailableError as error:
         overpass_error = error
@@ -1208,10 +1414,6 @@ def build_airport_map(
         if osm_elements:
             has_runway = any(feature_kind((element.get("tags") or {})) == "runway" for element in osm_elements)
             if not has_runway:
-                try:
-                    runway_raw = ourairports_runway_raw(ident, airport)
-                except Exception:
-                    runway_raw = {"elements": []}
                 if runway_raw.get("elements"):
                     osm_elements.extend(runway_raw["elements"])
             try:
@@ -1234,10 +1436,6 @@ def build_airport_map(
             if osm_buildings:
                 gateway_elements.extend(osm_buildings)
             if not any(feature_kind((element.get("tags") or {})) == "runway" for element in gateway_elements):
-                try:
-                    runway_raw = runway_raw or ourairports_runway_raw(ident, airport)
-                except Exception:
-                    runway_raw = {"elements": []}
                 if runway_raw.get("elements"):
                     gateway_elements.extend(runway_raw["elements"])
                     gateway_augmented = True
@@ -1261,12 +1459,6 @@ def build_airport_map(
         except AirportMapError as error:
             gateway_missing = error
     if result is None:
-        try:
-            runway_raw = runway_raw or ourairports_runway_raw(ident, airport)
-        except Exception as error:
-            runway_raw = {"elements": []}
-            if overpass_error is None:
-                overpass_error = OverpassUnavailableError(short_network_error(error))
         if runway_raw.get("elements"):
             result = normalize(runway_raw, airport, source="OurAirports", source_url="https://ourairports.com/data/")
     if result is None:

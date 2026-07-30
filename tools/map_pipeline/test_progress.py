@@ -1,3 +1,4 @@
+import os
 import pathlib
 import tempfile
 import threading
@@ -206,6 +207,8 @@ class OpenStreetMapPriorityTests(unittest.TestCase):
         with skycharts._ENDPOINT_CONDITION:
             skycharts._ENDPOINT_IN_FLIGHT.clear()
             skycharts._ENDPOINT_RETRY_AFTER.clear()
+            skycharts._ENDPOINT_FAILURE_COUNT.clear()
+            skycharts._ENDPOINT_LATENCY.clear()
             skycharts._ENDPOINT_CONDITION.notify_all()
 
     def test_overpass_waits_through_short_endpoint_cooldown(self):
@@ -254,6 +257,111 @@ class OpenStreetMapPriorityTests(unittest.TestCase):
             reason = skycharts.cached_unavailable_reason(marker)
 
         self.assertIsNone(reason)
+
+    def test_runway_bounds_reduce_dense_city_query_area(self):
+        airport = {
+            "latitude": 40.7769,
+            "longitude": -73.8740,
+        }
+        runway_raw = {
+            "elements": [{
+                "geometry": [
+                    {"lat": 40.766, "lon": -73.884},
+                    {"lat": 40.789, "lon": -73.858},
+                ],
+            }],
+        }
+
+        compact = skycharts.airport_query_bounds(airport, runway_raw)
+        fixed = skycharts.coordinate_bounds(
+            airport["latitude"],
+            airport["longitude"],
+            5500,
+        )
+        compact_area = (
+            (compact[2] - compact[0]) * (compact[3] - compact[1])
+        )
+        fixed_area = (fixed[2] - fixed[0]) * (fixed[3] - fixed[1])
+
+        self.assertLess(compact_area, fixed_area)
+        self.assertLessEqual(compact[0], 40.766)
+        self.assertGreaterEqual(compact[2], 40.789)
+
+    def test_isolated_nearby_airport_geometry_is_removed(self):
+        airport = {"latitude": 38.8512, "longitude": -77.0402}
+        runway = {
+            "id": "runway",
+            "kind": "runway",
+            "points": [[-77.048, 38.840], [-77.033, 38.863]],
+        }
+        terminal = {
+            "id": "terminal",
+            "kind": "terminal",
+            "points": [[-77.043, 38.852], [-77.042, 38.853]],
+        }
+        remote_hangar = {
+            "id": "remote",
+            "kind": "hangar",
+            "points": [[-76.996, 38.875], [-76.995, 38.876]],
+        }
+
+        selected = skycharts.filter_isolated_airport_features(
+            [runway, terminal, remote_hangar],
+            airport,
+        )
+
+        self.assertEqual(["runway", "terminal"], [
+            feature["id"] for feature in selected
+        ])
+
+
+class CatalogReliabilityTests(unittest.TestCase):
+    def test_bundled_catalog_avoids_first_run_network_dependency(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            cache = pipeline.SourceCache(pathlib.Path(temporary))
+            with (
+                mock.patch.object(
+                    pipeline,
+                    "bundled_catalog",
+                    return_value=b"bundled catalog",
+                ),
+                mock.patch.object(pipeline, "request_bytes") as request,
+            ):
+                result = pipeline.load_catalog_dataset(
+                    cache,
+                    "airports.csv",
+                    ("https://example.test/airports.csv",),
+                )
+
+        self.assertEqual(b"bundled catalog", result)
+        request.assert_not_called()
+
+    def test_stale_catalog_is_used_when_all_mirrors_fail(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            cache = pipeline.SourceCache(pathlib.Path(temporary))
+            key = pipeline.SourceCache.key("ourairports", "airports.csv")
+            cache.write_bytes(key, b"cached catalog")
+            cache_path = cache.positive / key
+            old = time.time() - 8 * 24 * 60 * 60
+            os.utime(cache_path, (old, old))
+            with (
+                mock.patch.object(pipeline, "bundled_catalog", return_value=None),
+                mock.patch.object(
+                    pipeline,
+                    "request_bytes",
+                    side_effect=pipeline.PipelineError("connection reset"),
+                ),
+            ):
+                result = pipeline.load_catalog_dataset(
+                    cache,
+                    "airports.csv",
+                    (
+                        "https://one.test/airports.csv",
+                        "https://two.test/airports.csv",
+                    ),
+                )
+
+        self.assertEqual(b"cached catalog", result)
 
 
 class AirportSelectionTests(unittest.TestCase):

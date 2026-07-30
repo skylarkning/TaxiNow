@@ -6,7 +6,10 @@ a = Analysis(
     ["taxinow_map_pipeline.py"],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        ("data/airports.csv.gz", "data"),
+        ("data/runways.csv.gz", "data"),
+    ],
     hiddenimports=collect_submodules("encodings"),
     hookspath=[],
     hooksconfig={},

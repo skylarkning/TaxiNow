@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#08111d" />
-    <title>TaxiNow V1.0 Beta 3</title>
+    <title>TaxiNow V1.0 Beta 4</title>
   </head>
   <body>
     <main id="app">
@@ -19,22 +19,27 @@
                     type="button"
                     aria-expanded="false">
               <strong id="airport-code">CYYZ</strong>
-              <span id="airport-name">Loading airport…</span>
+              <span id="airport-name"
+                    data-i18n="airport.loading">Loading airport…</span>
               <span aria-hidden="true">▾</span>
             </button>
             <div id="airport-picker-panel"
                  class="airport-picker-panel"
                  aria-label="Select airport map"
+                 data-i18n-aria-label="airport.select"
                  hidden>
-              <label for="airport-search">Search airport ICAO</label>
+              <label for="airport-search"
+                     data-i18n="airport.search">Search airport ICAO</label>
               <input id="airport-search"
                      autocomplete="off"
                      maxlength="5"
+                     data-i18n-placeholder="airport.searchPlaceholder"
                      placeholder="Enter ICAO, e.g. CYUL" />
               <div id="airport-results" class="airport-results"></div>
               <button id="quick-download"
                       class="primary-button"
                       type="button"
+                      data-i18n="airport.download"
                       hidden>Download map</button>
               <p id="airport-picker-feedback"
                  class="feedback"
@@ -48,32 +53,53 @@
                class="server-url"
                href="http://localhost:8780"
                target="_blank"
-               rel="noreferrer">Access at: finding address…</a>
+               rel="noreferrer"
+               data-i18n="access.finding">Access at: finding address…</a>
             <span class="info-bubble network-info">
               <button class="info-trigger"
                       type="button"
                       aria-label="How to access TaxiNow on another device"
+                      data-i18n-aria-label="access.helpAria"
                       aria-describedby="network-access-help">i</button>
               <span id="network-access-help"
                     class="info-tooltip"
                     role="tooltip">
-                On another device connected to the same network, such as a
-                phone or iPad, enter this local IP address in its browser.
-                Firefox is the recommended browser for TaxiNow.
+                <span lang="en">
+                  On another device connected to the same network, such as a
+                  phone or iPad, enter this local IP address in its browser.
+                  Firefox is the recommended browser for TaxiNow.
+                </span>
+                <span lang="zh-Hans">
+                  在连接同一网络的手机或 iPad 等设备浏览器中输入此本地 IP
+                  地址即可访问。推荐使用 Firefox 浏览器。
+                </span>
               </span>
             </span>
           </span>
-          <span id="status" class="status">Connecting</span>
-          <button id="open-assets" type="button">Maps &amp; storage</button>
-          <button id="fit-airport" type="button">Fit airport</button>
-          <button id="open-about" type="button">About</button>
+          <span id="status"
+                class="status"
+                data-i18n="status.connecting">Connecting</span>
+          <button id="open-assets"
+                  type="button"
+                  data-i18n="actions.assets">Maps &amp; storage</button>
+          <button id="language-selector"
+                  type="button"
+                  data-i18n="actions.language"
+                  data-i18n-aria-label="actions.languageAria">中文</button>
+          <button id="open-about"
+                  type="button"
+                  data-i18n="actions.about">About</button>
         </div>
       </header>
-      <div id="map" role="application" aria-label="TaxiNow airport map"></div>
+      <div id="map"
+           role="application"
+           aria-label="TaxiNow airport map"
+           data-i18n-aria-label="map.aria"></div>
       <button id="asset-backdrop"
               class="asset-backdrop"
               type="button"
               aria-label="Close map manager"
+              data-i18n-aria-label="panel.close"
               hidden></button>
       <aside id="asset-panel"
              class="asset-panel"
@@ -81,24 +107,89 @@
              aria-hidden="true">
         <div class="panel-heading">
           <div>
-            <span class="eyebrow">Offline maps</span>
-            <h1>Maps &amp; storage</h1>
+            <span class="eyebrow"
+                  data-i18n="panel.offlineMaps">Offline maps</span>
+            <h1 data-i18n="panel.title">Maps &amp; storage</h1>
           </div>
           <button id="close-assets" class="icon-button" type="button"
-                  aria-label="Close map manager">×</button>
+                  aria-label="Close map manager"
+                  data-i18n-aria-label="panel.close">×</button>
         </div>
 
         <form id="download-form" class="download-form">
           <label>
-            Download by
+            <span class="field-label-with-info">
+              <span data-i18n="download.by">Download by</span>
+              <span class="info-bubble download-speed-info">
+                <button class="info-trigger"
+                        type="button"
+                        aria-label="About map download speed and timeouts"
+                        data-i18n-aria-label="download.helpAria"
+                        aria-describedby="download-speed-help">i</button>
+                <span id="download-speed-help"
+                      class="info-tooltip"
+                      role="tooltip">
+                  <span lang="en">
+                    <strong data-i18n="download.helpLabel">
+                      Why can map downloads be slow?
+                    </strong>
+                    <span data-i18n="download.typical">
+                      Typical: 5–30 seconds
+                    </span>
+                    <span data-i18n="download.busy">
+                      Busy or complex airport: 30–90 seconds
+                    </span>
+                    <span data-i18n="download.rate">
+                      OSM server processing normally takes longer than the
+                      actual data transfer.
+                    </span>
+                    <span data-i18n="download.osmLimit">
+                      TaxiNow stops waiting for OSM after 120 seconds and then
+                      tries fallback sources.
+                    </span>
+                    <span data-i18n="download.normal">
+                      An animated progress bar is normal while OSM calculates
+                      the map.
+                    </span>
+                  </span>
+                  <span lang="zh-Hans">
+                    <strong>为什么地图下载可能较慢？</strong>
+                    <span>通常：5–30 秒</span>
+                    <span>繁忙或复杂机场：30–90 秒</span>
+                    <span>
+                      下载速度没有固定的 MB/s：主要等待时间通常来自 OSM
+                      服务器计算，而不是文件传输。开始接收数据后，传输通常会在数秒内完成。
+                    </span>
+                    <span>
+                      TaxiNow 等待 OSM 最长 120 秒，之后会尝试后备来源。
+                      一个机场通常会在约 3 分钟内完成或明确失败。
+                    </span>
+                    <span>
+                      OSM 正在计算地图且尚未返回数据时，动态进度条和“服务器处理中”
+                      属于正常现象。若 45 秒没有有效进展，任务会标记为“疑似卡住”；
+                      只有全部来源都失败后才会显示“失败”。
+                    </span>
+                    <span class="china-network-note">
+                      中国大陆的网络环境可能无法稳定访问海外地图数据源，部分中国电信
+                      线路尤其容易出现连接被重置或超时。如果持续失败，可在遵守当地
+                      法律及服务条款的前提下使用可靠的 VPN/网络加速服务，或更换网络后重试。
+                    </span>
+                  </span>
+                </span>
+              </span>
+            </span>
             <select id="download-mode">
-              <option value="icao">Airport ICAO</option>
-              <option value="country">Country/region or province/state</option>
+              <option value="icao"
+                      data-i18n="download.modeIcao">Airport ICAO</option>
+              <option value="country"
+                      data-i18n="download.modeRegion">
+                Country/region or province/state
+              </option>
             </select>
           </label>
           <div id="icao-fields">
             <label for="download-icao">
-              ICAO code
+              <span data-i18n="download.icao">ICAO code</span>
               <input id="download-icao"
                      name="icao"
                      autocomplete="off"
@@ -110,20 +201,30 @@
           <div id="country-fields" class="form-grid" hidden>
             <div class="form-field">
               <span class="field-label-with-info">
-                <label for="download-country">Country/Region</label>
+                <label for="download-country"
+                       data-i18n="download.country">Country/Region</label>
                 <span class="info-bubble">
                   <button class="info-trigger"
                           type="button"
                           aria-label="Where to find two-letter country or region codes"
+                          data-i18n-aria-label="download.countryInfo"
                           aria-describedby="country-code-help">i</button>
                   <span id="country-code-help"
                         class="info-tooltip"
                         role="tooltip">
-                    Use the ISO 3166-1 two-letter country/region code, such as
-                    CA, US, or GB.
-                    <a href="https://www.iso.org/iso-3166-country-codes.html"
-                       target="_blank"
-                       rel="noopener noreferrer">Find a code at ISO</a>.
+                    <span lang="en">
+                      Use the ISO 3166-1 two-letter country/region code, such as
+                      CA, US, or GB.
+                      <a href="https://www.iso.org/iso-3166-country-codes.html"
+                         target="_blank"
+                         rel="noopener noreferrer">Find a code at ISO</a>.
+                    </span>
+                    <span lang="zh-Hans">
+                      使用 ISO 3166-1 两位国家/地区代码，例如 CN、CA 或 JP。
+                      <a href="https://www.iso.org/iso-3166-country-codes.html"
+                         target="_blank"
+                         rel="noopener noreferrer">在 ISO 网站查找代码</a>。
+                    </span>
                   </span>
                 </span>
               </span>
@@ -134,7 +235,7 @@
                      placeholder="CA" />
             </div>
             <label for="download-region">
-              Province/State (optional)
+              <span data-i18n="download.region">Province/State (optional)</span>
               <input id="download-region"
                      name="regionCode"
                      autocomplete="off"
@@ -143,32 +244,49 @@
             </label>
             <div class="form-field full-row">
               <span class="field-label-with-info">
-                <label for="download-parallel">Maximum parallel downloads</label>
+                <label for="download-parallel"
+                       data-i18n="download.parallel">
+                  Maximum parallel downloads
+                </label>
                 <span class="info-bubble">
                   <button class="info-trigger"
                           type="button"
                           aria-label="About parallel map downloads"
+                          data-i18n-aria-label="download.parallelInfo"
                           aria-describedby="parallel-download-help">i</button>
                   <span id="parallel-download-help"
                         class="info-tooltip"
                         role="tooltip">
-                    Downloads several airports at the same time. Higher values
-                    may finish large regions faster, but use more bandwidth,
-                    CPU, and memory and may trigger source rate limits. Four is
-                    recommended; reduce it if downloads are being throttled.
+                    <span lang="en">
+                      Downloads several airports at the same time. Higher
+                      values may finish large regions faster, but use more
+                      bandwidth, CPU, and memory and may trigger source rate
+                      limits. Four is recommended; reduce it if downloads are
+                      being throttled.
+                    </span>
+                    <span lang="zh-Hans">
+                      同时下载多个机场。较高数值可能加快大型地区下载，但会占用更多
+                      带宽、CPU 和内存，也可能触发数据源限流。推荐使用 4；
+                      如果遇到限流或超时请降低该数值。
+                    </span>
                   </span>
                 </span>
               </span>
               <select id="download-parallel" name="maxParallel">
                 <option value="1">1</option>
                 <option value="2">2</option>
-                <option value="4" selected>4 (recommended)</option>
+                <option value="4"
+                        data-i18n="download.parallelRecommended"
+                        selected>4 (recommended)</option>
                 <option value="8">8</option>
                 <option value="16">16</option>
               </select>
             </div>
           </div>
-          <button id="start-download" class="primary-button" type="submit">
+          <button id="start-download"
+                  class="primary-button"
+                  type="submit"
+                  data-i18n="download.start">
             Download map
           </button>
           <p id="download-feedback" class="feedback" role="status"></p>
@@ -176,44 +294,60 @@
 
         <section class="manager-section" aria-labelledby="download-heading">
           <div class="section-heading">
-            <h2 id="download-heading">Download activity</h2>
+            <h2 id="download-heading"
+                data-i18n="download.activity">Download activity</h2>
             <div>
-              <button id="clear-downloads" class="text-button" type="button">
+              <button id="clear-downloads"
+                      class="text-button"
+                      type="button"
+                      data-i18n="download.clear">
                 Clear finished
               </button>
-              <button id="refresh-assets" class="text-button" type="button">
+              <button id="refresh-assets"
+                      class="text-button"
+                      type="button"
+                      data-i18n="download.refresh">
                 Refresh
               </button>
             </div>
           </div>
           <div id="download-jobs" class="job-list">
-            <p class="empty-state">No downloads in this session.</p>
+            <p class="empty-state"
+               data-i18n="download.empty">No downloads in this session.</p>
           </div>
         </section>
 
         <section class="manager-section" aria-labelledby="storage-heading">
-          <h2 id="storage-heading">Asset storage</h2>
+          <h2 id="storage-heading"
+              data-i18n="storage.title">Downloaded Asset</h2>
           <div id="desktop-storage-location"
                class="desktop-storage-location"
                hidden>
             <div>
-              <span>Downloaded maps location</span>
-              <strong id="storage-location-path">Finding location…</strong>
-              <small id="storage-location-note">
+              <span data-i18n="storage.location">Downloaded maps location</span>
+              <strong id="storage-location-path"
+                      data-i18n="storage.finding">Finding location…</strong>
+              <small id="storage-location-note"
+                     data-i18n="storage.note">
                 This setting is available in the Windows app only.
               </small>
             </div>
             <button id="change-storage-location"
                     class="text-button"
-                    type="button">Change folder</button>
+                    type="button"
+                    data-i18n="storage.change">Change folder</button>
           </div>
           <div class="storage-stats">
-            <div><strong id="storage-used">—</strong><span>TaxiNow maps</span></div>
-            <div><strong id="storage-free">—</strong><span>Disk free</span></div>
-            <div><strong id="storage-count">—</strong><span>Airports</span></div>
+            <div><strong id="storage-used">—</strong><span
+              data-i18n="storage.maps">TaxiNow maps</span></div>
+            <div><strong id="storage-free">—</strong><span
+              data-i18n="storage.free">Disk free</span></div>
+            <div><strong id="storage-count">—</strong><span
+              data-i18n="storage.airports">Airports</span></div>
           </div>
           <div id="asset-list" class="asset-list">
-            <p class="empty-state">Loading installed maps…</p>
+            <p class="empty-state"
+               data-i18n="storage.loading">Loading downloaded maps…</p>
           </div>
         </section>
       </aside>
@@ -236,7 +370,7 @@
             <h1 id="welcome-heading">Welcome to TaxiNow</h1>
             <p class="welcome-subtitle">欢迎使用 TaxiNow</p>
           </div>
-          <span class="welcome-version">V1.0 Beta 3</span>
+          <span class="welcome-version">V1.0 Beta 4</span>
         </div>
         <div class="welcome-languages">
           <section lang="en">
@@ -306,17 +440,19 @@
         <div class="welcome-actions">
           <label class="welcome-dismiss-option">
             <input id="welcome-do-not-show" type="checkbox" />
-            <span>Do not show again / 不再显示</span>
+            <span data-i18n="welcome.dismiss">Do not show again</span>
           </label>
           <button id="close-welcome"
                   class="primary-button"
-                  type="button">Enter TaxiNow / 进入 TaxiNow</button>
+                  type="button"
+                  data-i18n="welcome.enter">Enter TaxiNow</button>
         </div>
       </section>
       <button id="about-backdrop"
               class="about-backdrop"
               type="button"
               aria-label="Close About TaxiNow"
+              data-i18n-aria-label="about.close"
               hidden></button>
       <section id="about-dialog"
                class="about-dialog"
@@ -327,17 +463,21 @@
                hidden>
         <div class="about-heading">
           <div>
-            <span class="eyebrow">Application information</span>
+            <span class="eyebrow"
+                  data-i18n="about.info">Application information</span>
             <img class="about-brand-logo"
                  src="/branding/taxinow-logo.png"
                  alt="TaxiNow" />
-            <h1 id="about-heading">About</h1>
+            <h1 id="about-heading"
+                data-i18n="about.title">About</h1>
           </div>
           <button id="close-about"
                   class="icon-button"
                   type="button"
-                  aria-label="Close About TaxiNow">×</button>
+                  aria-label="Close About TaxiNow"
+                  data-i18n-aria-label="about.close">×</button>
         </div>
+        <div class="about-language" lang="en">
         <p>
           TaxiNow Developed by Sky Ning
           (GitHub:
@@ -385,10 +525,11 @@
           grant modification, disclosure, or redistribution rights.
         </p>
         <p class="about-version">
-          Version: <strong id="about-version">V1.0 Beta 3</strong>
+          Version: <strong id="about-version">V1.0 Beta 4</strong>
           (Build date: <span id="about-build-date">July 30, 2026</span>).
         </p>
-        <div class="about-chinese" lang="zh-Hans">
+        </div>
+        <div class="about-chinese about-language" lang="zh-Hans">
           <span class="eyebrow">中文</span>
           <p>
             TaxiNow是由Sky Ning开发的免费软件，如果你是从任何地方（如闲鱼，QQ群）付费购买的本软件，你也是软件倒卖的受害者。
@@ -402,14 +543,21 @@
             安全与隐私为目的，向开发者申请有限审查访问。
             审查权限不包含修改、披露或再发布授权。
           </p>
+          <p class="about-version">
+            版本：<strong id="about-version-zh">V1.0 Beta 4</strong>
+            （构建日期：<span id="about-build-date-zh">2026年7月30日</span>）。
+          </p>
         </div>
       </section>
       <footer>
-        <span>Flight simulation use only — not for real-world navigation.</span>
+        <span data-i18n="footer.disclaimer">
+          Flight simulation use only — not for real-world navigation.
+        </span>
         <span id="map-summary"></span>
         <span class="footer-right">
-          <span id="footer-version">V1.0 Beta 3</span>
-          <span id="attribution">Bundled TaxiNow fixture</span>
+          <span id="footer-version">V1.0 Beta 4</span>
+          <span id="attribution"
+                data-i18n="footer.fixture">Bundled TaxiNow fixture</span>
         </span>
       </footer>
       <output id="map-diagnostics" hidden aria-hidden="true"></output>
