@@ -6,6 +6,7 @@ import unittest
 from unittest import mock
 
 import taxinow_map_pipeline as pipeline
+import skycharts_airport_map as skycharts
 
 
 class CapturingProtocol(pipeline.Protocol):
@@ -198,6 +199,61 @@ class DownloadProgressTests(unittest.TestCase):
             any("ZBCZ: fallback failed: fallback unavailable" in warning
                 for warning in warnings)
         )
+
+
+class OpenStreetMapPriorityTests(unittest.TestCase):
+    def tearDown(self):
+        with skycharts._ENDPOINT_CONDITION:
+            skycharts._ENDPOINT_IN_FLIGHT.clear()
+            skycharts._ENDPOINT_RETRY_AFTER.clear()
+            skycharts._ENDPOINT_CONDITION.notify_all()
+
+    def test_overpass_waits_through_short_endpoint_cooldown(self):
+        endpoint = "https://overpass.test/api/interpreter"
+        with skycharts._ENDPOINT_CONDITION:
+            skycharts._ENDPOINT_RETRY_AFTER[endpoint] = (
+                time.monotonic() + 0.05
+            )
+
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        response.__exit__.return_value = False
+        response.headers = {}
+        response.read.side_effect = [b'{"elements":[]}', b""]
+
+        started = time.monotonic()
+        with (
+            mock.patch.object(
+                skycharts.urllib.request,
+                "urlopen",
+                return_value=response,
+            ) as urlopen,
+            mock.patch.object(skycharts, "OVERPASS_BUSY_WAIT", 1),
+        ):
+            result = skycharts.request_overpass(
+                "[out:json];out;",
+                (endpoint,),
+                timeout=1,
+            )
+
+        self.assertGreaterEqual(time.monotonic() - started, 0.02)
+        self.assertEqual([], result["elements"])
+        urlopen.assert_called_once()
+
+    def test_legacy_busy_marker_does_not_block_new_osm_attempt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            marker = pathlib.Path(temporary) / "ZBSN.unavailable.json"
+            marker.write_text(
+                (
+                    '{"reason":"Overpass services remained busy for 25 seconds",'
+                    f'"retryAfter":{time.time() + 900}}}'
+                ),
+                encoding="utf-8",
+            )
+
+            reason = skycharts.cached_unavailable_reason(marker)
+
+        self.assertIsNone(reason)
 
 
 class AirportSelectionTests(unittest.TestCase):

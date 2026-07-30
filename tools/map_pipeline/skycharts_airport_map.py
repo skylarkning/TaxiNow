@@ -35,9 +35,11 @@ OVERPASS_ENDPOINTS = (
     "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
     OVERPASS_URL,
 )
-OVERPASS_REQUEST_TIMEOUT = 20
-OVERPASS_FAILURE_COOLDOWN = 180
-OVERPASS_BUSY_WAIT = 25
+OVERPASS_REQUEST_TIMEOUT = 35
+OVERPASS_FAILURE_COOLDOWN = 45
+OVERPASS_BUSY_WAIT = 180
+NON_OSM_CACHE_MAX_AGE_DAYS = 1 / 48
+UNAVAILABLE_CACHE_REVISION = 2
 OSM_SOURCE_REVISION = 3
 XPLANE_SOURCE_REVISION = 4
 XPLANE_GATEWAY_AIRPORT_URL = "https://gateway.x-plane.com/apiv1/airport/{ident}"
@@ -276,23 +278,44 @@ def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT, progres
     errors = []
     attempted = set()
     busy_deadline = time.monotonic() + OVERPASS_BUSY_WAIT
+    report_progress(progress, "waiting_for_map_source", 8, "OpenStreetMap")
     while True:
         candidate = None
         with _ENDPOINT_CONDITION:
             while candidate is None:
                 now = time.monotonic()
-                candidate = next((value for value in endpoints
-                                  if value not in attempted
-                                  and value not in _ENDPOINT_IN_FLIGHT
-                                  and _ENDPOINT_RETRY_AFTER.get(value, 0) <= now), None)
+                eligible = [
+                    value for value in endpoints if value not in attempted
+                ]
+                candidate = next(
+                    (
+                        value
+                        for value in eligible
+                        if value not in _ENDPOINT_IN_FLIGHT
+                        and _ENDPOINT_RETRY_AFTER.get(value, 0) <= now
+                    ),
+                    None,
+                )
                 if candidate:
                     _ENDPOINT_IN_FLIGHT.add(candidate)
                     break
-                busy = any(value not in attempted and value in _ENDPOINT_IN_FLIGHT for value in endpoints)
                 remaining = busy_deadline - now
-                if not busy or remaining <= 0:
+                if not eligible or remaining <= 0:
                     break
-                _ENDPOINT_CONDITION.wait(timeout=remaining)
+                retry_delays = [
+                    _ENDPOINT_RETRY_AFTER.get(value, 0) - now
+                    for value in eligible
+                    if _ENDPOINT_RETRY_AFTER.get(value, 0) > now
+                ]
+                busy = any(
+                    value in _ENDPOINT_IN_FLIGHT for value in eligible
+                )
+                if not busy and not retry_delays:
+                    break
+                wait_for = remaining
+                if retry_delays:
+                    wait_for = min(wait_for, min(retry_delays))
+                _ENDPOINT_CONDITION.wait(timeout=max(0.05, wait_for))
         if not candidate:
             break
         attempted.add(candidate)
@@ -1100,6 +1123,8 @@ def cached_unavailable_reason(path):
         return None
     try:
         record = json.loads(path.read_text(encoding="utf-8"))
+        if int(record.get("cacheRevision") or 0) != UNAVAILABLE_CACHE_REVISION:
+            return None
         if float(record.get("retryAfter") or 0) > time.time():
             return record.get("reason") or "airport-map sources are temporarily unavailable"
     except (OSError, TypeError, ValueError):
@@ -1115,6 +1140,7 @@ def write_unavailable_marker(path, reason, retry_seconds):
     temporary = pathlib.Path(temporary_name)
     try:
         temporary.write_text(json.dumps({
+            "cacheRevision": UNAVAILABLE_CACHE_REVISION,
             "reason": reason,
             "checkedAt": dt.datetime.now(dt.timezone.utc).isoformat(),
             "retryAfter": time.time() + retry_seconds,
@@ -1142,8 +1168,12 @@ def build_airport_map(
     unavailable_path = cache_dir / (ident + ".unavailable.json")
     if not refresh and cache_path.is_file():
         cached = json.loads(cache_path.read_text(encoding="utf-8"))
-        cache_days = min(maximum_age_days, 1) if cached.get("source") == "OurAirports" else maximum_age_days
         source = str(cached.get("source") or "")
+        cache_days = (
+            maximum_age_days
+            if "OpenStreetMap" in source
+            else min(maximum_age_days, NON_OSM_CACHE_MAX_AGE_DAYS)
+        )
         try:
             gateway_revision = int(cached.get("sourceRevision") or 0)
         except (TypeError, ValueError):
