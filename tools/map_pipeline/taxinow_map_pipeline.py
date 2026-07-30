@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import csv
 import gzip
 import hashlib
@@ -49,6 +50,7 @@ SUPPORTED_KINDS = {
     "jetway",
     "pavement",
 }
+ALLOWED_PARALLEL_DOWNLOADS = {1, 2, 4, 8, 16}
 
 
 @dataclass(frozen=True)
@@ -72,6 +74,7 @@ class Protocol:
         self.request = request
         self.request_id = str(request.get("requestId", ""))
         self.started = time.monotonic()
+        self._emit_lock = threading.Lock()
 
     def emit(self, event: str, **payload: Any) -> None:
         value = {
@@ -80,7 +83,8 @@ class Protocol:
             "event": event,
             **payload,
         }
-        print(json.dumps(value, separators=(",", ":")), flush=True)
+        with self._emit_lock:
+            print(json.dumps(value, separators=(",", ":")), flush=True)
 
     def progress(
         self,
@@ -96,9 +100,12 @@ class Protocol:
         bytes_downloaded: int = 0,
         download_bytes_total: int | None = None,
         download_bytes_per_second: float | None = None,
+        overall_percentage: float | None = None,
     ) -> None:
         elapsed = time.monotonic() - self.started
-        if total == 0:
+        if overall_percentage is not None:
+            percentage = max(0.0, min(overall_percentage, 100.0))
+        elif total == 0:
             percentage = stage_percentage or 0.0
         elif stage_percentage is None:
             percentage = completed * 100.0 / total
@@ -295,7 +302,14 @@ out tags geom;
     errors: list[str] = []
     raw = None
     parsed = None
-    for endpoint in OVERPASS_URLS:
+    endpoint_offset = int(
+        hashlib.sha256(airport.icao.encode("ascii")).hexdigest()[:8],
+        16,
+    ) % len(OVERPASS_URLS)
+    endpoints = (
+        OVERPASS_URLS[endpoint_offset:] + OVERPASS_URLS[:endpoint_offset]
+    )
+    for endpoint in endpoints:
         try:
             raw = request_bytes(
                 endpoint,
@@ -742,6 +756,183 @@ def download_airport_with_progress(
     return outcome["result"]
 
 
+def download_airports_parallel(
+    protocol: Protocol,
+    airports: list[Airport],
+    output_directory: pathlib.Path,
+    cache: SourceCache,
+    max_parallel: int,
+    warnings: list[str],
+) -> tuple[list[str], int, list[str]]:
+    total = len(airports)
+    if total == 0:
+        return [], 0, warnings
+
+    worker_count = max(1, min(max_parallel, total))
+    state_lock = threading.Lock()
+    states: dict[str, dict[str, Any]] = {
+        airport.icao: {
+            "phase": "queued",
+            "percentage": 0.0,
+            "source": "OpenStreetMap",
+            "bytes_downloaded": 0,
+            "download_bytes_total": None,
+            "download_bytes_per_second": 0.0,
+            "estimated_remaining_seconds": None,
+        }
+        for airport in airports
+    }
+
+    def acquire(airport: Airport) -> tuple[pathlib.Path, int, list[str]]:
+        local_warnings: list[str] = []
+
+        def update_progress(**values: Any) -> None:
+            with state_lock:
+                states[airport.icao].update(values)
+
+        update_progress(phase="acquiring", percentage=0.0)
+        try:
+            path, written = download_airport(
+                airport,
+                output_directory,
+                cache,
+                update_progress,
+            )
+            update_progress(phase="normalizing", percentage=100.0)
+            return path, written, local_warnings
+        except PipelineError as error:
+            local_warnings.append(f"{airport.icao}: {error}")
+            update_progress(
+                phase="runway_fallback",
+                percentage=70.0,
+                source="OurAirports",
+                download_bytes_per_second=0.0,
+                estimated_remaining_seconds=None,
+            )
+            try:
+                path, written = download_runway_fallback(
+                    airport,
+                    output_directory,
+                    cache,
+                )
+                local_warnings.append(
+                    f"{airport.icao}: using runway-only OurAirports fallback."
+                )
+                update_progress(phase="normalizing", percentage=100.0)
+                return path, written, local_warnings
+            except PipelineError as fallback_error:
+                local_warnings.append(
+                    f"{airport.icao}: fallback failed: {fallback_error}"
+                )
+                update_progress(phase="failed", percentage=100.0)
+                return pathlib.Path(), 0, local_warnings
+
+    outputs: list[str] = []
+    bytes_written = 0
+    completed = 0
+    batch_started = time.monotonic()
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=worker_count,
+        thread_name_prefix="TaxiNow-map",
+    ) as executor:
+        future_airports = {
+            executor.submit(acquire, airport): airport
+            for airport in airports
+        }
+        pending = set(future_airports)
+        while pending:
+            done, pending = concurrent.futures.wait(
+                pending,
+                timeout=0.25,
+                return_when=concurrent.futures.FIRST_COMPLETED,
+            )
+            for future in done:
+                path, written, local_warnings = future.result()
+                if written > 0:
+                    outputs.append(str(path))
+                    bytes_written += written
+                warnings.extend(local_warnings)
+                completed += 1
+
+            with state_lock:
+                snapshots = {
+                    icao: dict(state)
+                    for icao, state in states.items()
+                }
+            pending_icaos = {
+                future_airports[future].icao
+                for future in pending
+            }
+            active = [
+                (icao, snapshots[icao])
+                for icao in sorted(pending_icaos)
+                if snapshots[icao]["phase"] != "queued"
+            ]
+            partial = sum(
+                max(0.0, min(float(state["percentage"]), 100.0)) / 100.0
+                for _, state in active
+            )
+            aggregate_percentage = (
+                (completed + partial) * 100.0 / total
+            )
+            active_names = [icao for icao, _ in active]
+            current_icao = ", ".join(active_names[:3])
+            if len(active_names) > 3:
+                current_icao += f" +{len(active_names) - 3}"
+            speed = sum(
+                float(state.get("download_bytes_per_second") or 0.0)
+                for _, state in active
+            )
+            downloaded = sum(
+                int(state.get("bytes_downloaded") or 0)
+                for state in snapshots.values()
+            )
+            known_totals = [
+                int(state["download_bytes_total"])
+                for state in snapshots.values()
+                if state.get("download_bytes_total") is not None
+            ]
+            elapsed = max(time.monotonic() - batch_started, 0.001)
+            if completed > 0 and completed < total:
+                eta = elapsed / completed * (total - completed)
+            else:
+                active_etas = [
+                    float(state["estimated_remaining_seconds"])
+                    for _, state in active
+                    if state.get("estimated_remaining_seconds") is not None
+                ]
+                eta = (
+                    max(active_etas) * math.ceil(total / worker_count)
+                    if active_etas
+                    else None
+                )
+            phases = {str(state["phase"]) for _, state in active}
+            phase = (
+                "waiting_sources"
+                if any(value.startswith("waiting_") for value in phases)
+                else "acquiring_parallel"
+            )
+            sources = sorted(
+                {str(state["source"]) for _, state in active if state.get("source")}
+            )
+            protocol.progress(
+                phase,
+                completed,
+                total,
+                current_icao or None,
+                " + ".join(sources) or "OpenStreetMap",
+                bytes_written,
+                warnings,
+                estimated_remaining_seconds=eta,
+                bytes_downloaded=downloaded,
+                download_bytes_total=sum(known_totals) if known_totals else None,
+                download_bytes_per_second=speed,
+                overall_percentage=aggregate_percentage,
+            )
+
+    return sorted(outputs), bytes_written, warnings
+
+
 def download_runway_fallback(
     airport: Airport,
     output_directory: pathlib.Path,
@@ -859,50 +1050,77 @@ def handle(request: dict[str, Any]) -> None:
                 f"{'' if skipped == 1 else 's'}."
             )
     outputs: list[str] = []
-    for airport in selected:
-        protocol.progress(
-            "acquiring",
-            completed,
-            total,
-            airport.icao,
-            "OpenStreetMap",
-            bytes_written,
+    requested_parallel = int(request.get("maxParallel") or 4)
+    if requested_parallel not in ALLOWED_PARALLEL_DOWNLOADS:
+        raise PipelineError(
+            "maxParallel must be 1, 2, 4, 8, or 16."
+        )
+    max_parallel = (
+        requested_parallel
+        if request.get("command") == "download_country"
+        else 1
+    )
+    if max_parallel > 1:
+        outputs, bytes_written, warnings = download_airports_parallel(
+            protocol,
+            selected,
+            output,
+            cache,
+            max_parallel,
             warnings,
         )
-        try:
-            path, written = download_airport_with_progress(
-                protocol,
-                airport,
-                output,
-                cache,
+        completed = total
+    else:
+        for airport in selected:
+            protocol.progress(
+                "acquiring",
                 completed,
                 total,
+                airport.icao,
+                "OpenStreetMap",
                 bytes_written,
                 warnings,
             )
-            outputs.append(str(path))
-            bytes_written += written
-        except PipelineError as error:
-            warnings.append(f"{airport.icao}: {error}")
             try:
-                path, written = download_runway_fallback(airport, output, cache)
+                path, written = download_airport_with_progress(
+                    protocol,
+                    airport,
+                    output,
+                    cache,
+                    completed,
+                    total,
+                    bytes_written,
+                    warnings,
+                )
                 outputs.append(str(path))
                 bytes_written += written
-                warnings.append(
-                    f"{airport.icao}: using runway-only OurAirports fallback."
-                )
-            except PipelineError as fallback_error:
-                warnings.append(f"{airport.icao}: fallback failed: {fallback_error}")
-        completed += 1
-        protocol.progress(
-            "normalizing",
-            completed,
-            total,
-            airport.icao,
-            "OpenStreetMap",
-            bytes_written,
-            warnings,
-        )
+            except PipelineError as error:
+                warnings.append(f"{airport.icao}: {error}")
+                try:
+                    path, written = download_runway_fallback(
+                        airport,
+                        output,
+                        cache,
+                    )
+                    outputs.append(str(path))
+                    bytes_written += written
+                    warnings.append(
+                        f"{airport.icao}: using runway-only OurAirports fallback."
+                    )
+                except PipelineError as fallback_error:
+                    warnings.append(
+                        f"{airport.icao}: fallback failed: {fallback_error}"
+                    )
+            completed += 1
+            protocol.progress(
+                "normalizing",
+                completed,
+                total,
+                airport.icao,
+                "OpenStreetMap",
+                bytes_written,
+                warnings,
+            )
     protocol.emit(
         "completed",
         phase="completed",

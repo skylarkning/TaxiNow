@@ -141,6 +141,32 @@
                      maxlength="7"
                      placeholder="CA-ON" />
             </label>
+            <div class="form-field full-row">
+              <span class="field-label-with-info">
+                <label for="download-parallel">Maximum parallel downloads</label>
+                <span class="info-bubble">
+                  <button class="info-trigger"
+                          type="button"
+                          aria-label="About parallel map downloads"
+                          aria-describedby="parallel-download-help">i</button>
+                  <span id="parallel-download-help"
+                        class="info-tooltip"
+                        role="tooltip">
+                    Downloads several airports at the same time. Higher values
+                    may finish large regions faster, but use more bandwidth,
+                    CPU, and memory and may trigger source rate limits. Four is
+                    recommended; reduce it if downloads are being throttled.
+                  </span>
+                </span>
+              </span>
+              <select id="download-parallel" name="maxParallel">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="4" selected>4 (recommended)</option>
+                <option value="8">8</option>
+                <option value="16">16</option>
+              </select>
+            </div>
           </div>
           <button id="start-download" class="primary-button" type="submit">
             Download map

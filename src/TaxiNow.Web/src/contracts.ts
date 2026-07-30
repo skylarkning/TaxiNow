@@ -118,6 +118,7 @@ export interface DownloadJob {
   phase: string;
   airportsCompleted: number;
   airportsTotal: number;
+  maxParallel: number;
   bytesWritten: number;
   bytesDownloaded: number;
   downloadBytesTotal: number | null;

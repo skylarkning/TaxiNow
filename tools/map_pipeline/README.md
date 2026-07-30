@@ -26,6 +26,10 @@ OSM relations, and can use the X-Plane Scenery Gateway for airport detail when
 OSM is incomplete. OurAirports provides the catalog and the runway-only final
 fallback. TaxiNow then converts the result into its validated schema v2 asset.
 Country jobs can include an optional ISO 3166-2 region code such as `CA-ON`.
+They can also set `maxParallel` to `1`, `2`, `4`, `8`, or `16`. The pipeline
+uses a bounded worker pool and aggregates progress, speed, and ETA across
+active airports. Source-specific coordination still limits each public
+Overpass endpoint to one in-flight request at a time.
 
 To convert an existing SkyCharts schema-v1 map without downloading it:
 

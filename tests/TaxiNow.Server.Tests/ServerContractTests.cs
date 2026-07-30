@@ -44,6 +44,7 @@ public sealed class ServerContractTests
 
         Assert.Equal("icao", request.Mode);
         Assert.Equal("CYYZ", request.Icao);
+        Assert.Equal(1, request.MaxParallel);
     }
 
     [Fact]
@@ -63,6 +64,37 @@ public sealed class ServerContractTests
         Assert.Equal("country", request.Mode);
         Assert.Equal("CA", request.CountryCode);
         Assert.Equal("CA-ON", request.RegionCode);
+        Assert.Equal(4, request.MaxParallel);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(8)]
+    [InlineData(16)]
+    public void DownloadRequest_AcceptsSupportedParallelLimits(int maxParallel)
+    {
+        var request = DownloadRequestValidator.NormalizeAndValidate(
+            new DownloadRequest(
+                "country",
+                null,
+                "CA",
+                MaxParallel: maxParallel));
+
+        Assert.Equal(maxParallel, request.MaxParallel);
+    }
+
+    [Fact]
+    public void DownloadRequest_RejectsUnsupportedParallelLimit()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            DownloadRequestValidator.NormalizeAndValidate(
+                new DownloadRequest(
+                    "country",
+                    null,
+                    "CA",
+                    MaxParallel: 3)));
     }
 
     [Fact]

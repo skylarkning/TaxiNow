@@ -12,7 +12,8 @@ public sealed record PipelineRequest(
     string OutputDirectory,
     string CacheDirectory,
     string? RegionCode,
-    IReadOnlyList<string>? ExcludeIcaos);
+    IReadOnlyList<string>? ExcludeIcaos,
+    int MaxParallel);
 
 public sealed record PipelineEvent(
     string ProtocolVersion,

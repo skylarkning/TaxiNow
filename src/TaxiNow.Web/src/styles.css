@@ -437,6 +437,7 @@ footer {
   z-index: 25;
   width: min(430px, 100vw);
   padding: 18px;
+  overflow-x: hidden;
   overflow-y: auto;
   color: #eaf2f5;
   background:
@@ -873,8 +874,12 @@ footer {
 
 .form-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 0 10px;
+}
+
+.form-grid > * {
+  min-width: 0;
 }
 
 .form-grid .full-row {

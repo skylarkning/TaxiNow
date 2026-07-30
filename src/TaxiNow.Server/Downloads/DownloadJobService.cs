@@ -8,7 +8,8 @@ public sealed record DownloadRequest(
     string Mode,
     string? Icao,
     string? CountryCode,
-    string? RegionCode = null);
+    string? RegionCode = null,
+    int MaxParallel = 4);
 
 public sealed record DownloadJob(
     Guid JobId,
@@ -16,6 +17,7 @@ public sealed record DownloadJob(
     string Phase,
     int AirportsCompleted,
     int AirportsTotal,
+    int MaxParallel,
     long BytesWritten,
     long BytesDownloaded,
     long? DownloadBytesTotal,
@@ -54,7 +56,7 @@ public static class DownloadRequestValidator
             {
                 throw new ArgumentException("ICAO mode requires a valid ICAO code.");
             }
-            return normalized;
+            return normalized with { MaxParallel = 1 };
         }
 
         if (normalized.Mode == "country")
@@ -73,6 +75,11 @@ public static class DownloadRequestValidator
                 throw new ArgumentException(
                     "Province/state code must match the country/region, " +
                     "for example CA-ON.");
+            }
+            if (normalized.MaxParallel is not (1 or 2 or 4 or 8 or 16))
+            {
+                throw new ArgumentException(
+                    "Maximum parallel downloads must be 1, 2, 4, 8, or 16.");
             }
             return normalized;
         }
@@ -100,6 +107,7 @@ public sealed class DownloadJobService(
             "queued",
             0,
             request.Mode.Equals("icao", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
+            request.MaxParallel,
             0,
             0,
             null,
@@ -200,7 +208,8 @@ public sealed class DownloadJobService(
                 OutputDirectory: outputDirectory,
                 CacheDirectory: storagePaths.SourceCachePath,
                 RegionCode: request.RegionCode,
-                ExcludeIcaos: excludedIcaos);
+                ExcludeIcaos: excludedIcaos,
+                MaxParallel: request.MaxParallel);
 
             PipelineEvent? completed = null;
             await foreach (var pipelineEvent in client.RunAsync(

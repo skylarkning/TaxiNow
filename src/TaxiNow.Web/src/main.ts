@@ -460,6 +460,9 @@ async function submitDownload(form: HTMLFormElement): Promise<void> {
     .querySelector<HTMLInputElement>("#download-region")!
     .value.trim()
     .toUpperCase();
+  const maxParallel = Number(
+    document.querySelector<HTMLSelectElement>("#download-parallel")!.value
+  );
 
   if (!form.reportValidity()) {
     return;
@@ -487,7 +490,8 @@ async function submitDownload(form: HTMLFormElement): Promise<void> {
         mode,
         icao: mode === "icao" ? icao : null,
         countryCode: mode === "country" ? countryCode : null,
-        regionCode: mode === "country" && regionCode ? regionCode : null
+        regionCode: mode === "country" && regionCode ? regionCode : null,
+        maxParallel: mode === "country" ? maxParallel : 1
       })
     });
     feedback.textContent = "Download started. Progress appears below.";
@@ -776,7 +780,8 @@ function renderDownloadJobs(jobs: DownloadJob[]): void {
     const detail = document.createElement("small");
     detail.textContent = job.error ||
       `${formatPhase(job.phase)} · ${Math.round(job.percentage)}%` +
-      (job.currentSource ? ` · ${job.currentSource}` : "");
+      (job.currentSource ? ` · ${job.currentSource}` : "") +
+      (job.maxParallel > 1 ? ` · ${job.maxParallel} parallel` : "");
     const metrics = document.createElement("small");
     metrics.className = "job-metrics";
     const metricParts: string[] = [];

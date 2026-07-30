@@ -1,5 +1,6 @@
 import pathlib
 import tempfile
+import threading
 import time
 import unittest
 from unittest import mock
@@ -75,6 +76,68 @@ class DownloadProgressTests(unittest.TestCase):
         self.assertEqual(1048576, latest["downloadBytesTotal"])
         self.assertEqual(262144, latest["downloadBytesPerSecond"])
         self.assertEqual(2, latest["estimatedRemainingSeconds"])
+
+    def test_country_workers_obey_parallel_limit(self):
+        airports = [
+            pipeline.Airport(
+                f"CY{index:02d}",
+                f"Airport {index}",
+                "CA",
+                "CA-ON",
+                "Toronto",
+                43.6 + index * 0.01,
+                -79.6,
+                "medium_airport",
+            )
+            for index in range(4)
+        ]
+        protocol = CapturingProtocol()
+        active = 0
+        peak_active = 0
+        active_lock = threading.Lock()
+
+        def fake_download(airport, output, _cache, callback):
+            nonlocal active, peak_active
+            with active_lock:
+                active += 1
+                peak_active = max(peak_active, active)
+            try:
+                callback(
+                    phase="downloading_map",
+                    percentage=50,
+                    source="OpenStreetMap",
+                    bytes_downloaded=100,
+                    download_bytes_total=200,
+                    download_bytes_per_second=1000,
+                    estimated_remaining_seconds=0.1,
+                )
+                time.sleep(0.12)
+                return output / f"{airport.icao}.json", 200
+            finally:
+                with active_lock:
+                    active -= 1
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            cache = pipeline.SourceCache(root / "cache")
+            with mock.patch.object(
+                pipeline, "download_airport", side_effect=fake_download
+            ):
+                outputs, written, warnings = (
+                    pipeline.download_airports_parallel(
+                        protocol,
+                        airports,
+                        root / "output",
+                        cache,
+                        max_parallel=2,
+                        warnings=[],
+                    )
+                )
+
+        self.assertEqual(2, peak_active)
+        self.assertEqual(4, len(outputs))
+        self.assertEqual(800, written)
+        self.assertEqual([], warnings)
 
 
 class AirportSelectionTests(unittest.TestCase):

@@ -64,8 +64,11 @@ their surrounding white canvas and create the required output sizes.
 - Visible map downloader and asset manager for ICAO, country/region, and
   optional province/state downloads, with byte-level progress, transfer speed,
   estimated time remaining, installed-map sizes, free disk space, queue
-  clearing, and deletion. Country/region downloads include inline guidance and
-  a link to the official ISO 3166-1 two-letter code list.
+  clearing, and deletion. Country/region downloads can run 1, 2, 4, 8, or 16
+  airport acquisitions in parallel, with four as the balanced default and
+  source-aware throttling to avoid sending simultaneous requests to the same
+  Overpass endpoint. Inline guidance explains both country codes and the
+  bandwidth, resource, and source-rate-limit tradeoffs of higher concurrency.
 - Header airport search switches among installed maps. Entering a missing
   four-character ICAO code offers an immediate download beside the search.
 - Installed assets are grouped as country/region → province/state → airport,
