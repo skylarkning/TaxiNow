@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#08111d" />
-    <title>TaxiNow</title>
+    <title>TaxiNow V1.0 Beta</title>
   </head>
   <body>
     <main id="app">
@@ -49,6 +49,7 @@
           <span id="status" class="status">Connecting</span>
           <button id="open-assets" type="button">Maps &amp; storage</button>
           <button id="fit-airport" type="button">Fit airport</button>
+          <button id="open-about" type="button">About</button>
         </div>
       </header>
       <div id="map" role="application" aria-label="TaxiNow airport map"></div>
@@ -159,10 +160,64 @@
           </div>
         </section>
       </aside>
+      <button id="about-backdrop"
+              class="about-backdrop"
+              type="button"
+              aria-label="Close About TaxiNow"
+              hidden></button>
+      <section id="about-dialog"
+               class="about-dialog"
+               role="dialog"
+               aria-modal="true"
+               aria-labelledby="about-heading"
+               tabindex="-1"
+               hidden>
+        <div class="about-heading">
+          <div>
+            <span class="eyebrow">Application information</span>
+            <h1 id="about-heading">About TaxiNow</h1>
+          </div>
+          <button id="close-about"
+                  class="icon-button"
+                  type="button"
+                  aria-label="Close About TaxiNow">×</button>
+        </div>
+        <p>
+          TaxiNow Developed by Sky Ning
+          (GitHub:
+          <a href="https://github.com/skylarkning"
+             target="_blank"
+             rel="noopener noreferrer">skylarkning</a>).
+        </p>
+        <p>
+          TaxiNow is a 100% free application, for personal flight simulator use
+          only.
+        </p>
+        <div class="about-warning">
+          <strong>
+            Commercial/Real-world navigation using TaxiNow is strictly
+            prohibited.
+          </strong>
+          <p>You have been scammed if you paid for this app.</p>
+        </div>
+        <p class="about-version">
+          Version: <strong id="about-version">V1.0 Beta</strong>
+          (Build date: <span id="about-build-date">July 29, 2026</span>).
+        </p>
+        <div class="about-chinese" lang="zh-Hans">
+          <span class="eyebrow">中文</span>
+          <p>
+            TaxiNow是由Sky Ning开发的免费软件，如果你是从任何地方（如闲鱼，QQ群）付费购买的本软件，你也是软件倒卖的受害者。
+          </p>
+        </div>
+      </section>
       <footer>
         <span>Flight simulation use only — not for real-world navigation.</span>
         <span id="map-summary"></span>
-        <span id="attribution">Bundled TaxiNow fixture</span>
+        <span class="footer-right">
+          <button id="footer-version" type="button">V1.0 Beta</button>
+          <span id="attribution">Bundled TaxiNow fixture</span>
+        </span>
       </footer>
       <output id="map-diagnostics" hidden aria-hidden="true"></output>
     </main>

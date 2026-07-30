@@ -74,6 +74,9 @@ export interface TelemetrySnapshot {
 
 export interface AppStatus {
   product: string;
+  version: string;
+  displayVersion: string;
+  buildDate: string;
   apiVersion: number;
   localUrl: string;
   localUrls: string[];

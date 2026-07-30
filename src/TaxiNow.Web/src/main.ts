@@ -52,7 +52,9 @@ const assetGroupOpenState = new Map<string, boolean>();
 async function start(): Promise<void> {
   setupAssetManager();
   setupAirportPicker();
+  setupAboutDialog();
   const appStatus = await getJson<AppStatus>("/api/v1/status");
+  applyProductMetadata(appStatus);
   const serverLink =
     document.querySelector<HTMLAnchorElement>("#server-url")!;
   serverLink.href = appStatus.localUrl;
@@ -78,6 +80,54 @@ async function start(): Promise<void> {
   }
   await loadAirport(initialIcao);
   await connectTelemetry();
+}
+
+function setupAboutDialog(): void {
+  const dialog = document.querySelector<HTMLElement>("#about-dialog")!;
+  const backdrop =
+    document.querySelector<HTMLButtonElement>("#about-backdrop")!;
+  const openButtons = [
+    document.querySelector<HTMLButtonElement>("#open-about")!,
+    document.querySelector<HTMLButtonElement>("#footer-version")!
+  ];
+  let returnFocus: HTMLElement | null = null;
+
+  const setOpen = (open: boolean): void => {
+    dialog.hidden = !open;
+    backdrop.hidden = !open;
+    if (open) {
+      returnFocus = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+      dialog.focus();
+    } else {
+      returnFocus?.focus();
+      returnFocus = null;
+    }
+  };
+
+  for (const button of openButtons) {
+    button.addEventListener("click", () => setOpen(true));
+  }
+  document
+    .querySelector("#close-about")!
+    .addEventListener("click", () => setOpen(false));
+  backdrop.addEventListener("click", () => setOpen(false));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !dialog.hidden) {
+      setOpen(false);
+    }
+  });
+}
+
+function applyProductMetadata(status: AppStatus): void {
+  document.title = `TaxiNow ${status.displayVersion}`;
+  document.querySelector("#footer-version")!.textContent =
+    status.displayVersion;
+  document.querySelector("#about-version")!.textContent =
+    status.displayVersion;
+  document.querySelector("#about-build-date")!.textContent =
+    status.buildDate;
 }
 
 async function loadAirport(icao: string): Promise<void> {
@@ -816,6 +866,7 @@ function createMap(airport: AirportMap): MapLibreMap {
   });
 
   created.addControl(new maplibregl.NavigationControl(), "bottom-right");
+  labelNavigationControls(created);
   created.once("load", () => {
     if (diagnostics) {
       diagnostics.dataset.loadEvent = "true";
@@ -874,6 +925,32 @@ function createMap(airport: AirportMap): MapLibreMap {
     }
   });
   return created;
+}
+
+function labelNavigationControls(target: MapLibreMap): void {
+  const container = target.getContainer();
+  const zoomIn = container.querySelector<HTMLButtonElement>(
+    ".maplibregl-ctrl-zoom-in"
+  );
+  const zoomOut = container.querySelector<HTMLButtonElement>(
+    ".maplibregl-ctrl-zoom-out"
+  );
+  const compass = container.querySelector<HTMLButtonElement>(
+    ".maplibregl-ctrl-compass"
+  );
+  if (zoomIn) {
+    zoomIn.title = "Zoom in";
+    zoomIn.setAttribute("aria-label", "Zoom in");
+  }
+  if (zoomOut) {
+    zoomOut.title = "Zoom out";
+    zoomOut.setAttribute("aria-label", "Zoom out");
+  }
+  if (compass) {
+    const label = "Map rotation: drag to rotate; click to reset north";
+    compass.title = label;
+    compass.setAttribute("aria-label", label);
+  }
 }
 
 function addAirportLayers(target: MapLibreMap): void {

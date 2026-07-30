@@ -6,6 +6,10 @@ desktop WebView2 shell and in an optional browser view.
 
 > Flight simulation use only. Not for real-world navigation.
 
+Current release: **V1.0 Beta** (build date: July 29, 2026). The About dialog
+identifies the developer, links to the official GitHub account, and clearly
+states that TaxiNow is free software for personal flight-simulator use only.
+
 ## Current vertical slice
 
 - ASP.NET Core host with status, airport-map, storage, download-job, and
