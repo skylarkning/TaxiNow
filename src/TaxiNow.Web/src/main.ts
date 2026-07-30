@@ -41,6 +41,7 @@ let pendingAirportIcao: string | null = null;
 let mapInitialized = false;
 let assetRefreshInFlight = false;
 let activeDownloads = false;
+const assetGroupOpenState = new Map<string, boolean>();
 
 async function start(): Promise<void> {
   setupAssetManager();
@@ -50,7 +51,9 @@ async function start(): Promise<void> {
     document.querySelector<HTMLAnchorElement>("#server-url")!;
   serverLink.href = appStatus.localUrl;
   serverLink.textContent =
-    `Other devices: ${appStatus.localUrl.replace(/^https?:\/\//, "")}`;
+    `Access Map on Other Device's Browser: ${
+      appStatus.localUrl.replace(/^https?:\/\//, "")
+    }`;
   serverLink.title =
     `Open TaxiNow from another device on this network: ${
       appStatus.localUrls.join(", ")
@@ -476,6 +479,11 @@ function renderStorage(storage: StorageSummary): void {
     String(storage.airportCount);
 
   const list = document.querySelector<HTMLElement>("#asset-list")!;
+  for (const group of list.querySelectorAll<HTMLDetailsElement>(
+    "details[data-group-key]"
+  )) {
+    assetGroupOpenState.set(group.dataset.groupKey!, group.open);
+  }
   list.replaceChildren();
   if (storage.assets.length === 0) {
     list.append(createEmptyState("No offline maps installed."));
@@ -487,9 +495,14 @@ function renderStorage(storage: StorageSummary): void {
     (asset) => asset.countryCode || "ZZ"
   );
   for (const [countryCode, countryAssets] of [...countries].sort()) {
+    const countryKey = `country:${countryCode}`;
     const country = document.createElement("details");
     country.className = "asset-group asset-country";
-    country.open = true;
+    country.dataset.groupKey = countryKey;
+    country.open = assetGroupOpenState.get(countryKey) ?? true;
+    country.addEventListener("toggle", () => {
+      assetGroupOpenState.set(countryKey, country.open);
+    });
     country.append(createAssetGroupSummary(countryCode, countryAssets));
 
     const regions = groupBy(
@@ -497,9 +510,14 @@ function renderStorage(storage: StorageSummary): void {
       (asset) => asset.regionCode || "Other"
     );
     for (const [regionCode, regionAssets] of [...regions].sort()) {
+      const regionKey = `${countryKey}/region:${regionCode}`;
       const region = document.createElement("details");
       region.className = "asset-group asset-region";
-      region.open = true;
+      region.dataset.groupKey = regionKey;
+      region.open = assetGroupOpenState.get(regionKey) ?? true;
+      region.addEventListener("toggle", () => {
+        assetGroupOpenState.set(regionKey, region.open);
+      });
       region.append(createAssetGroupSummary(regionCode, regionAssets));
       const airports = document.createElement("div");
       airports.className = "asset-airports";
@@ -777,6 +795,7 @@ function createMap(airport: AirportMap): MapLibreMap {
       addAirportLayers(created);
       created.addImage("ownship-plane", createOwnshipImage(), { pixelRatio: 2 });
       addOwnshipLayer(created);
+      created.moveLayer("taxiway-labels");
       created.moveLayer("building-labels");
       fitAirport();
       created.once("idle", () => {
@@ -950,12 +969,15 @@ function addAirportLayers(target: MapLibreMap): void {
     minzoom: 13.5,
     layout: {
       "symbol-placement": "line",
-      "symbol-spacing": 170,
+      "symbol-spacing": 145,
       "text-field": ["coalesce", ["get", "ref"], ""],
       "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 17, 14],
       "text-font": ["Segoe UI", "Arial Unicode MS Regular"],
       "text-rotation-alignment": "map",
-      "text-keep-upright": true
+      "text-keep-upright": true,
+      "text-allow-overlap": false,
+      "text-ignore-placement": false,
+      "text-padding": 4
     },
     paint: {
       "text-color": "#ffd52f",
@@ -1015,6 +1037,12 @@ function addAirportLayers(target: MapLibreMap): void {
       "text-halo-width": 1.5
     }
   });
+
+  // SkyCharts paints taxiway pavement below runway pavement, then restores
+  // the yellow centerline above the runway. This keeps crossings continuous
+  // without letting broad taxiway strokes obscure runway markings.
+  target.moveLayer("taxiway-outline", "runway-outline");
+  target.moveLayer("taxiways", "runway-outline");
 }
 
 function addOwnshipLayer(target: MapLibreMap): void {
@@ -1394,6 +1422,18 @@ function publishMapDiagnostics(target: MapLibreMap): void {
   );
 }
 
+interface FallbackProjectedFeature {
+  feature: AirportFeature;
+  points: maplibregl.Point[];
+}
+
+interface FallbackLabelBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 function activateFallbackOverlay(
   target: MapLibreMap,
   features: AirportFeature[]
@@ -1406,65 +1446,174 @@ function activateFallbackOverlay(
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.id = "airport-fallback";
   svg.setAttribute("aria-hidden", "true");
-  const staticGroup = document.createElementNS(
-    "http://www.w3.org/2000/svg",
-    "g"
+  const namespace = "http://www.w3.org/2000/svg";
+  const backgroundGroup = document.createElementNS(namespace, "g");
+  const taxiPavementGroup = document.createElementNS(namespace, "g");
+  const runwayGroup = document.createElementNS(namespace, "g");
+  const taxiCenterlineGroup = document.createElementNS(namespace, "g");
+  const foregroundGroup = document.createElementNS(namespace, "g");
+  svg.append(
+    backgroundGroup,
+    taxiPavementGroup,
+    runwayGroup,
+    taxiCenterlineGroup,
+    foregroundGroup
   );
-  svg.append(staticGroup);
   fallbackOwnship = createFallbackOwnship();
   svg.append(fallbackOwnship);
-  const terminalLabelGroup = document.createElementNS(
-    "http://www.w3.org/2000/svg",
-    "g"
-  );
-  svg.append(terminalLabelGroup);
+  const labelGroup = document.createElementNS(namespace, "g");
+  svg.append(labelGroup);
   mapContainer.append(svg);
   const terminalLabelIds = new Set(
     selectTerminalLabelFeatures(features).map((feature) => feature.id)
   );
-  const renderedTerminalLabels = new Set<string>();
 
   const redraw = () => {
-    staticGroup.replaceChildren();
-    terminalLabelGroup.replaceChildren();
-    renderedTerminalLabels.clear();
+    backgroundGroup.replaceChildren();
+    taxiPavementGroup.replaceChildren();
+    runwayGroup.replaceChildren();
+    taxiCenterlineGroup.replaceChildren();
+    foregroundGroup.replaceChildren();
+    labelGroup.replaceChildren();
     const zoom = target.getZoom();
-    for (const feature of features) {
-      const projected = feature.points.map((coordinate) =>
-        target.project(coordinate)
-      );
-      if (projected.length === 0) {
+    const projectedFeatures: FallbackProjectedFeature[] = features.map(
+      (feature) => ({
+        feature,
+        points: feature.points.map((coordinate) => target.project(coordinate))
+      })
+    );
+
+    // Paint by semantic layer, not feature order. This mirrors SkyCharts:
+    // taxi pavement below runways, continuous centerlines above runways, and
+    // every marker in a final overlay where geometry cannot cover it.
+    for (const { feature, points } of projectedFeatures) {
+      if (points.length === 0) {
         continue;
       }
-      const element = createFallbackGeometry(feature, projected, zoom);
-      staticGroup.append(element);
-      if (feature.ref && shouldShowFallbackLabel(feature, zoom)) {
-        staticGroup.append(
-          createFallbackLabel(feature.ref, projected, feature.kind)
+      if (feature.kind === "taxiway" || feature.kind === "taxilane") {
+        const [pavement, centerline] =
+          createFallbackTaxiwayLayers(points, zoom);
+        taxiPavementGroup.append(pavement);
+        taxiCenterlineGroup.append(centerline);
+      } else if (feature.kind === "runway" && points.length >= 2) {
+        runwayGroup.append(createFallbackRunway(feature, points));
+      } else if (
+        ["apron", "terminal", "hangar", "pavement"].includes(feature.kind)
+      ) {
+        backgroundGroup.append(createFallbackGeometry(feature, points, zoom));
+      } else {
+        foregroundGroup.append(createFallbackGeometry(feature, points, zoom));
+      }
+    }
+
+    const occupied: FallbackLabelBox[] = [];
+    for (const { feature, points } of projectedFeatures) {
+      if (feature.kind !== "runway" || points.length < 2) {
+        continue;
+      }
+      for (const label of createFallbackRunwayLabels(feature, points)) {
+        labelGroup.append(label);
+        occupyFallbackLabel(
+          occupied,
+          label.textContent ?? "",
+          Number(label.getAttribute("x")),
+          Number(label.getAttribute("y"))
         );
       }
+    }
+
+    const renderedTerminalLabels = new Set<string>();
+    for (const { feature } of projectedFeatures) {
       const terminalName = feature.name?.trim();
       if (
-        terminalName &&
-        feature.kind === "terminal" &&
-        terminalLabelIds.has(feature.id) &&
-        !renderedTerminalLabels.has(terminalName.toLowerCase())
+        !terminalName ||
+        feature.kind !== "terminal" ||
+        !terminalLabelIds.has(feature.id) ||
+        renderedTerminalLabels.has(terminalName.toLowerCase())
       ) {
-        const labelCoordinate = terminalLabelPoint(feature.points);
-        terminalLabelGroup.append(
-          createFallbackLabel(
-            terminalName,
-            [target.project(labelCoordinate)],
-            feature.kind
-          )
+        continue;
+      }
+      const anchor = target.project(terminalLabelPoint(feature.points));
+      const placed = availableFallbackLabelPoint(
+        terminalName,
+        anchor,
+        occupied,
+        svg.clientWidth,
+        svg.clientHeight,
+        2
+      );
+      if (placed) {
+        labelGroup.append(
+          createFallbackLabel(terminalName, [placed], feature.kind)
         );
-        renderedTerminalLabels.add(terminalName.toLowerCase());
+        occupyFallbackLabel(occupied, terminalName, placed.x, placed.y);
+      }
+      renderedTerminalLabels.add(terminalName.toLowerCase());
+    }
+
+    if (zoom >= 13.5) {
+      appendFallbackTaxiwayLabels(
+        labelGroup,
+        projectedFeatures,
+        occupied,
+        svg.clientWidth,
+        svg.clientHeight
+      );
+    }
+
+    if (zoom >= 15) {
+      for (const { feature, points } of projectedFeatures) {
+        if (!feature.ref || !shouldShowFallbackLabel(feature, zoom)) {
+          continue;
+        }
+        if (feature.kind === "taxiway" || feature.kind === "taxilane") {
+          continue;
+        }
+        const anchor = points[Math.floor(points.length / 2)]!;
+        const placed = availableFallbackLabelPoint(
+          feature.ref,
+          anchor,
+          occupied,
+          svg.clientWidth,
+          svg.clientHeight,
+          2
+        );
+        if (placed) {
+          labelGroup.append(
+            createFallbackLabel(feature.ref, [placed], feature.kind)
+          );
+          occupyFallbackLabel(
+            occupied,
+            feature.ref,
+            placed.x,
+            placed.y
+          );
+        }
       }
     }
   };
   target.on("move", redraw);
   target.on("resize", redraw);
   redraw();
+}
+
+function createFallbackTaxiwayLayers(
+  points: maplibregl.Point[],
+  zoom: number
+): [SVGPolylineElement, SVGPolylineElement] {
+  const pavement = createFallbackPolyline(
+    points,
+    "fallback-taxiway-pavement"
+  );
+  pavement.setAttribute(
+    "stroke-width",
+    String(Math.max(3, (zoom - 9) * 1.8))
+  );
+  const centerline = createFallbackPolyline(
+    points,
+    "fallback-taxiway-centerline"
+  );
+  return [pavement, centerline];
 }
 
 function createFallbackGeometry(
@@ -1475,20 +1624,6 @@ function createFallbackGeometry(
   const namespace = "http://www.w3.org/2000/svg";
   if (feature.kind === "runway" && points.length >= 2) {
     return createFallbackRunway(feature, points);
-  }
-  if (
-    (feature.kind === "taxiway" || feature.kind === "taxilane") &&
-    points.length >= 2
-  ) {
-    const group = document.createElementNS(namespace, "g");
-    const pavement = createFallbackPolyline(points, "fallback-taxiway-pavement");
-    pavement.setAttribute("stroke-width", String(Math.max(3, (zoom - 9) * 1.8)));
-    const centerline = createFallbackPolyline(
-      points,
-      "fallback-taxiway-centerline"
-    );
-    group.append(pavement, centerline);
-    return group;
   }
   if (
     ["apron", "terminal", "hangar", "pavement"].includes(feature.kind) &&
@@ -1531,6 +1666,9 @@ function createFallbackRunway(
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const length = Math.hypot(dx, dy);
+  if (length < 0.01) {
+    return group;
+  }
   const along = { x: dx / length, y: dy / length };
   const across = { x: -along.y, y: along.x };
   const midpointLatitude = (feature.points[0]![1] + feature.points.at(-1)![1]) / 2;
@@ -1565,20 +1703,36 @@ function createFallbackRunway(
       screenPoint(thresholdCenter, across, width * 0.42)
     ], "fallback-runway-threshold");
     group.append(threshold);
-
-    const labelText = (feature.ref ?? "").split("/")[endIndex] ??
-      (feature.ref ?? "").split("/")[0] ?? "";
-    if (labelText) {
-      const labelPoint = screenPoint(origin, along, direction * length * 0.09);
-      const label = createFallbackLabel(
-        labelText,
-        [labelPoint],
-        "runway"
-      );
-      group.append(label);
-    }
   }
   return group;
+}
+
+function createFallbackRunwayLabels(
+  feature: AirportFeature,
+  points: maplibregl.Point[]
+): SVGTextElement[] {
+  const start = points[0]!;
+  const end = points.at(-1)!;
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 0.01) {
+    return [];
+  }
+  const along = { x: dx / length, y: dy / length };
+  const references = (feature.ref ?? "").split("/");
+  const labels: SVGTextElement[] = [];
+  for (const endIndex of [0, 1] as const) {
+    const text = references[endIndex] ?? references[0] ?? "";
+    if (!text) {
+      continue;
+    }
+    const origin = endIndex === 0 ? start : end;
+    const direction = endIndex === 0 ? 1 : -1;
+    const point = screenPoint(origin, along, direction * length * 0.09);
+    labels.push(createFallbackLabel(text, [point], "runway"));
+  }
+  return labels;
 }
 
 function createFallbackPolyline(
@@ -1620,6 +1774,226 @@ function createFallbackLabel(
   label.setAttribute("class", `fallback-label fallback-label-${kind}`);
   label.textContent = text;
   return label;
+}
+
+function createFallbackTaxiwayBadge(
+  text: string,
+  point: maplibregl.Point
+): SVGGElement {
+  const namespace = "http://www.w3.org/2000/svg";
+  const group = document.createElementNS(namespace, "g");
+  group.setAttribute("class", "fallback-taxiway-badge");
+  const box = fallbackLabelBox(text, point.x, point.y);
+  const background = document.createElementNS(namespace, "rect");
+  background.setAttribute("x", String(box.left));
+  background.setAttribute("y", String(box.top));
+  background.setAttribute("width", String(box.right - box.left));
+  background.setAttribute("height", String(box.bottom - box.top));
+  background.setAttribute("rx", "2");
+  const label = createFallbackLabel(text, [point], "taxiway");
+  group.append(background, label);
+  return group;
+}
+
+function appendFallbackTaxiwayLabels(
+  group: SVGGElement,
+  features: FallbackProjectedFeature[],
+  occupied: FallbackLabelBox[],
+  viewportWidth: number,
+  viewportHeight: number
+): void {
+  const references = new Map<
+    string,
+    { candidates: maplibregl.Point[]; screenLength: number }
+  >();
+  for (const { feature, points } of features) {
+    if (feature.kind !== "taxiway" && feature.kind !== "taxilane") {
+      continue;
+    }
+    const reference = feature.ref?.trim().toUpperCase() ?? "";
+    if (!reference || reference.length > 7 || points.length < 2) {
+      continue;
+    }
+    const screenLength = fallbackPolylineLength(points);
+    const record = references.get(reference) ?? {
+      candidates: [],
+      screenLength: 0
+    };
+    record.candidates.push(...fallbackTaxiwayCandidates(points, 145));
+    record.screenLength += screenLength;
+    references.set(reference, record);
+  }
+
+  let labelsDrawn = 0;
+  const ordered = [...references].sort(
+    ([leftRef, left], [rightRef, right]) =>
+      right.screenLength - left.screenLength ||
+      leftRef.localeCompare(rightRef)
+  );
+  for (const [reference, record] of ordered) {
+    if (labelsDrawn >= 60) {
+      break;
+    }
+    const referenceLimit = Math.min(
+      4,
+      Math.max(1, Math.ceil(record.screenLength / 360))
+    );
+    const accepted: maplibregl.Point[] = [];
+    for (const candidate of record.candidates) {
+      if (labelsDrawn >= 60 || accepted.length >= referenceLimit) {
+        break;
+      }
+      if (accepted.some((prior) =>
+        Math.hypot(candidate.x - prior.x, candidate.y - prior.y) < 110)) {
+        continue;
+      }
+      const placed = availableFallbackLabelPoint(
+        reference,
+        candidate,
+        occupied,
+        viewportWidth,
+        viewportHeight,
+        accepted.length === 0 ? 1 : 4
+      );
+      if (!placed) {
+        continue;
+      }
+      group.append(createFallbackTaxiwayBadge(reference, placed));
+      occupyFallbackLabel(occupied, reference, placed.x, placed.y);
+      accepted.push(candidate);
+      labelsDrawn++;
+    }
+  }
+}
+
+function fallbackTaxiwayCandidates(
+  points: maplibregl.Point[],
+  spacing: number
+): maplibregl.Point[] {
+  const cumulative = [0];
+  for (let index = 1; index < points.length; index++) {
+    const previous = points[index - 1]!;
+    const current = points[index]!;
+    cumulative.push(
+      cumulative[index - 1]! +
+      Math.hypot(current.x - previous.x, current.y - previous.y)
+    );
+  }
+  const length = cumulative.at(-1) ?? 0;
+  if (length < 8) {
+    return [];
+  }
+  const count = Math.min(
+    12,
+    Math.max(1, Math.ceil(length / Math.max(55, spacing)))
+  );
+  const candidates: maplibregl.Point[] = [];
+  let segment = 1;
+  for (let marker = 0; marker < count; marker++) {
+    const target = length * (marker + 0.5) / count;
+    while (segment < cumulative.length && cumulative[segment]! < target) {
+      segment++;
+    }
+    if (segment >= points.length) {
+      break;
+    }
+    const priorDistance = cumulative[segment - 1]!;
+    const nextDistance = cumulative[segment]!;
+    const fraction = nextDistance > priorDistance
+      ? (target - priorDistance) / (nextDistance - priorDistance)
+      : 0;
+    const previous = points[segment - 1]!;
+    const current = points[segment]!;
+    candidates.push(new maplibregl.Point(
+      previous.x + (current.x - previous.x) * fraction,
+      previous.y + (current.y - previous.y) * fraction
+    ));
+  }
+  return candidates;
+}
+
+function fallbackPolylineLength(points: maplibregl.Point[]): number {
+  let length = 0;
+  for (let index = 1; index < points.length; index++) {
+    length += Math.hypot(
+      points[index]!.x - points[index - 1]!.x,
+      points[index]!.y - points[index - 1]!.y
+    );
+  }
+  return length;
+}
+
+function availableFallbackLabelPoint(
+  text: string,
+  anchor: maplibregl.Point,
+  occupied: FallbackLabelBox[],
+  viewportWidth: number,
+  viewportHeight: number,
+  margin: number
+): maplibregl.Point | null {
+  const offsets = [
+    [0, 0], [0, -14], [0, 14], [-18, 0], [18, 0],
+    [-14, -13], [14, -13], [-14, 13], [14, 13]
+  ];
+  for (const [offsetX, offsetY] of offsets) {
+    const candidate = new maplibregl.Point(
+      anchor.x + offsetX!,
+      anchor.y + offsetY!
+    );
+    const box = fallbackLabelBox(text, candidate.x, candidate.y);
+    if (
+      box.left < 2 ||
+      box.top < 2 ||
+      box.right > viewportWidth - 2 ||
+      box.bottom > viewportHeight - 2
+    ) {
+      continue;
+    }
+    const expanded = {
+      left: box.left - margin,
+      top: box.top - margin,
+      right: box.right + margin,
+      bottom: box.bottom + margin
+    };
+    if (!occupied.some((prior) => fallbackBoxesOverlap(expanded, prior))) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+function occupyFallbackLabel(
+  occupied: FallbackLabelBox[],
+  text: string,
+  x: number,
+  y: number
+): void {
+  occupied.push(fallbackLabelBox(text, x, y));
+}
+
+function fallbackLabelBox(
+  text: string,
+  x: number,
+  y: number
+): FallbackLabelBox {
+  const width = Math.max(14, text.length * 7 + 7);
+  const height = 16;
+  return {
+    left: x - width / 2,
+    top: y - height / 2,
+    right: x + width / 2,
+    bottom: y + height / 2
+  };
+}
+
+function fallbackBoxesOverlap(
+  left: FallbackLabelBox,
+  right: FallbackLabelBox
+): boolean {
+  return left.left < right.right &&
+    left.right > right.left &&
+    left.top < right.bottom &&
+    left.bottom > right.top;
 }
 
 function shouldShowFallbackLabel(

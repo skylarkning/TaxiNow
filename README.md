@@ -15,6 +15,9 @@ desktop WebView2 shell and in an optional browser view.
 - Proportional runway pavement, centerlines, thresholds, aiming marks,
   end-designators, taxiway centerlines, and zoom-dependent labels, informed by
   the proven SkyCharts map-drawing behavior.
+- Taxiway pavement is layered below runway pavement while yellow centerlines
+  remain continuous above it. Long taxiway references repeat at collision-aware
+  intervals using the SkyCharts marker-density convention.
 - Smooth replay ownship animation through a SignalR telemetry stream.
 - Schema v2 validation and a schema v1 adapter.
 - Visible map downloader and asset manager for ICAO, country, and optional
@@ -23,7 +26,8 @@ desktop WebView2 shell and in an optional browser view.
 - Header airport search switches among installed maps. Entering a missing
   four-character ICAO code offers an immediate download beside the search.
 - Installed assets are grouped as country → region → airport, following the
-  SkyCharts asset hierarchy.
+  SkyCharts asset hierarchy, and folded groups retain their state during live
+  download refreshes.
 - SQLite-backed asset catalog and atomic map replacement.
 - WPF/WebView2 desktop shell with deterministic Close/Quit behavior and
   minimize-to-tray support. Left-click the tray icon to restore it, or
@@ -67,10 +71,10 @@ dotnet run --project .\src\TaxiNow.App
 Closing the desktop window quits TaxiNow and releases the local server port.
 Minimizing hides the window in the Windows notification area instead.
 
-For another device, use the **Other devices** address shown in the TaxiNow
-header. Both devices must be on the same trusted LAN. If Windows Firewall asks,
-allow TaxiNow on **Private networks** only; do not expose port 8780 through a
-router or public-network firewall profile.
+For another device, use the **Access Map on Other Device's Browser** address
+shown in the TaxiNow header. Both devices must be on the same trusted LAN. If
+Windows Firewall asks, allow TaxiNow on **Private networks** only; do not expose
+port 8780 through a router or public-network firewall profile.
 
 The built Windows executable is:
 
