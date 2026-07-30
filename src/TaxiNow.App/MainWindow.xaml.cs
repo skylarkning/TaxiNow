@@ -25,7 +25,15 @@ public partial class MainWindow : Window
     {
         try
         {
-            await MapView.EnsureCoreWebView2Async();
+            var webViewData = Path.Combine(
+                Environment.GetFolderPath(
+                    Environment.SpecialFolder.LocalApplicationData),
+                "TaxiNow",
+                "WebView2");
+            Directory.CreateDirectory(webViewData);
+            var environment = await CoreWebView2Environment.CreateAsync(
+                userDataFolder: webViewData);
+            await MapView.EnsureCoreWebView2Async(environment);
             MapView.CoreWebView2.Settings.AreDevToolsEnabled = true;
             MapView.CoreWebView2.Settings.IsStatusBarEnabled = false;
             MapView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;

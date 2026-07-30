@@ -16,11 +16,23 @@ internal static class DesktopSettingsStore
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "TaxiNow",
         "desktop-settings.json");
+    public static string StorageRootPointerPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "TaxiNow",
+        "desktop-storage-root.txt");
 
     public static DesktopSettings Load()
     {
         try
         {
+            if (File.Exists(StorageRootPointerPath))
+            {
+                var storedRoot = File.ReadAllText(StorageRootPointerPath).Trim();
+                if (!string.IsNullOrWhiteSpace(storedRoot))
+                {
+                    return new DesktopSettings(storedRoot);
+                }
+            }
             if (!File.Exists(SettingsPath))
             {
                 return new DesktopSettings();
@@ -49,5 +61,12 @@ internal static class DesktopSettingsStore
             temporaryPath,
             JsonSerializer.Serialize(settings, JsonOptions));
         File.Move(temporaryPath, SettingsPath, overwrite: true);
+
+        var pointerTemporaryPath = StorageRootPointerPath + ".tmp";
+        File.WriteAllText(pointerTemporaryPath, settings.StorageRoot ?? "");
+        File.Move(
+            pointerTemporaryPath,
+            StorageRootPointerPath,
+            overwrite: true);
     }
 }

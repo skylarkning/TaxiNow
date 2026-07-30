@@ -87,13 +87,22 @@ public partial class App : System.Windows.Application
         try
         {
             selected = Path.GetFullPath(selected);
-            new StoragePaths(selected).EnsureCreated();
+            var paths = PrepareStorageRoot(selected);
+            try
+            {
+                DesktopSettingsStore.Save(new DesktopSettings(selected));
+            }
+            catch
+            {
+                // Storage remains usable if the optional preference pointer
+                // cannot be refreshed during startup.
+            }
             return selected;
         }
         catch (Exception exception)
         {
             var fallback = StoragePaths.Default.Root;
-            new StoragePaths(fallback).EnsureCreated();
+            PrepareStorageRoot(fallback);
             System.Windows.MessageBox.Show(
                 $"The selected TaxiNow data folder is unavailable:\n\n" +
                 $"{selected}\n\n{exception.Message}\n\n" +
@@ -111,7 +120,7 @@ public partial class App : System.Windows.Application
         try
         {
             selected = Path.GetFullPath(selectedFolder);
-            new StoragePaths(selected).EnsureCreated();
+            PrepareStorageRoot(selected);
         }
         catch (Exception exception)
         {
@@ -163,6 +172,39 @@ public partial class App : System.Windows.Application
         Dispatcher.BeginInvoke(
             () => _ = QuitAsync(restartApplication: true));
         return Task.FromResult(true);
+    }
+
+    private static StoragePaths PrepareStorageRoot(string root)
+    {
+        var normalized = Path.GetFullPath(root);
+        if (string.Equals(
+                normalized.TrimEnd(Path.DirectorySeparatorChar),
+                Path.GetPathRoot(normalized)?.TrimEnd(
+                    Path.DirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Select a dedicated folder, not the root of a drive.");
+        }
+
+        var paths = new StoragePaths(normalized);
+        var isDefault = string.Equals(
+            normalized.TrimEnd(Path.DirectorySeparatorChar),
+            StoragePaths.Default.Root.TrimEnd(Path.DirectorySeparatorChar),
+            StringComparison.OrdinalIgnoreCase);
+        if (!isDefault &&
+            !paths.HasOwnershipMarker() &&
+            !paths.CanClaimOwnership())
+        {
+            throw new InvalidOperationException(
+                "The selected folder contains files that do not belong to " +
+                "TaxiNow. Select an empty folder dedicated to TaxiNow so the " +
+                "uninstaller can remove downloaded assets safely.");
+        }
+
+        paths.EnsureCreated();
+        paths.WriteOwnershipMarker();
+        return paths;
     }
 
     private async Task DisposeServerAfterFailedStartAsync()

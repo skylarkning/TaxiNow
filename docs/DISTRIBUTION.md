@@ -1,21 +1,28 @@
 # Windows distribution
 
-TaxiNow should ship in two forms:
+TaxiNow V1.0 Beta ships in two forms:
 
-1. A signed Windows installer is the primary release for most users.
+1. A Windows installer is the primary release for most users.
 2. A portable ZIP is a secondary release for advanced users and troubleshooting.
 
-The installer should install TaxiNow outside the user's map-data directory,
-create Start menu and uninstall entries, install or detect the Evergreen
-Microsoft Edge WebView2 Runtime, preserve user data during upgrades, and limit
-any Windows Firewall rule to private networks. Future releases should support
-in-place upgrades. The release executable and installer should be code signed
-before public distribution.
+The per-user installer:
 
-The portable ZIP should contain the same self-contained x64 application and
-native dependencies, but it cannot provide the same prerequisite checks,
-shortcuts, uninstall experience, or reliable upgrade workflow. It should not
-store downloaded maps inside the extracted application directory.
+- displays and requires acceptance of `EULA.txt`;
+- installs the self-contained x64 app under
+  `%LocalAppData%\Programs\TaxiNow`;
+- creates Start menu entries, an optional desktop shortcut, and an uninstaller;
+- detects or installs the Microsoft Edge WebView2 Evergreen Runtime;
+- preserves application and map data during in-place upgrades; and
+- removes the application and TaxiNow-owned data during uninstall.
+
+The installer and executable should be code signed with a publicly trusted
+code-signing certificate before public distribution. The packaging script does
+not create or trust a self-signed certificate.
+
+The portable ZIP contains the same self-contained x64 application and native
+dependencies, but it cannot provide the same prerequisite checks, shortcuts,
+uninstall experience, or reliable upgrade workflow. It does not store
+downloaded maps inside the extracted application directory.
 
 ## Map-data location
 
@@ -39,3 +46,47 @@ left in the old location: TaxiNow never silently copies or deletes a potentially
 large map library. Selecting the old folder restores access to those assets.
 The folder picker is a desktop-only capability and is not exposed through the
 LAN browser interface.
+
+Every data root selected by the app carries this ownership marker:
+
+```text
+.taxinow-data-root
+```
+
+TaxiNow accepts only an empty dedicated custom folder, an existing TaxiNow-only
+folder, or an already marked folder. This lets the uninstaller distinguish
+TaxiNow storage from an arbitrary user folder.
+
+## Uninstall behavior
+
+Uninstalling TaxiNow permanently removes the following data for the current
+Windows user:
+
+- the installed application and shortcuts;
+- downloaded airport maps and the asset database;
+- source caches, pipeline working data, web exports, and logs;
+- desktop settings and the WebView2 browser profile; and
+- TaxiNow content in the selected custom storage root when its ownership marker
+  is valid.
+
+The default `%LocalAppData%\TaxiNow` directory is dedicated to TaxiNow and is
+removed recursively. For a marked custom root, the uninstaller deletes only
+known TaxiNow directories, database files, and the ownership marker. If
+unrelated files are present, it leaves those files and their parent directory
+untouched.
+
+The uninstaller does not remove Microsoft Flight Simulator or the system-wide
+Microsoft Edge WebView2 Runtime.
+
+## Build release artifacts
+
+Run from the repository root:
+
+```powershell
+.\scripts\package-windows.ps1
+```
+
+The script publishes the self-contained app, verifies the Microsoft signature
+on the downloaded WebView2 bootstrapper, compiles the Inno Setup installer,
+creates the portable ZIP, and writes SHA-256 checksums beneath
+`artifacts\installer`.
