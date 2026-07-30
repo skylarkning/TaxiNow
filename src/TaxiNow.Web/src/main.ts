@@ -53,6 +53,7 @@ async function start(): Promise<void> {
   setupAssetManager();
   setupAirportPicker();
   setupAboutDialog();
+  setupWelcomeDialog();
   const appStatus = await getJson<AppStatus>("/api/v1/status");
   applyProductMetadata(appStatus);
   const serverLink =
@@ -86,10 +87,8 @@ function setupAboutDialog(): void {
   const dialog = document.querySelector<HTMLElement>("#about-dialog")!;
   const backdrop =
     document.querySelector<HTMLButtonElement>("#about-backdrop")!;
-  const openButtons = [
-    document.querySelector<HTMLButtonElement>("#open-about")!,
-    document.querySelector<HTMLButtonElement>("#footer-version")!
-  ];
+  const openButton =
+    document.querySelector<HTMLButtonElement>("#open-about")!;
   let returnFocus: HTMLElement | null = null;
 
   const setOpen = (open: boolean): void => {
@@ -106,9 +105,7 @@ function setupAboutDialog(): void {
     }
   };
 
-  for (const button of openButtons) {
-    button.addEventListener("click", () => setOpen(true));
-  }
+  openButton.addEventListener("click", () => setOpen(true));
   document
     .querySelector("#close-about")!
     .addEventListener("click", () => setOpen(false));
@@ -117,6 +114,42 @@ function setupAboutDialog(): void {
     if (event.key === "Escape" && !dialog.hidden) {
       setOpen(false);
     }
+  });
+}
+
+function setupWelcomeDialog(): void {
+  const storageKey = "taxinow.welcome.v1.dismissed";
+  const dialog = document.querySelector<HTMLElement>("#welcome-dialog")!;
+  const backdrop =
+    document.querySelector<HTMLButtonElement>("#welcome-backdrop")!;
+  const doNotShow =
+    document.querySelector<HTMLInputElement>("#welcome-do-not-show")!;
+  const close =
+    document.querySelector<HTMLButtonElement>("#close-welcome")!;
+
+  let dismissed = false;
+  try {
+    dismissed = window.localStorage.getItem(storageKey) === "true";
+  } catch {
+    // If storage is unavailable, show the welcome on each new launch.
+  }
+  if (dismissed) {
+    return;
+  }
+
+  dialog.hidden = false;
+  backdrop.hidden = false;
+  dialog.focus();
+  close.addEventListener("click", () => {
+    if (doNotShow.checked) {
+      try {
+        window.localStorage.setItem(storageKey, "true");
+      } catch {
+        // Closing the welcome must still work if storage is unavailable.
+      }
+    }
+    dialog.hidden = true;
+    backdrop.hidden = true;
   });
 }
 

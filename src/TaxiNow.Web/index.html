@@ -160,6 +160,82 @@
           </div>
         </section>
       </aside>
+      <button id="welcome-backdrop"
+              class="welcome-backdrop"
+              type="button"
+              aria-label="TaxiNow welcome information"
+              tabindex="-1"
+              hidden></button>
+      <section id="welcome-dialog"
+               class="welcome-dialog"
+               role="dialog"
+               aria-modal="true"
+               aria-labelledby="welcome-heading"
+               tabindex="-1"
+               hidden>
+        <div class="welcome-heading">
+          <div>
+            <span class="welcome-badge">100% FREE · 完全免费</span>
+            <h1 id="welcome-heading">Welcome to TaxiNow</h1>
+            <p class="welcome-subtitle">欢迎使用 TaxiNow</p>
+          </div>
+          <span class="welcome-version">V1.0 Beta</span>
+        </div>
+        <div class="welcome-languages">
+          <section lang="en">
+            <h2>Important information</h2>
+            <p>
+              TaxiNow is a completely free, public-benefit project provided for
+              personal flight-simulator use.
+            </p>
+            <p>
+              <strong>If you paid for TaxiNow, you have been scammed.</strong>
+            </p>
+            <p>
+              The developer distributes TaxiNow only through
+              <a href="https://flightsim.to/"
+                 target="_blank"
+                 rel="noopener noreferrer">flightsim.to</a>
+              and has not published or authorized it on any other platform.
+            </p>
+            <p>
+              Commercial use and use for real-world flight or navigation are
+              strictly prohibited.
+            </p>
+            <p>
+              Except for third-party data used by the software, such as map
+              data, the TaxiNow software and its original content are
+              copyrighted. Derivative works and modification are prohibited.
+            </p>
+          </section>
+          <section lang="zh-Hans">
+            <h2>重要说明</h2>
+            <p>TaxiNow 是一个纯免费、公益提供的个人飞行模拟器项目。</p>
+            <p><strong>如果你为本软件付费购买，说明你已经上当受骗。</strong></p>
+            <p>
+              作者仅在
+              <a href="https://flightsim.to/"
+                 target="_blank"
+                 rel="noopener noreferrer">flightsim.to</a>
+              提供官方下载，未登录或授权任何其他平台。
+            </p>
+            <p>严禁商业使用，严禁用于真实飞行或真实导航。</p>
+            <p>
+              除软件使用的第三方数据（例如地图数据）外，TaxiNow
+              软件及原创内容均受版权保护，禁止二次创作，禁止修改。
+            </p>
+          </section>
+        </div>
+        <div class="welcome-actions">
+          <label class="welcome-dismiss-option">
+            <input id="welcome-do-not-show" type="checkbox" />
+            <span>Do not show again / 不再显示</span>
+          </label>
+          <button id="close-welcome"
+                  class="primary-button"
+                  type="button">Enter TaxiNow / 进入 TaxiNow</button>
+        </div>
+      </section>
       <button id="about-backdrop"
               class="about-backdrop"
               type="button"
@@ -195,7 +271,7 @@
         </p>
         <div class="about-warning">
           <strong>
-            Commercial/Real-world navigation using TaxiNow is strictly
+            Commercial use/real-world navigation using TaxiNow is strictly
             prohibited.
           </strong>
           <p>You have been scammed if you paid for this app.</p>
@@ -215,7 +291,7 @@
         <span>Flight simulation use only — not for real-world navigation.</span>
         <span id="map-summary"></span>
         <span class="footer-right">
-          <button id="footer-version" type="button">V1.0 Beta</button>
+          <span id="footer-version">V1.0 Beta</span>
           <span id="attribution">Bundled TaxiNow fixture</span>
         </span>
       </footer>

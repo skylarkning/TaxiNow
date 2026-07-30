@@ -9,6 +9,9 @@ desktop WebView2 shell and in an optional browser view.
 Current release: **V1.0 Beta** (build date: July 29, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is free software for personal flight-simulator use only.
+On first launch, a bilingual English/Chinese welcome screen identifies the
+official distribution channel, warns against paid or unauthorized copies, and
+offers a per-device **Do not show again / 不再显示** option.
 
 ## Current vertical slice
 
