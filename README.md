@@ -69,6 +69,9 @@ their surrounding white canvas and create the required output sizes.
   source-aware throttling to avoid sending simultaneous requests to the same
   Overpass endpoint. Inline guidance explains both country codes and the
   bandwidth, resource, and source-rate-limit tradeoffs of higher concurrency.
+  Source-side waits that expose no measurable byte progress use an animated
+  active state and elapsed timer instead of a misleading `0%` and guessed ETA;
+  percentages, speed, and ETA appear once progress becomes measurable.
 - Header airport search switches among installed maps. Entering a missing
   four-character ICAO code offers an immediate download beside the search.
 - Installed assets are grouped as country/region → province/state → airport,
@@ -76,6 +79,9 @@ their surrounding white canvas and create the required output sizes.
   during live download refreshes. Country/region and province/state rows can
   delete every map beneath them after confirmation.
 - SQLite-backed asset catalog and atomic map replacement.
+- Desktop users can choose the downloaded-map and asset-catalog folder from
+  **Maps & storage**. The per-user choice persists across launches; changing it
+  requires a restart, and TaxiNow leaves the previous folder untouched.
 - WPF/WebView2 desktop shell with deterministic Close/Quit behavior and
   minimize-to-tray support. Left-click the tray icon to restore it, or
   right-click it for Open and Quit commands.
@@ -137,6 +143,12 @@ The built Windows executable is:
 ```text
 src\TaxiNow.App\bin\x64\Debug\net10.0-windows\win-x64\TaxiNow.App.exe
 ```
+
+For public releases, use a signed Windows installer as the primary download and
+offer a portable ZIP as a secondary option for advanced users. The installer
+provides prerequisite checks, clean upgrades, shortcuts, and uninstall support;
+the portable build remains useful for troubleshooting. See
+[`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).
 
 Live MSFS 2024 telemetry is the default. To run without the simulator, select
 the deterministic replay source:

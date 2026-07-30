@@ -921,6 +921,42 @@ footer {
   margin-bottom: 12px;
 }
 
+.desktop-storage-location {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid rgba(76, 240, 209, 0.18);
+  border-radius: 8px;
+  background: rgba(5, 17, 27, 0.62);
+}
+
+.desktop-storage-location > div {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 3px;
+}
+
+.desktop-storage-location span,
+.desktop-storage-location small {
+  color: #7f99a6;
+  font-size: 9px;
+}
+
+.desktop-storage-location strong {
+  overflow: hidden;
+  color: #dcebed;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-storage-location .text-button {
+  flex: 0 0 auto;
+}
+
 .storage-stats > div {
   display: grid;
   gap: 3px;
@@ -1057,6 +1093,33 @@ footer {
   border: 0;
   border-radius: 4px;
   accent-color: #4cf0d1;
+}
+
+.job-row progress.job-progress-indeterminate {
+  border-radius: 4px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(76, 240, 209, 0.12) 0%,
+      rgba(76, 240, 209, 0.85) 48%,
+      rgba(76, 240, 209, 0.12) 100%
+    );
+  background-size: 220% 100%;
+  animation: download-progress-active 1.3s ease-in-out infinite;
+}
+
+.job-row progress.job-progress-indeterminate::-webkit-progress-bar {
+  background: transparent;
+}
+
+@keyframes download-progress-active {
+  from {
+    background-position: 120% 0;
+  }
+
+  to {
+    background-position: -120% 0;
+  }
 }
 
 .job-metrics {

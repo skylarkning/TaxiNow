@@ -1,9 +1,12 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using Microsoft.AspNetCore.Builder;
 using TaxiNow.Server;
+using TaxiNow.Storage;
 using Forms = System.Windows.Forms;
 
 namespace TaxiNow.App;
@@ -20,6 +23,7 @@ public partial class App : System.Windows.Application
     private Icon? _applicationIcon;
     private bool _allowWindowClose;
     private bool _quitStarted;
+    private string _storageRoot = StoragePaths.Default.Root;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -42,7 +46,8 @@ public partial class App : System.Windows.Application
         }
 
         CreateTrayIcon();
-        _window = new MainWindow();
+        _storageRoot = ResolveStorageRoot();
+        _window = new MainWindow(_storageRoot, ChangeStorageRootAsync);
         MainWindow = _window;
         _window.Closing += OnWindowClosing;
         _window.StateChanged += OnWindowStateChanged;
@@ -54,7 +59,10 @@ public partial class App : System.Windows.Application
     {
         try
         {
-            _server = TaxiNowHost.Build(args);
+            _server = TaxiNowHost.Build(
+                args,
+                builder =>
+                    builder.Configuration["TaxiNow:StorageRoot"] = _storageRoot);
             await _server.StartAsync();
             await window.LoadMapAsync();
         }
@@ -68,6 +76,93 @@ public partial class App : System.Windows.Application
                 MessageBoxImage.Error);
             await QuitAsync(1, stopServer: false);
         }
+    }
+
+    private static string ResolveStorageRoot()
+    {
+        var configured = DesktopSettingsStore.Load().StorageRoot;
+        var selected = string.IsNullOrWhiteSpace(configured)
+            ? StoragePaths.Default.Root
+            : configured;
+        try
+        {
+            selected = Path.GetFullPath(selected);
+            new StoragePaths(selected).EnsureCreated();
+            return selected;
+        }
+        catch (Exception exception)
+        {
+            var fallback = StoragePaths.Default.Root;
+            new StoragePaths(fallback).EnsureCreated();
+            System.Windows.MessageBox.Show(
+                $"The selected TaxiNow data folder is unavailable:\n\n" +
+                $"{selected}\n\n{exception.Message}\n\n" +
+                $"TaxiNow will use its default folder for this session:\n{fallback}",
+                "Storage folder unavailable",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return fallback;
+        }
+    }
+
+    private Task<bool> ChangeStorageRootAsync(string selectedFolder)
+    {
+        string selected;
+        try
+        {
+            selected = Path.GetFullPath(selectedFolder);
+            new StoragePaths(selected).EnsureCreated();
+        }
+        catch (Exception exception)
+        {
+            System.Windows.MessageBox.Show(
+                $"TaxiNow cannot use that folder.\n\n{exception.Message}",
+                "Storage folder unavailable",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return Task.FromResult(false);
+        }
+
+        var unchanged = string.Equals(
+            selected.TrimEnd(Path.DirectorySeparatorChar),
+            _storageRoot.TrimEnd(Path.DirectorySeparatorChar),
+            StringComparison.OrdinalIgnoreCase);
+
+        try
+        {
+            DesktopSettingsStore.Save(new DesktopSettings(selected));
+        }
+        catch (Exception exception)
+        {
+            System.Windows.MessageBox.Show(
+                $"TaxiNow could not save that folder choice.\n\n" +
+                exception.Message,
+                "Storage setting could not be saved",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return Task.FromResult(false);
+        }
+        _storageRoot = selected;
+        if (unchanged)
+        {
+            return Task.FromResult(false);
+        }
+
+        var restart = System.Windows.MessageBox.Show(
+            $"TaxiNow will store new map downloads at:\n\n{selected}\n\n" +
+            "Existing maps remain safely in the previous folder and are not " +
+            "moved or deleted. Restart TaxiNow now to use the new location?",
+            "Map storage location saved",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Information);
+        if (restart != MessageBoxResult.Yes)
+        {
+            return Task.FromResult(true);
+        }
+
+        Dispatcher.BeginInvoke(
+            () => _ = QuitAsync(restartApplication: true));
+        return Task.FromResult(true);
     }
 
     private async Task DisposeServerAfterFailedStartAsync()
@@ -198,7 +293,10 @@ public partial class App : System.Windows.Application
         _ = QuitAsync();
     }
 
-    private async Task QuitAsync(int exitCode = 0, bool stopServer = true)
+    private async Task QuitAsync(
+        int exitCode = 0,
+        bool stopServer = true,
+        bool restartApplication = false)
     {
         if (_quitStarted)
         {
@@ -250,6 +348,16 @@ public partial class App : System.Windows.Application
         _applicationIcon?.Dispose();
         _applicationIcon = null;
         ReleaseInstanceMutex();
+        if (restartApplication)
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = Environment.ProcessPath
+                    ?? throw new InvalidOperationException(
+                        "TaxiNow could not resolve its executable path."),
+                UseShellExecute = true
+            });
+        }
         Shutdown(exitCode);
     }
 

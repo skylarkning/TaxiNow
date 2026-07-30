@@ -193,6 +193,20 @@
 
         <section class="manager-section" aria-labelledby="storage-heading">
           <h2 id="storage-heading">Asset storage</h2>
+          <div id="desktop-storage-location"
+               class="desktop-storage-location"
+               hidden>
+            <div>
+              <span>Downloaded maps location</span>
+              <strong id="storage-location-path">Finding location…</strong>
+              <small id="storage-location-note">
+                This setting is available in the Windows app only.
+              </small>
+            </div>
+            <button id="change-storage-location"
+                    class="text-button"
+                    type="button">Change folder</button>
+          </div>
           <div class="storage-stats">
             <div><strong id="storage-used">—</strong><span>TaxiNow maps</span></div>
             <div><strong id="storage-free">—</strong><span>Disk free</span></div>

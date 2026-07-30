@@ -32,6 +32,10 @@ import {
   type InterpolatedOwnship
 } from "./interpolation";
 import { buildRunwayDecorations } from "./runwayGeometry";
+import {
+  formatDownloadPercentage,
+  isIndeterminateDownload
+} from "./downloadPresentation";
 
 const telemetrySamples: TelemetrySnapshot[] = [];
 let lastOwnshipFrameAt = 0;
@@ -51,6 +55,20 @@ let mapInitialized = false;
 let assetRefreshInFlight = false;
 let activeDownloads = false;
 const assetGroupOpenState = new Map<string, boolean>();
+
+interface DesktopWebViewBridge {
+  postMessage(message: unknown): void;
+  addEventListener(
+    type: "message",
+    listener: (event: MessageEvent<unknown>) => void
+  ): void;
+}
+
+interface DesktopStorageMessage {
+  type: "storage-location";
+  path: string;
+  restartRequired: boolean;
+}
 
 async function start(): Promise<void> {
   setupAssetManager();
@@ -366,6 +384,7 @@ function setupAssetManager(): void {
   const backdrop = document.querySelector<HTMLButtonElement>("#asset-backdrop")!;
   const mode = document.querySelector<HTMLSelectElement>("#download-mode")!;
   const form = document.querySelector<HTMLFormElement>("#download-form")!;
+  setupDesktopStorageLocation();
 
   const open = (): void => {
     assetPanelOpen = true;
@@ -415,6 +434,43 @@ function setupAssetManager(): void {
     event.preventDefault();
     void submitDownload(form);
   });
+}
+
+function setupDesktopStorageLocation(): void {
+  const bridge = (
+    window as typeof window & {
+      chrome?: { webview?: DesktopWebViewBridge };
+    }
+  ).chrome?.webview;
+  if (!bridge) {
+    return;
+  }
+
+  const section =
+    document.querySelector<HTMLElement>("#desktop-storage-location")!;
+  const path =
+    document.querySelector<HTMLElement>("#storage-location-path")!;
+  const note =
+    document.querySelector<HTMLElement>("#storage-location-note")!;
+  const change =
+    document.querySelector<HTMLButtonElement>("#change-storage-location")!;
+  section.hidden = false;
+  change.addEventListener("click", () => {
+    bridge.postMessage({ type: "storage-location:choose" });
+  });
+  bridge.addEventListener("message", (event) => {
+    const message = event.data as Partial<DesktopStorageMessage> | null;
+    if (message?.type !== "storage-location" ||
+        typeof message.path !== "string") {
+      return;
+    }
+    path.textContent = message.path;
+    path.title = message.path;
+    note.textContent = message.restartRequired
+      ? "Saved. Restart TaxiNow to use this folder."
+      : "New downloads and the asset catalog are stored here.";
+  });
+  bridge.postMessage({ type: "storage-location:get" });
 }
 
 function ensureAssetPolling(): void {
@@ -776,17 +832,42 @@ function renderDownloadJobs(jobs: DownloadJob[]): void {
 
     const progress = document.createElement("progress");
     progress.max = 100;
-    progress.value = Math.max(0, Math.min(100, job.percentage));
+    const indeterminate = isIndeterminateDownload(job);
+    if (indeterminate) {
+      progress.className = "job-progress-indeterminate";
+      progress.setAttribute(
+        "aria-label",
+        job.state === "queued"
+          ? "Download waiting to start"
+          : "Download active; waiting for map source response"
+      );
+    } else {
+      progress.value = Math.max(0, Math.min(100, job.percentage));
+      progress.setAttribute(
+        "aria-label",
+        `Download ${formatDownloadPercentage(job.percentage)} complete`
+      );
+    }
     const detail = document.createElement("small");
     detail.textContent = job.error ||
-      `${formatPhase(job.phase)} · ${Math.round(job.percentage)}%` +
+      formatPhase(job.phase) +
+      (indeterminate
+        ? " · active"
+        : ` · ${formatDownloadPercentage(job.percentage)}`) +
       (job.currentSource ? ` · ${job.currentSource}` : "") +
       (job.maxParallel > 1 ? ` · ${job.maxParallel} parallel` : "");
     const metrics = document.createElement("small");
     metrics.className = "job-metrics";
     const metricParts: string[] = [];
     if (job.state === "running") {
-      if (job.downloadBytesPerSecond && job.downloadBytesPerSecond > 0) {
+      if (indeterminate) {
+        metricParts.push(
+          `waiting for map source response · active for ${
+            formatTimeSpan(job.elapsed)
+          }`
+        );
+      } else if (job.downloadBytesPerSecond &&
+                 job.downloadBytesPerSecond > 0) {
         metricParts.push(`${formatBytes(job.downloadBytesPerSecond)}/s`);
       } else if (job.phase.includes("waiting") ||
                  job.phase.includes("requesting")) {
@@ -801,11 +882,13 @@ function renderDownloadJobs(jobs: DownloadJob[]): void {
             : formatBytes(job.bytesDownloaded)
         );
       }
-      metricParts.push(
-        job.estimatedRemaining
-          ? `about ${formatTimeSpan(job.estimatedRemaining)} remaining`
-          : "estimating remaining time"
-      );
+      if (!indeterminate) {
+        metricParts.push(
+          job.estimatedRemaining
+            ? `about ${formatTimeSpan(job.estimatedRemaining)} remaining`
+            : "estimating remaining time"
+        );
+      }
     } else if (job.state === "completed") {
       metricParts.push(`${formatBytes(job.bytesWritten)} installed`);
     }

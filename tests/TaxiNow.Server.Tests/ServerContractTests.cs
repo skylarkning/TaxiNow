@@ -1,7 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 using TaxiNow.Core.Telemetry;
+using TaxiNow.Server;
 using TaxiNow.Server.Downloads;
+using TaxiNow.Storage;
 using Xunit;
 
 namespace TaxiNow.Server.Tests;
@@ -103,5 +106,32 @@ public sealed class ServerContractTests
         Assert.Throws<ArgumentException>(() =>
             DownloadRequestValidator.NormalizeAndValidate(
                 new DownloadRequest("country", null, "CA", "US-NY")));
+    }
+
+    [Fact]
+    public async Task BuilderConfiguration_SelectsStorageRootBeforeInitialization()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "TaxiNow.Tests",
+            Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var app = TaxiNowHost.Build(
+                configure: builder =>
+                    builder.Configuration["TaxiNow:StorageRoot"] = root);
+
+            var paths = app.Services.GetRequiredService<StoragePaths>();
+
+            Assert.Equal(Path.GetFullPath(root), paths.Root);
+            Assert.True(File.Exists(paths.DatabasePath));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 }

@@ -27,6 +27,7 @@ public static class TaxiNowHost
             WebRootPath = ResolveWebRoot()
         };
         var builder = WebApplication.CreateBuilder(options);
+        configure?.Invoke(builder);
         builder.WebHost.ConfigureKestrel(kestrel =>
         {
             var port =
@@ -88,7 +89,6 @@ public static class TaxiNowHost
                 configuration.GetValue("TaxiNow:ReplayLoop", true));
         });
         builder.Services.AddHostedService<TelemetryPublisher>();
-        configure?.Invoke(builder);
 
         var app = builder.Build();
         app.UseDefaultFiles();
