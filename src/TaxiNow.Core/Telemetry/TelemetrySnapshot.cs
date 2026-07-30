@@ -30,6 +30,7 @@ public sealed record TelemetrySnapshot(
     DateTimeOffset SourceTimestampUtc,
     DateTimeOffset ServerTimestampUtc,
     long SourceMonotonicMilliseconds,
+    bool HasPosition = true,
     bool IsStale = false,
     TrackingState State = TrackingState.Connected);
 
@@ -42,4 +43,3 @@ public interface ITelemetrySink
 {
     ValueTask WriteAsync(TelemetrySnapshot snapshot, CancellationToken cancellationToken);
 }
-

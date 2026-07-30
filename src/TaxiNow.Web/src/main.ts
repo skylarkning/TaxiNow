@@ -25,10 +25,16 @@ import type {
   StoredMapAsset,
   TelemetrySnapshot
 } from "./contracts";
-import { interpolateOwnship } from "./interpolation";
+import {
+  interpolateOwnship,
+  type InterpolatedOwnship
+} from "./interpolation";
 import { buildRunwayDecorations } from "./runwayGeometry";
 
 const telemetrySamples: TelemetrySnapshot[] = [];
+let lastOwnshipFrameAt = 0;
+let lastRenderedOwnship: InterpolatedOwnship | null = null;
+let ownshipVisible = false;
 let map: MapLibreMap;
 let airportBounds: LngLatBoundsLike;
 let ownshipAnimationStarted = false;
@@ -837,7 +843,9 @@ function createMap(airport: AirportMap): MapLibreMap {
         data: ownshipFeature(
           airport.airport.center[0],
           airport.airport.center[1],
-          0
+          0,
+          true,
+          false
         )
       });
       addAirportLayers(created);
@@ -1091,7 +1099,8 @@ function addOwnshipLayer(target: MapLibreMap): void {
       "icon-allow-overlap": true,
       "icon-ignore-placement": true,
       "icon-rotate": ["get", "heading"],
-      "icon-rotation-alignment": "map"
+      "icon-rotation-alignment": "map",
+      "visibility": "none"
     },
     paint: {
       "icon-opacity": ["case", ["get", "stale"], 0.45, 1]
@@ -1102,9 +1111,9 @@ function addOwnshipLayer(target: MapLibreMap): void {
 async function connectTelemetry(): Promise<void> {
   try {
     const initial = await getJson<TelemetrySnapshot>("/api/v1/telemetry");
-    telemetrySamples.push(initial);
+    applyTelemetrySample(initial);
   } catch {
-    setStatus("Waiting for replay telemetry", "waiting");
+    setStatus("Checking MSFS 2024…", "waiting");
   }
 
   const connection = new HubConnectionBuilder()
@@ -1113,25 +1122,54 @@ async function connectTelemetry(): Promise<void> {
     .configureLogging(LogLevel.Warning)
     .build();
   connection.on("TelemetryUpdated", (sample: TelemetrySnapshot) => {
+    applyTelemetrySample(sample);
+  });
+  connection.onreconnecting(() =>
+    setStatus("Reconnecting TaxiNow…", "waiting"));
+  connection.onclose(() =>
+    setStatus("TaxiNow connection lost.", "error"));
+  await connection.start();
+}
+
+function applyTelemetrySample(sample: TelemetrySnapshot): void {
+  if (sample.hasPosition) {
     telemetrySamples.push(sample);
     while (telemetrySamples.length > 2) {
       telemetrySamples.shift();
     }
+    setStatus("Position in sync with MSFS.", "connected");
+  } else {
+    telemetrySamples.length = 0;
+    lastRenderedOwnship = null;
     setStatus(
-      sample.simulator === "replay"
-        ? "Replay · ground tracking"
-        : `${sample.simulator.toUpperCase()} · ${formatState(sample.state)}`,
-      sample.onGround ? "connected" : "waiting"
+      sample.state === "disconnected"
+        ? "Simulator is not running."
+        : "Flight is not started.",
+      sample.state === "disconnected" ? "error" : "waiting"
     );
-  });
-  connection.onreconnecting(() => setStatus("Reconnecting", "waiting"));
-  connection.onclose(() => setStatus("Disconnected", "error"));
-  await connection.start();
+  }
 }
 
-function renderOwnship(): void {
+function renderOwnship(frameTime = performance.now()): void {
+  if (frameTime - lastOwnshipFrameAt < 33) {
+    requestAnimationFrame(renderOwnship);
+    return;
+  }
+  lastOwnshipFrameAt = frameTime;
   const ownship = interpolateOwnship(telemetrySamples, Date.now());
   if (ownship) {
+    if (
+      lastRenderedOwnship &&
+      Math.abs(lastRenderedOwnship.longitude - ownship.longitude) < 1e-9 &&
+      Math.abs(lastRenderedOwnship.latitude - ownship.latitude) < 1e-9 &&
+      Math.abs(lastRenderedOwnship.heading - ownship.heading) < 0.05 &&
+      lastRenderedOwnship.visible === ownship.visible &&
+      lastRenderedOwnship.stale === ownship.stale
+    ) {
+      requestAnimationFrame(renderOwnship);
+      return;
+    }
+    lastRenderedOwnship = ownship;
     if (map?.isStyleLoaded() && map.getLayer("ownship")) {
       const source = map.getSource("ownship") as GeoJSONSource | undefined;
       source?.setData(
@@ -1158,6 +1196,15 @@ function renderOwnship(): void {
       fallbackOwnship.style.display = ownship.visible ? "" : "none";
       fallbackOwnship.style.opacity = ownship.stale ? "0.45" : "1";
     }
+    ownshipVisible = ownship.visible;
+  } else if (ownshipVisible) {
+    if (map?.isStyleLoaded() && map.getLayer("ownship")) {
+      map.setLayoutProperty("ownship", "visibility", "none");
+    }
+    if (fallbackOwnship) {
+      fallbackOwnship.style.display = "none";
+    }
+    ownshipVisible = false;
   }
   requestAnimationFrame(renderOwnship);
 }
@@ -1495,6 +1542,7 @@ function activateFallbackOverlay(
     foregroundGroup
   );
   fallbackOwnship = createFallbackOwnship();
+  fallbackOwnship.style.display = "none";
   svg.append(fallbackOwnship);
   const labelGroup = document.createElementNS(namespace, "g");
   svg.append(labelGroup);
@@ -1504,6 +1552,7 @@ function activateFallbackOverlay(
   );
 
   const redraw = () => {
+    lastRenderedOwnship = null;
     backgroundGroup.replaceChildren();
     taxiPavementGroup.replaceChildren();
     runwayGroup.replaceChildren();
@@ -2072,10 +2121,6 @@ function setStatus(message: string, state: "connected" | "waiting" | "error"): v
   const element = document.querySelector("#status")!;
   element.textContent = message;
   element.className = `status ${state}`;
-}
-
-function formatState(state: TelemetrySnapshot["state"]): string {
-  return state.replace(/([A-Z])/g, " $1").toLowerCase();
 }
 
 async function getJson<T>(url: string): Promise<T> {

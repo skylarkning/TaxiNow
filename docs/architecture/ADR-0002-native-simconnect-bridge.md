@@ -1,6 +1,6 @@
 # ADR-0002: Native SimConnect bridge
 
-- Status: Accepted
+- Status: Superseded by ADR-0004
 - Date: 2026-07-29
 
 ## Context
@@ -20,4 +20,3 @@ SDK and ABI differences are isolated, and the UI never receives simulator
 callbacks. A native build workload and an explicitly selected SDK are required.
 If the common bridge cannot support both simulators, the approved fallback is a
 .NET Framework 4.7.2 helper process with a versioned named-pipe protocol.
-

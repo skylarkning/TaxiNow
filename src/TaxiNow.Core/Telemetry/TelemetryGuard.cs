@@ -12,6 +12,14 @@ public sealed class TelemetryGuard(
 
     public TelemetrySnapshot? Accept(TelemetrySnapshot sample)
     {
+        if (!sample.HasPosition)
+        {
+            _lastAccepted = null;
+            _onGroundStreak = 0;
+            _groundTracking = false;
+            return sample with { IsStale = true };
+        }
+
         if (!IsCoordinateValid(sample.Latitude, sample.Longitude) ||
             !double.IsFinite(sample.TrueHeadingDegrees) ||
             !double.IsFinite(sample.GroundSpeedKnots))
@@ -67,4 +75,3 @@ public sealed class TelemetryGuard(
         latitude is >= -90 and <= 90 &&
         longitude is >= -180 and <= 180;
 }
-

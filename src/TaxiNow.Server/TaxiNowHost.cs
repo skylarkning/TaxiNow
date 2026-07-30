@@ -6,6 +6,7 @@ using TaxiNow.Core.Telemetry;
 using TaxiNow.Server.Airports;
 using TaxiNow.Server.Downloads;
 using TaxiNow.Server.Telemetry;
+using TaxiNow.SimConnect.Managed;
 using TaxiNow.SimConnect.Replay;
 using TaxiNow.Storage;
 
@@ -64,6 +65,12 @@ public static class TaxiNowHost
         {
             var configuration = services.GetRequiredService<IConfiguration>();
             var replayPath = configuration["TaxiNow:ReplayPath"];
+            var mode = ResolveTelemetryMode(configuration);
+            if (mode != "replay")
+            {
+                return new ManagedSimConnectTelemetrySource();
+            }
+
             if (string.IsNullOrWhiteSpace(replayPath))
             {
                 replayPath = Path.Combine(
@@ -126,6 +133,7 @@ public static class TaxiNowHost
             var sample = telemetry.Latest;
             var port = configuration.GetValue("TaxiNow:Port", DefaultPort);
             var localUrls = LocalNetworkAddresses.GetUrls(port);
+            var mode = ResolveTelemetryMode(configuration);
             return Results.Ok(new
             {
                 product = "TaxiNow",
@@ -133,8 +141,11 @@ public static class TaxiNowHost
                 localUrl = localUrls[0],
                 localUrls,
                 port,
-                mode = "replay",
-                simulator = sample?.Simulator ?? SimulatorEdition.Replay,
+                mode,
+                simulator = sample?.Simulator ??
+                    (mode == "replay"
+                        ? SimulatorEdition.Replay
+                        : SimulatorEdition.Msfs2024),
                 state = sample?.State ?? TrackingState.Connecting,
                 connected = sample?.Connected ?? false,
                 selectedAirport = "CYYZ",
@@ -225,6 +236,23 @@ public static class TaxiNowHost
                     return Results.Accepted();
                 });
         }
+    }
+
+    private static string ResolveTelemetryMode(IConfiguration configuration)
+    {
+        var configured = configuration["TaxiNow:TelemetryMode"];
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured.Trim().Equals(
+                "replay",
+                StringComparison.OrdinalIgnoreCase)
+                ? "replay"
+                : "msfs2024";
+        }
+
+        return string.IsNullOrWhiteSpace(configuration["TaxiNow:ReplayPath"])
+            ? "msfs2024"
+            : "replay";
     }
 
     private static string ResolveWebRoot()

@@ -32,6 +32,25 @@ public sealed class TelemetryTests
         Assert.Null(guard.Accept(Sample(2, true) with { Latitude = 44.6 }));
     }
 
+    [Fact]
+    public void ConnectionStatus_ResetsPositionJumpHistory()
+    {
+        var guard = new TelemetryGuard(maximumJumpMeters: 100);
+        var status = Sample(2, false) with
+        {
+            Connected = false,
+            HasPosition = false,
+            State = TrackingState.Disconnected
+        };
+
+        Assert.NotNull(guard.Accept(Sample(1, true)));
+        Assert.Equal(
+            TrackingState.Disconnected,
+            guard.Accept(status)!.State);
+        Assert.NotNull(guard.Accept(
+            Sample(3, true) with { Latitude = 44.6 }));
+    }
+
     private static TelemetrySnapshot Sample(long sequence, bool onGround)
     {
         var now = DateTimeOffset.UtcNow;

@@ -1,6 +1,6 @@
 # ADR-0003: Replay-first vertical slice
 
-- Status: Accepted
+- Status: Superseded by ADR-0004
 - Date: 2026-07-29
 
 ## Context
@@ -19,4 +19,3 @@ managed snapshot interface.
 
 Most development and CI do not require MSFS. Replay mode is explicitly labeled
 as simulated and cannot be used as evidence of live compatibility.
-

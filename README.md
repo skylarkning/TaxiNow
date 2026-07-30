@@ -18,7 +18,13 @@ desktop WebView2 shell and in an optional browser view.
 - Taxiway pavement is layered below runway pavement while yellow centerlines
   remain continuous above it. Long taxiway references repeat at collision-aware
   intervals using the SkyCharts marker-density convention.
-- Smooth replay ownship animation through a SignalR telemetry stream.
+- Live MSFS 2024 ground-position tracking through SimConnect, with a
+  heading-oriented ownship icon and smooth SignalR/WebView animation.
+- Simulator status is visible in the header: red when MSFS is not running,
+  orange while no flight is active, and green when position is synchronized.
+- Performance-aware telemetry uses event-driven SimConnect callbacks, bounded
+  buffers, change filtering, and a one-second parked heartbeat rather than a
+  high-rate polling loop.
 - Schema v2 validation and a schema v1 adapter.
 - Visible map downloader and asset manager for ICAO, country/region, and
   optional province/state downloads, with byte-level progress, transfer speed,
@@ -44,8 +50,8 @@ desktop WebView2 shell and in an optional browser view.
   OurAirports runway fallback. Country/region and province/state downloads skip
   ICAOs that are already installed and acquire every remaining airport in the
   selected scope.
-- Native x64 SimConnect C ABI spike, managed wrapper, JSONL recorder, and replay
-  source.
+- Official managed SimConnect integration for MSFS 2024, plus the native x64
+  C ABI spike, JSONL recorder, and deterministic replay source.
 
 Live simulator compatibility is tracked in
 [`docs/WINDOWS_ENVIRONMENT.md`](docs/WINDOWS_ENVIRONMENT.md).
@@ -60,6 +66,12 @@ The build packages the Python map pipeline as
 `pipeline\taxinow-map-pipeline.exe`, so the desktop downloader does not require
 a separate Python installation at runtime. PyInstaller is downloaded into the
 ignored `artifacts` directory when needed.
+
+Live MSFS 2024 builds currently discover the SimConnect SDK from
+`MSFS_SDK_ROOT`, or from `C:\MSFS SDK` when the environment variable is not
+set. The build copies the required managed wrapper and native runtime beside
+TaxiNow. A build made without that SDK remains usable for maps and replay but
+cannot connect to the simulator.
 
 Run the browser/server vertical slice:
 
@@ -87,8 +99,16 @@ The built Windows executable is:
 src\TaxiNow.App\bin\x64\Debug\net10.0-windows\win-x64\TaxiNow.App.exe
 ```
 
-The replay fixture loops by default. Set `TaxiNow__ReplayPath` to another JSONL
-recording to override it.
+Live MSFS 2024 telemetry is the default. To run without the simulator, select
+the deterministic replay source:
+
+```powershell
+$env:TaxiNow__TelemetryMode = 'replay'
+dotnet run --project .\src\TaxiNow.App
+```
+
+Set `TaxiNow__ReplayPath` to select another JSONL recording. Supplying a replay
+path without an explicit telemetry mode also selects replay for compatibility.
 
 ## Repository layout
 

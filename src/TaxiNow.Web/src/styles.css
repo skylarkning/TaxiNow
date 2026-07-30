@@ -197,6 +197,7 @@ header > div {
   gap: 7px;
   color: #c6d5dc;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .status::before {

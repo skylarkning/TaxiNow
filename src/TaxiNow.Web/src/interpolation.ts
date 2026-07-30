@@ -31,10 +31,10 @@ export function interpolateOwnship(
   }
 
   const previous = samples.at(-2);
-  const targetTime = renderTimeMs - interpolationDelayMs;
-  if (!previous) {
+  if (!latest.hasPosition || !previous?.hasPosition) {
     return toOwnship(latest);
   }
+  const targetTime = renderTimeMs - interpolationDelayMs;
 
   const previousTime = Date.parse(previous.serverTimestampUtc);
   const latestTime = Date.parse(latest.serverTimestampUtc);
@@ -84,7 +84,7 @@ function toOwnship(sample: TelemetrySnapshot): InterpolatedOwnship {
     longitude: sample.longitude,
     latitude: sample.latitude,
     heading: normalizeHeading(sample.trueHeadingDegrees),
-    visible: sample.connected && sample.onGround,
+    visible: sample.hasPosition && sample.connected && sample.onGround,
     stale: sample.isStale
   };
 }
@@ -101,4 +101,3 @@ function normalizeHeading(value: number): number {
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
-

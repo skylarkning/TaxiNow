@@ -33,6 +33,7 @@ public sealed class ServerContractTests
         Assert.Contains("\"simulator\":\"msfs2024\"", json);
         Assert.Contains("\"state\":\"groundTracking\"", json);
         Assert.Contains("\"trueHeadingDegrees\":237", json);
+        Assert.Contains("\"hasPosition\":true", json);
     }
 
     [Fact]

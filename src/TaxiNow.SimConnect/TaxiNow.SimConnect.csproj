@@ -1,8 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <MsfsSdkRoot Condition="'$(MsfsSdkRoot)' == '' and '$(MSFS_SDK_ROOT)' != ''">$(MSFS_SDK_ROOT)</MsfsSdkRoot>
+    <MsfsSdkRoot Condition="'$(MsfsSdkRoot)' == '' and Exists('C:\MSFS SDK\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">C:\MSFS SDK</MsfsSdkRoot>
+    <DefineConstants Condition="Exists('$(MsfsSdkRoot)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">$(DefineConstants);TAXINOW_MANAGED_SIMCONNECT</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\TaxiNow.Core\TaxiNow.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="Exists('$(MsfsSdkRoot)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">
+    <Reference Include="Microsoft.FlightSimulator.SimConnect">
+      <HintPath>$(MsfsSdkRoot)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Content Include="$(MsfsSdkRoot)\SimConnect SDK\lib\SimConnect.dll"
+             Link="SimConnect.dll"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

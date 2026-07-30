@@ -61,6 +61,7 @@ export interface TelemetrySnapshot {
   sourceTimestampUtc: string;
   serverTimestampUtc: string;
   sourceMonotonicMilliseconds: number;
+  hasPosition: boolean;
   isStale: boolean;
   state:
     | "disconnected"
