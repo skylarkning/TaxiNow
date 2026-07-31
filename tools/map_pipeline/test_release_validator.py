@@ -88,6 +88,39 @@ class MapPackReleaseValidatorTests(unittest.TestCase):
         self.assertTrue(any("built 1/2" in error for error in errors))
         self.assertTrue(any("quality warnings" in error for error in errors))
 
+    def test_accepts_controlled_omission_and_records_warning_policy(self):
+        temporary, plan, output, _ = self.make_build(
+            warnings=1,
+            built=1,
+        )
+        self.addCleanup(temporary.cleanup)
+
+        errors, _ = validator.validate_build(
+            plan,
+            output,
+            {"CA-BC"},
+            max_rejected_airports=1,
+            max_rejected_percent=50.0,
+            allow_quality_warnings=True,
+        )
+
+        self.assertEqual([], errors)
+
+    def test_controlled_omission_still_enforces_percentage_cap(self):
+        temporary, plan, output, _ = self.make_build(built=1)
+        self.addCleanup(temporary.cleanup)
+
+        errors, _ = validator.validate_build(
+            plan,
+            output,
+            {"CA-BC"},
+            max_rejected_airports=10,
+            max_rejected_percent=2.0,
+            allow_quality_warnings=True,
+        )
+
+        self.assertTrue(any("policy allows" in error for error in errors))
+
     def test_merged_index_replaces_only_matching_region(self):
         current = {
             "schemaVersion": 1,

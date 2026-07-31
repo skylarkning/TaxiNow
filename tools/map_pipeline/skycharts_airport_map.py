@@ -75,6 +75,7 @@ MAP_KINDS = (
     "terminal",
     "hangar",
 )
+POLYGON_KINDS = {"apron", "terminal", "hangar", "pavement"}
 
 
 class AirportMapError(RuntimeError):
@@ -1183,6 +1184,29 @@ def feature_counts(features):
     return counts
 
 
+def discard_incomplete_polygon_features(features):
+    """Drop clipped or degenerate area fragments before map publication.
+
+    Regional extracts and fallback scenery can contain an open building or
+    apron fragment when geometry crosses an extraction boundary. Rendering
+    such a fragment as an area creates holes, spikes, or large closing edges.
+    It is safer to omit only that fragment while retaining the rest of the
+    airport than to reject the entire airport map.
+    """
+    return [
+        feature
+        for feature in features
+        if not (
+            feature.get("kind") in POLYGON_KINDS
+            and len(feature.get("points") or []) > 1
+            and (
+                len(feature.get("points") or []) < 4
+                or feature["points"][0] != feature["points"][-1]
+            )
+        )
+    ]
+
+
 def map_detail_score(result):
     counts = (result or {}).get("counts") or {}
     taxiways = counts.get("taxiway", 0) + counts.get("taxilane", 0)
@@ -2106,6 +2130,7 @@ def normalize(raw, airport, source="OpenStreetMap contributors", source_url="htt
         features.append(feature)
     if not features:
         raise AirportMapError("No runway, taxiway, apron, or stand geometry was found for %s" % airport["ident"])
+    features = discard_incomplete_polygon_features(features)
     features = filter_isolated_airport_features(features, airport)
     all_points = [
         point

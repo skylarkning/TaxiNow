@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Validate locally generated TaxiNow map packs before publication.
 
-The validator deliberately blocks partial regional releases. It verifies that
-every airport planned for the selected country/subdivision was built without
-quality warnings, that every pack ZIP matches the generated index, and writes
-a merged public index plus paste-ready GitHub upload instructions.
+The validator always blocks damaged archives and failed regions. A controlled
+publication policy may permit a very small number of explicitly recorded
+airport omissions and non-blocking quality warnings; omitted airports remain
+available through TaxiNow's normal per-airport source fallback.
 """
 
 from __future__ import annotations
@@ -70,6 +70,9 @@ def validate_build(
     plan_path: pathlib.Path,
     output: pathlib.Path,
     only: set[str] | None = None,
+    max_rejected_airports: int = 0,
+    max_rejected_percent: float = 0.0,
+    allow_quality_warnings: bool = False,
 ) -> tuple[list[str], dict[str, Any] | None]:
     errors: list[str] = []
     only = {value.upper() for value in only or set()}
@@ -130,12 +133,25 @@ def validate_build(
                 f"{selector}: plan lists {expected} airports but the "
                 f"quality report examined {selected}."
             )
-        if built != expected or rejected:
+        if built + rejected != selected:
             errors.append(
-                f"{selector}: built {built}/{expected} airports "
-                f"with {rejected} rejected."
+                f"{selector}: quality totals are inconsistent: "
+                f"{built} built + {rejected} rejected != {selected} selected."
             )
-        if warnings:
+        rejected_percent = (
+            rejected * 100.0 / expected if expected else 100.0
+        )
+        if rejected and (
+            rejected > max_rejected_airports
+            or rejected_percent > max_rejected_percent
+        ):
+            errors.append(
+                f"{selector}: built {built}/{expected} airports with "
+                f"{rejected} rejected ({rejected_percent:.2f}%); policy "
+                f"allows at most {max_rejected_airports} and "
+                f"{max_rejected_percent:.2f}%."
+            )
+        if warnings and not allow_quality_warnings:
             errors.append(
                 f"{selector}: {warnings} airport map(s) still have "
                 "quality warnings."
@@ -156,12 +172,6 @@ def validate_build(
             f"The index contains {indexed_airports} airports but quality "
             f"reports show {built_airports} built."
         )
-    if expected_airports != built_airports:
-        errors.append(
-            f"The selected plan requires {expected_airports} airports; "
-            f"only {built_airports} are publishable."
-        )
-
     for pack in packs:
         file_name = pathlib.Path(str(pack.get("url") or "")).name
         if not file_name:
@@ -248,16 +258,30 @@ def publishing_instructions(
     release_tag: str,
     output: pathlib.Path,
     pack_names: list[str],
+    quality_notes: list[str],
 ) -> str:
     uploads = " ".join(
         f'"{(output / "packs" / name).resolve()}"'
         for name in pack_names
     )
     publish_index = (output / "index.publish.json").resolve()
+    notes = (
+        "\n".join(f"- {note}" for note in quality_notes)
+        if quality_notes
+        else "- No airport omissions or quality warnings."
+    )
     return f"""# Publish TaxiNow regional map packs
 
 The local quality gate passed. Publish in this order so clients never see an
 index entry before its ZIP exists.
+
+## Recorded quality notes
+
+{notes}
+
+Airport omissions listed here are intentional source-data exceptions. TaxiNow
+can still acquire those airports individually through its normal source
+fallback instead of invalidating the complete regional package.
 
 ## 1. Upload immutable ZIP files to the release
 
@@ -319,7 +343,49 @@ def parse_arguments() -> argparse.Namespace:
         "--public-index-url",
         default=DEFAULT_PUBLIC_INDEX_URL,
     )
+    parser.add_argument("--max-rejected-airports", type=int, default=0)
+    parser.add_argument("--max-rejected-percent", type=float, default=0.0)
+    parser.add_argument("--allow-quality-warnings", action="store_true")
     return parser.parse_args()
+
+
+def collect_quality_notes(
+    plan: dict[str, Any],
+    output: pathlib.Path,
+    only: set[str],
+) -> list[str]:
+    notes: list[str] = []
+    for region in selected_regions(plan, only):
+        selector = str(
+            region.get("regionCode") or region.get("countryCode") or ""
+        )
+        report_path = output / "quality" / f"{region_identifier(region)}.json"
+        try:
+            report = load_json(report_path)
+        except (OSError, json.JSONDecodeError):
+            continue
+        rejected = [
+            airport for airport in report.get("airports") or []
+            if isinstance(airport, dict)
+            and airport.get("status") == "rejected"
+        ]
+        for airport in rejected:
+            reasons = "; ".join(
+                str(value) for value in airport.get("errors") or []
+            ) or "source geometry was not publishable"
+            notes.append(
+                f"{selector} omits {airport.get('icao')}: {reasons}"
+            )
+        warning_count = int(
+            (report.get("summary") or {}).get("withWarnings") or 0
+        )
+        if warning_count:
+            notes.append(
+                f"{selector} includes {warning_count} usable airport map(s) "
+                "with non-blocking source-data quality warnings; see "
+                f"quality/{report_path.name}."
+            )
+    return notes
 
 
 def main() -> int:
@@ -329,7 +395,14 @@ def main() -> int:
         for value in args.only or []
         if value.strip()
     }
-    errors, generated = validate_build(args.plan, args.output, only)
+    errors, generated = validate_build(
+        args.plan,
+        args.output,
+        only,
+        args.max_rejected_airports,
+        args.max_rejected_percent,
+        args.allow_quality_warnings,
+    )
     failed_path = args.output / "VALIDATION-FAILED.txt"
     if errors or generated is None:
         failed_path.write_text(
@@ -343,6 +416,8 @@ def main() -> int:
 
     failed_path.unlink(missing_ok=True)
     current = read_public_index(args.public_index_url)
+    plan = load_json(args.plan)
+    quality_notes = collect_quality_notes(plan, args.output, only)
     merged = merge_indexes(current, generated)
     publish_index_path = args.output / "index.publish.json"
     publish_index_path.write_text(
@@ -361,10 +436,13 @@ def main() -> int:
             args.release_tag,
             args.output,
             pack_names,
+            quality_notes,
         ),
         encoding="utf-8",
     )
-    print("Map packs passed the strict local publication gate.")
+    print("Map packs passed the controlled local publication gate.")
+    for note in quality_notes:
+        print(f"QUALITY NOTE: {note}")
     print(f"Merged index: {publish_index_path}")
     print(f"Instructions: {instructions_path}")
     return 0

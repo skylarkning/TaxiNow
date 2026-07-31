@@ -7,6 +7,7 @@ import unittest
 from unittest import mock
 
 import map_pack_builder
+import skycharts_airport_map as skycharts
 
 
 class OsmiumLauncherTests(unittest.TestCase):
@@ -72,6 +73,33 @@ class OsmiumLauncherTests(unittest.TestCase):
             )
 
         readable.assert_called_once_with(cache)
+
+
+class AirportGeometrySanitizerTests(unittest.TestCase):
+    def test_discards_only_incomplete_area_fragments(self):
+        runway = {
+            "kind": "runway",
+            "points": [[1.0, 1.0], [2.0, 2.0]],
+        }
+        valid_terminal = {
+            "kind": "terminal",
+            "points": [
+                [1.0, 1.0],
+                [1.0, 2.0],
+                [2.0, 2.0],
+                [1.0, 1.0],
+            ],
+        }
+        open_apron = {
+            "kind": "apron",
+            "points": [[1.0, 1.0], [1.0, 2.0], [2.0, 2.0]],
+        }
+
+        result = skycharts.discard_incomplete_polygon_features(
+            [runway, valid_terminal, open_apron]
+        )
+
+        self.assertEqual([runway, valid_terminal], result)
 
 
 if __name__ == "__main__":

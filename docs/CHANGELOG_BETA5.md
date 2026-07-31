@@ -13,6 +13,12 @@ regional preprocessing run. Build 104 also fixes the Windows osmium-tool
 launcher incompatibility that caused every regional build to exit with code 2.
 TaxiNow itself remains Build 102.
 
+**Map Pack Builder Build 105:** incomplete polygon fragments are discarded
+before publication, completed airports are reused when retrying a failed
+country build, and a small number of explicitly recorded source-data omissions
+no longer invalidates an otherwise verified country pack. Archive integrity,
+region failures, inconsistent counts, and excessive omissions remain blocking.
+
 ## Highlights since Beta 3
 
 - Added English and Simplified Chinese application interfaces with a globe

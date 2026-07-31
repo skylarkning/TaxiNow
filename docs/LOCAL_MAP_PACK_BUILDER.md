@@ -1,16 +1,16 @@
 # TaxiNow Local Map Pack Builder
 
 The Windows GUI replaces the slow GitHub Actions preprocessing job. It runs the
-same resumable Geofabrik-based pipeline on the maintainer PC, blocks partial or
-warning-bearing releases, and produces exact upload instructions only after
-the build passes validation.
+same resumable Geofabrik-based pipeline on the maintainer PC, blocks damaged
+or excessively incomplete releases, and produces exact upload instructions
+only after the build passes validation.
 
 ## 1. Install or build the GUI
 
 For normal use, run the standard Windows installer:
 
 ```text
-artifacts\map-pack-builder-installer\TaxiNow-Local-Map-Pack-Builder-Build-104-Setup.exe
+artifacts\map-pack-builder-installer\TaxiNow-Local-Map-Pack-Builder-Build-105-Setup.exe
 ```
 
 It adds a Start menu shortcut, offers an optional desktop shortcut, and
@@ -33,7 +33,7 @@ cmd /c .\scripts\build-map-pack-builder.cmd
 The installer, self-contained folder, and portable ZIP are created at:
 
 ```text
-artifacts\map-pack-builder-installer\TaxiNow-Local-Map-Pack-Builder-Build-104-Setup.exe
+artifacts\map-pack-builder-installer\TaxiNow-Local-Map-Pack-Builder-Build-105-Setup.exe
 artifacts\map-pack-builder\TaxiNow.MapPackBuilder.exe
 artifacts\TaxiNow-Local-Map-Pack-Builder.zip
 ```
@@ -95,21 +95,25 @@ The first build can take a long time because it downloads a regional PBF and
 optional building datasets. Later runs reuse those files. Cancelling does not
 delete completed downloads or regions.
 
-## 4. Strict publication gate
+## 4. Controlled publication gate
 
 The GUI calls `validate_map_pack_release.py` after generation. Publication is
 blocked when any of the following is true:
 
 - a planned region failed;
-- fewer airports were examined or built than the plan requires;
-- an airport was rejected;
-- any generated airport retains a quality warning;
+- the quality-report totals do not match the plan;
+- more than 10 airports or more than 2% of a region are rejected;
+- an airport contains blocking geometry errors and is not excluded;
 - an index count does not match the quality reports;
 - a ZIP is absent, has the wrong size, or fails SHA-256 verification.
 
 A failed build writes `output\VALIDATION-FAILED.txt`. It does not create
-publication instructions. This prevents experimental, incomplete, or known-bad
-pilot packages from being advertised to TaxiNow clients.
+publication instructions. Non-blocking warnings and a small number of
+explicitly rejected airports are recorded in `PUBLISHING.md` and the quality
+report. Excluded airports are omitted from the regional ZIP so TaxiNow can use
+its normal individual-airport fallback. This prevents one unavailable airport
+from discarding an otherwise verified country package while still blocking
+broadly incomplete or damaged output.
 
 A passing build writes:
 

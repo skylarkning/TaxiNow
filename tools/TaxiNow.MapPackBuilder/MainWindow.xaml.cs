@@ -286,25 +286,32 @@ public partial class MainWindow : Window
                 output,
                 "--release-tag",
                 releaseTag,
+                "--max-rejected-airports",
+                "10",
+                "--max-rejected-percent",
+                "2",
+                "--allow-quality-warnings",
             };
             if (!string.IsNullOrEmpty(subdivision))
             {
                 validationArguments.Add("--only");
                 validationArguments.Add(subdivision);
             }
-            StatusTextBlock.Text = "Running strict publication gate";
+            StatusTextBlock.Text = "Running controlled publication gate";
             await RunPythonAsync(python, validationArguments, token);
 
             StatusTextBlock.Text = "Ready to publish";
             AppendLog("");
             AppendLog(
-                "SUCCESS: every planned airport passed the strict quality "
-                + "gate. Open PUBLISHING.md for the exact GitHub steps.");
+                "SUCCESS: the regional package passed archive integrity and "
+                + "the controlled airport-quality policy. Open PUBLISHING.md "
+                + "for exclusions, warnings, and the exact GitHub steps.");
             OpenPublishingButton.IsEnabled = true;
             MessageBox.Show(
                 this,
-                "The local build completed and passed the strict publication "
-                + "gate. No partial or warning-bearing package was approved.",
+                "The local build completed. Any safe airport omissions or "
+                + "non-blocking warnings are recorded in PUBLISHING.md; "
+                + "damaged archives and excessive omissions remain blocked.",
                 "TaxiNow map packs ready",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -585,7 +592,7 @@ public partial class MainWindow : Window
             MessageBox.Show(
                 this,
                 "PUBLISHING.md is created only after a build passes the "
-                + "strict publication gate.",
+                + "controlled publication gate.",
                 "No publishable build",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);

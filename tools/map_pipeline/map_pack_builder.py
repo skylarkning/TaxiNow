@@ -32,6 +32,7 @@ import taxinow_map_pipeline as pipeline
 
 PACK_SCHEMA_VERSION = 1
 PACK_SOURCE_REVISION = 2
+MAP_BUILD_PIPELINE_REVISION = 2
 MICROSOFT_BUILDING_INDEX_URL = (
     "https://bfppub.blob.core.windows.net/$web/2026-07-24/"
     "dataset-links.csv"
@@ -634,6 +635,7 @@ def build_maps_from_geofabrik(
     region_code: str | None,
     with_overture: bool = False,
     with_microsoft: bool = False,
+    force_airports: bool = False,
 ) -> dict:
     maps_directory.mkdir(parents=True, exist_ok=True)
     quality_records = []
@@ -705,6 +707,55 @@ def build_maps_from_geofabrik(
             skycharts_work / "ourairports-runways.csv",
         )
         for airport in selected:
+            map_path = maps_directory / f"{airport.icao}.json"
+            if map_path.is_file() and not force_airports:
+                try:
+                    existing = json.loads(map_path.read_text(encoding="utf-8"))
+                    existing_airport = existing.get("airport") or {}
+                    existing_features = existing.get("features") or []
+                    existing_counts = existing.get("counts") or {}
+                    invalid_polygons = [
+                        feature for feature in existing_features
+                        if feature.get("kind") in skycharts.POLYGON_KINDS
+                        and len(feature.get("points") or []) > 1
+                        and (
+                            len(feature.get("points") or []) < 4
+                            or feature["points"][0] != feature["points"][-1]
+                        )
+                    ]
+                    if (
+                        int(existing.get("schemaVersion") or 0) != 2
+                        or str(existing_airport.get("icao") or "").upper()
+                        != airport.icao
+                        or int(existing_counts.get("runways") or 0) == 0
+                        or invalid_polygons
+                    ):
+                        raise ValueError("cached airport map failed validation")
+                    quality_records.append({
+                        "icao": airport.icao,
+                        "status": "built",
+                        "errors": [],
+                        "warnings": list(
+                            existing.get("qualityWarnings") or []
+                        ),
+                        "terminalCompleteness": (
+                            skycharts.terminal_completeness_metrics(
+                                {"features": existing_features}
+                            )
+                        ),
+                        "sources": [
+                            str(source.get("name") or "Unknown")
+                            for source in existing.get("sources") or []
+                            if isinstance(source, dict)
+                        ],
+                    })
+                    print(
+                        f"Reusing completed airport map for {airport.icao}",
+                        flush=True,
+                    )
+                    continue
+                except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                    map_path.unlink(missing_ok=True)
             source_names = [
                 "OpenStreetMap regional extract",
                 "OurAirports",
@@ -1017,6 +1068,7 @@ def build_maps_from_geofabrik(
             })
     return {
         "schemaVersion": 1,
+        "pipelineRevision": MAP_BUILD_PIPELINE_REVISION,
         "generatedAt": iso_now(),
         "countryCode": country_code.upper(),
         "regionCode": region_code.upper() if region_code else None,
@@ -1051,6 +1103,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--maps-directory", type=pathlib.Path)
     parser.add_argument("--with-overture", action="store_true")
     parser.add_argument("--with-microsoft", action="store_true")
+    parser.add_argument("--force-airports", action="store_true")
     parser.add_argument("--output", required=True, type=pathlib.Path)
     parser.add_argument("--metadata-output", type=pathlib.Path)
     parser.add_argument("--quality-report", type=pathlib.Path)
@@ -1104,6 +1157,7 @@ def main() -> None:
             args.region,
             args.with_overture,
             args.with_microsoft,
+            args.force_airports,
         )
         roots = [maps_directory]
     if not roots:

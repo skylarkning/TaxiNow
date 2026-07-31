@@ -182,6 +182,7 @@ def build_region(
     with_overture: bool,
     with_microsoft: bool,
     maximum_airports: int,
+    force_airports: bool,
 ) -> list[dict]:
     selector = str(
         region["regionCode"] or region["countryCode"]
@@ -226,8 +227,26 @@ def build_region(
         arguments.append("--with-overture")
     if with_microsoft:
         arguments.append("--with-microsoft")
+    if force_airports:
+        arguments.append("--force-airports")
     subprocess.run(arguments, check=True)
     return json.loads(metadata_path.read_text(encoding="utf-8"))
+
+
+def completed_region_is_current(
+    metadata_path: pathlib.Path,
+    quality_path: pathlib.Path,
+) -> bool:
+    """Return true only for a package produced by the current map pipeline."""
+    if not metadata_path.is_file() or not quality_path.is_file():
+        return False
+    try:
+        report = json.loads(quality_path.read_text(encoding="utf-8"))
+        return int(report.get("pipelineRevision") or 0) >= (
+            map_pack_builder.MAP_BUILD_PIPELINE_REVISION
+        )
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return False
 
 
 def build_plan(
@@ -263,7 +282,11 @@ def build_plan(
             continue
         identifier = safe_name(str(region["id"]).lower())
         metadata_path = metadata_root / f"{identifier}.json"
-        if metadata_path.exists() and not force:
+        quality_path = reports_root / f"{identifier}.json"
+        if (
+            not force
+            and completed_region_is_current(metadata_path, quality_path)
+        ):
             entries.extend(
                 json.loads(metadata_path.read_text(encoding="utf-8"))
             )
@@ -281,6 +304,7 @@ def build_plan(
                     with_overture=with_overture,
                     with_microsoft=with_microsoft,
                     maximum_airports=maximum_airports,
+                    force_airports=force,
                 )
             )
         except Exception as error:
