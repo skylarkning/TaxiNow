@@ -23,6 +23,10 @@ planned work and are not final release notes.
 - Verify MSFS 2020 live at CYYZ Gate B19: SimConnect returned latitude,
   longitude, true heading, on-ground state, and ground speed; normal tracking
   and force refresh both passed.
+- Expand the bilingual About-page FAQ with supported simulators, the current
+  X-Plane support position, issue-reporting guidance, TaxiNow's permanent-free
+  intent, privacy and network behavior, independent security review, and the
+  no-donations policy.
 
 ---
 
@@ -46,3 +50,6 @@ Beta 6 仍在开发中。以下内容区分已经完成和计划后续完成的�
   如果两者同时运行，优先保持 MSFS 2024 连接。
 - 已在 CYYZ B19 机位完成 MSFS 2020 实机测试：SimConnect 成功返回经纬度、
   真航向、地面状态和地速，正常跟踪和强制刷新均通过。
+- 扩充“关于”页面的中英双语常见问题，新增支持平台、暂不支持 X-Plane 的
+  原因、问题反馈方式、永久免费计划、隐私与联网行为、独立安全审查以及暂不
+  接受捐赠等说明。

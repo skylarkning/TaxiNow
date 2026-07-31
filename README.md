@@ -32,8 +32,9 @@ On first launch, a bilingual English/Chinese welcome screen identifies the
 official distribution channel, warns against paid or unauthorized copies, and
 offers a per-device **Do not show again / 不再显示** option.
 
-Official binaries are published only by `skylarkning` through flightsim.to and
-the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release).
+Official binaries are published only by `skylarkning` through the
+[official TaxiNow page on flightsim.to](https://flightsim.to/addon/112712/taxinow)
+and the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release).
 TaxiNow is provided **“AS IS”**, without warranties of any kind. Source code is
 not publicly available; qualified independent security or privacy experts may
 request limited review access solely to verify TaxiNow's security and privacy.

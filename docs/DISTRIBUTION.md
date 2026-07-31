@@ -6,7 +6,7 @@ TaxiNow V1.0 Beta 5 (internal build 102) ships in two forms:
 2. A portable ZIP is a secondary release for advanced users and troubleshooting.
 
 Official public binaries are published only by `skylarkning` through the
-TaxiNow page on flightsim.to and the
+[TaxiNow page on flightsim.to](https://flightsim.to/addon/112712/taxinow) and the
 [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release).
 The private development repository is not a public distribution channel.
 
