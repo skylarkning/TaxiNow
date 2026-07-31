@@ -10,6 +10,8 @@
     <ApplicationIcon>..\..\src\TaxiNow.App\Assets\TaxiNow.ico</ApplicationIcon>
     <AssemblyName>TaxiNow.MapPackBuilder</AssemblyName>
     <RootNamespace>TaxiNow.MapPackBuilder</RootNamespace>
+    <FileVersion>1.0.0.103</FileVersion>
+    <InformationalVersion>1.0.0-beta.5-map-pack-builder+build.103</InformationalVersion>
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="..\..\src\TaxiNow.App\Assets\TaxiNow.ico"
@@ -39,6 +41,12 @@
              CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\map_pipeline\install_map_pack_environment.cmd"
              Link="pipeline\install_map_pack_environment.cmd"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\map_pipeline\data\airports.csv.gz"
+             Link="pipeline\data\airports.csv.gz"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\map_pipeline\data\runways.csv.gz"
+             Link="pipeline\data\runways.csv.gz"
              CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

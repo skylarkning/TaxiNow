@@ -4,7 +4,7 @@ set "REPO_ROOT=%~dp0.."
 set "OUTPUT=%REPO_ROOT%\artifacts\map-pack-builder"
 set "ZIP=%REPO_ROOT%\artifacts\TaxiNow-Local-Map-Pack-Builder.zip"
 set "INSTALLER_OUTPUT=%REPO_ROOT%\artifacts\map-pack-builder-installer"
-set "INSTALLER=%INSTALLER_OUTPUT%\TaxiNow-Local-Map-Pack-Builder-Build-102-Setup.exe"
+set "INSTALLER=%INSTALLER_OUTPUT%\TaxiNow-Local-Map-Pack-Builder-Build-103-Setup.exe"
 set "PREREQUISITES=%REPO_ROOT%\artifacts\prerequisites"
 set "MICROMAMBA=%PREREQUISITES%\micromamba.exe"
 set "MICROMAMBA_DOWNLOAD=%PREREQUISITES%\micromamba-win-64.exe"
@@ -19,6 +19,15 @@ dotnet publish "%REPO_ROOT%\tools\TaxiNow.MapPackBuilder\TaxiNow.MapPackBuilder.
   --output "%OUTPUT%"
 
 if errorlevel 1 exit /b %errorlevel%
+
+if not exist "%OUTPUT%\pipeline\data\airports.csv.gz" (
+  echo Required bundled airport catalog was not published.
+  exit /b 1
+)
+if not exist "%OUTPUT%\pipeline\data\runways.csv.gz" (
+  echo Required bundled runway catalog was not published.
+  exit /b 1
+)
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "if (Test-Path -LiteralPath '%ZIP%') { Remove-Item -LiteralPath '%ZIP%' -Force }; Compress-Archive -Path '%OUTPUT%\*' -DestinationPath '%ZIP%' -CompressionLevel Optimal"

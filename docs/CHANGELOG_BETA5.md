@@ -4,6 +4,10 @@ Beta 4 is intentionally skipped as a public upgrade target. The Beta 4 work
 and the additional fixes completed afterward have been consolidated into this
 Beta 5 release. Users should update directly from Beta 3 to Beta 5 Build 102.
 
+**Map Pack Builder hotfix:** Builder Build 103 includes the bundled airport
+and runway catalogs that were accidentally omitted from the initial Build 102
+installer. TaxiNow itself remains Build 102.
+
 ## Highlights since Beta 3
 
 - Added English and Simplified Chinese application interfaces with a globe
@@ -50,6 +54,9 @@ Beta 5 release. Users should update directly from Beta 3 to Beta 5 Build 102.
 
 Beta 4 有意不作为公开升级目标单独发布。Beta 4 的全部更新以及此后完成的
 修复已经合并到 Beta 5。用户应当直接从 Beta 3 升级至 Beta 5 Build 102。
+
+**地图包生成器热修复：**Builder Build 103 补回了初版 Build 102 安装器中
+误漏的机场和跑道目录数据。TaxiNow 主程序仍为 Build 102。
 
 ## 相比 Beta 3 的主要更新
 

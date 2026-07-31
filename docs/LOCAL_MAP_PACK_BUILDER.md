@@ -10,7 +10,7 @@ the build passes validation.
 For normal use, run the standard Windows installer:
 
 ```text
-artifacts\map-pack-builder-installer\TaxiNow-Local-Map-Pack-Builder-Build-102-Setup.exe
+artifacts\map-pack-builder-installer\TaxiNow-Local-Map-Pack-Builder-Build-103-Setup.exe
 ```
 
 It adds a Start menu shortcut, offers an optional desktop shortcut, and
@@ -33,7 +33,7 @@ cmd /c .\scripts\build-map-pack-builder.cmd
 The installer, self-contained folder, and portable ZIP are created at:
 
 ```text
-artifacts\map-pack-builder-installer\TaxiNow-Local-Map-Pack-Builder-Build-102-Setup.exe
+artifacts\map-pack-builder-installer\TaxiNow-Local-Map-Pack-Builder-Build-103-Setup.exe
 artifacts\map-pack-builder\TaxiNow.MapPackBuilder.exe
 artifacts\TaxiNow-Local-Map-Pack-Builder.zip
 ```
