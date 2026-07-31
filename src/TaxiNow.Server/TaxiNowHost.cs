@@ -15,6 +15,13 @@ namespace TaxiNow.Server;
 public static class TaxiNowHost
 {
     public const int DefaultPort = 8780;
+    public const string ProductVersion = "1.0.0-beta.5";
+    public const string DisplayVersion = "V1.0 Beta 5";
+    public const int InternalBuildId = 101;
+    public const string BuildDate = "July 30, 2026";
+
+    public static string MapShellUrl =>
+        $"http://127.0.0.1:{DefaultPort}/?build={InternalBuildId}";
 
     public static WebApplication Build(
         string[]? args = null,
@@ -96,13 +103,21 @@ public static class TaxiNowHost
         {
             OnPrepareResponse = context =>
             {
-                context.Context.Response.Headers.CacheControl =
-                    string.Equals(
+                if (string.Equals(
                         context.File.Name,
                         "index.html",
-                        StringComparison.OrdinalIgnoreCase)
-                        ? "no-cache"
-                        : "public,max-age=31536000,immutable";
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Context.Response.Headers.CacheControl =
+                        "no-store,no-cache,must-revalidate,max-age=0";
+                    context.Context.Response.Headers.Pragma = "no-cache";
+                    context.Context.Response.Headers.Expires = "0";
+                }
+                else
+                {
+                    context.Context.Response.Headers.CacheControl =
+                        "public,max-age=31536000,immutable";
+                }
             }
         });
 
@@ -139,10 +154,10 @@ public static class TaxiNowHost
             return Results.Ok(new
             {
                 product = "TaxiNow",
-                version = "1.0.0-beta.5",
-                displayVersion = "V1.0 Beta 5",
-                internalBuildId = 100,
-                buildDate = "July 30, 2026",
+                version = ProductVersion,
+                displayVersion = DisplayVersion,
+                internalBuildId = InternalBuildId,
+                buildDate = BuildDate,
                 apiVersion = 1,
                 localUrl = localUrls[0],
                 localUrls,

@@ -12,6 +12,17 @@ namespace TaxiNow.Server.Tests;
 public sealed class ServerContractTests
 {
     [Fact]
+    public void ProductMetadata_UsesBuildSpecificMapShellUrl()
+    {
+        Assert.Equal("1.0.0-beta.5", TaxiNowHost.ProductVersion);
+        Assert.Equal("V1.0 Beta 5", TaxiNowHost.DisplayVersion);
+        Assert.Equal(101, TaxiNowHost.InternalBuildId);
+        Assert.Equal(
+            "http://127.0.0.1:8780/?build=101",
+            TaxiNowHost.MapShellUrl);
+    }
+
+    [Fact]
     public void TelemetryContract_UsesCamelCaseStringEnums()
     {
         var now = DateTimeOffset.UtcNow;

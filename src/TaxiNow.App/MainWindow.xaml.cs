@@ -19,6 +19,7 @@ public partial class MainWindow : Window
         _storageRoot = storageRoot;
         _changeStorageRootAsync = changeStorageRootAsync;
         InitializeComponent();
+        Title = $"TaxiNow {TaxiNowHost.DisplayVersion}";
     }
 
     public async Task LoadMapAsync()
@@ -38,7 +39,7 @@ public partial class MainWindow : Window
             MapView.CoreWebView2.Settings.IsStatusBarEnabled = false;
             MapView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
             MapView.NavigationCompleted += OnNavigationCompleted;
-            MapView.Source = new Uri($"http://127.0.0.1:{TaxiNowHost.DefaultPort}/");
+            MapView.Source = new Uri(TaxiNowHost.MapShellUrl);
         }
         catch (WebView2RuntimeNotFoundException)
         {
