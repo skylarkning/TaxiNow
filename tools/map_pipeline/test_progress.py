@@ -552,6 +552,70 @@ class OpenStreetMapPriorityTests(unittest.TestCase):
             feature["id"] for feature in selected
         ])
 
+    def test_large_airport_connected_features_survive_runway_buffer(self):
+        airport = {"latitude": 40.077349, "longitude": 116.596702}
+        features = [
+            {
+                "id": "runway-west",
+                "kind": "runway",
+                "points": [[116.59, 40.05], [116.59, 40.105]],
+            },
+            {
+                "id": "runway-east",
+                "kind": "runway",
+                "points": [[116.62, 40.05], [116.62, 40.105]],
+            },
+            {
+                "id": "connector-a",
+                "kind": "taxiway",
+                "points": [[116.602, 40.075], [116.606, 40.075]],
+            },
+            {
+                "id": "connector-b",
+                "kind": "taxiway",
+                "points": [[116.606, 40.075], [116.611, 40.075]],
+            },
+            {
+                "id": "terminal-3",
+                "kind": "terminal",
+                "points": [
+                    [116.611, 40.0745],
+                    [116.616, 40.0745],
+                    [116.616, 40.0755],
+                    [116.611, 40.0755],
+                    [116.611, 40.0745],
+                ],
+            },
+            {
+                "id": "unrelated-heliport",
+                "kind": "hangar",
+                "points": [
+                    [116.65, 40.12],
+                    [116.651, 40.12],
+                    [116.651, 40.121],
+                    [116.65, 40.12],
+                ],
+            },
+        ]
+
+        selected = skycharts.filter_isolated_airport_features(
+            features,
+            airport,
+            maximum_distance=1000,
+            connection_distance=100,
+        )
+
+        self.assertEqual(
+            [
+                "runway-west",
+                "runway-east",
+                "connector-a",
+                "connector-b",
+                "terminal-3",
+            ],
+            [feature["id"] for feature in selected],
+        )
+
 
 class CatalogReliabilityTests(unittest.TestCase):
     def test_bundled_catalog_avoids_first_run_network_dependency(self):

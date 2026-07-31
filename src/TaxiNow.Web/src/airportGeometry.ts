@@ -3,6 +3,14 @@ import type { AirportFeature, AirportMap } from "./contracts";
 const METRES_PER_LATITUDE_DEGREE = 111_320;
 const PRIMARY_RUNWAY_RADIUS_METRES = 5_000;
 const AIRPORT_FEATURE_DISTANCE_METRES = 1_200;
+const AIRPORT_FEATURE_CONNECTION_METRES = 90;
+
+type LocalBounds = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+};
 
 function localPoint(
   point: [number, number],
@@ -55,10 +63,41 @@ function pointSegmentDistance(
   );
 }
 
+function featureBounds(
+  feature: AirportFeature,
+  latitude: number
+): LocalBounds | null {
+  if (feature.points.length === 0) {
+    return null;
+  }
+  const points = feature.points.map((point) => localPoint(point, latitude));
+  return {
+    minX: Math.min(...points.map((point) => point[0])),
+    minY: Math.min(...points.map((point) => point[1])),
+    maxX: Math.max(...points.map((point) => point[0])),
+    maxY: Math.max(...points.map((point) => point[1]))
+  };
+}
+
+function boundsDistance(left: LocalBounds, right: LocalBounds): number {
+  const deltaX = Math.max(
+    left.minX - right.maxX,
+    right.minX - left.maxX,
+    0
+  );
+  const deltaY = Math.max(
+    left.minY - right.maxY,
+    right.minY - left.maxY,
+    0
+  );
+  return Math.hypot(deltaX, deltaY);
+}
+
 export function filterAirportFeatures(
   features: AirportFeature[],
   center: [number, number],
-  maximumDistance = AIRPORT_FEATURE_DISTANCE_METRES
+  maximumDistance = AIRPORT_FEATURE_DISTANCE_METRES,
+  connectionDistance = AIRPORT_FEATURE_CONNECTION_METRES
 ): AirportFeature[] {
   const runways = features.filter(
     (feature) => feature.kind === "runway" && feature.points.length >= 2
@@ -81,19 +120,57 @@ export function filterAirportFeatures(
     )
   );
 
-  return features.filter((feature) => {
+  const selectedIds = new Set<string>();
+  for (const feature of features) {
     if (runwayIds.has(feature.id)) {
-      return true;
+      selectedIds.add(feature.id);
+      continue;
     }
     if (feature.points.length === 0) {
-      return false;
+      continue;
     }
-    return feature.points.some((point) =>
+    if (feature.points.some((point) =>
       segments.some(([start, end]) =>
         pointSegmentDistance(point, start, end, center[1]) <= maximumDistance
       )
-    );
-  });
+    )) {
+      selectedIds.add(feature.id);
+    }
+  }
+
+  // Large airports can extend well beyond the runway buffer. Recover the
+  // remainder of the same operational network transitively while still
+  // rejecting detached facilities from nearby airports and heliports.
+  const boundsById = new Map(
+    features.map((feature) =>
+      [feature.id, featureBounds(feature, center[1])] as const
+    )
+  );
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const selectedBounds = [...selectedIds]
+      .map((id) => boundsById.get(id))
+      .filter((bounds): bounds is LocalBounds => bounds !== null && bounds !== undefined);
+    for (const feature of features) {
+      if (selectedIds.has(feature.id)) {
+        continue;
+      }
+      const bounds = boundsById.get(feature.id);
+      if (!bounds) {
+        continue;
+      }
+      if (selectedBounds.some(
+        (candidate) => boundsDistance(bounds, candidate) <= connectionDistance
+      )) {
+        selectedIds.add(feature.id);
+        selectedBounds.push(bounds);
+        changed = true;
+      }
+    }
+  }
+
+  return features.filter((feature) => selectedIds.has(feature.id));
 }
 
 export function calculateFeatureBounds(

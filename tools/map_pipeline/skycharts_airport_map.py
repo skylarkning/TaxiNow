@@ -42,6 +42,7 @@ OVERPASS_MAX_FAILURE_COOLDOWN = 15 * 60
 OVERPASS_BUSY_WAIT = 120
 AIRPORT_QUERY_MARGIN_METRES = 1200
 AIRPORT_FEATURE_DISTANCE_METRES = 1200
+AIRPORT_FEATURE_CONNECTION_METRES = 90
 NON_OSM_CACHE_MAX_AGE_DAYS = 1 / 48
 UNAVAILABLE_CACHE_REVISION = 3
 OSM_SOURCE_REVISION = 9
@@ -1316,6 +1317,7 @@ def filter_isolated_airport_features(
     features,
     airport,
     maximum_distance=AIRPORT_FEATURE_DISTANCE_METRES,
+    connection_distance=AIRPORT_FEATURE_CONNECTION_METRES,
 ):
     """Remove facilities belonging to nearby airports or heliports.
 
@@ -1363,7 +1365,58 @@ def filter_isolated_airport_features(
         )
         if distance <= maximum_distance:
             selected.append(feature)
-    return selected
+
+    # A direct runway buffer is insufficient for large airports such as ZBAA:
+    # terminal satellites, remote stands, and their taxiways can extend beyond
+    # it while remaining connected to the airport network. Expand from the
+    # runway-seeded cluster through nearby feature bounds, but do not admit a
+    # detached cluster belonging to another airport or heliport.
+    def feature_bounds(feature):
+        points = [local_xy(point, latitude) for point in feature["points"]]
+        if not points:
+            return None
+        return (
+            min(point[0] for point in points),
+            min(point[1] for point in points),
+            max(point[0] for point in points),
+            max(point[1] for point in points),
+        )
+
+    def bounds_distance(left, right):
+        delta_x = max(left[0] - right[2], right[0] - left[2], 0)
+        delta_y = max(left[1] - right[3], right[1] - left[3], 0)
+        return math.hypot(delta_x, delta_y)
+
+    selected_ids = {id(feature) for feature in selected}
+    bounds_by_id = {
+        id(feature): feature_bounds(feature)
+        for feature in features
+    }
+    changed = True
+    while changed:
+        changed = False
+        selected_bounds = [
+            bounds_by_id[identity]
+            for identity in selected_ids
+            if bounds_by_id.get(identity) is not None
+        ]
+        for feature in features:
+            identity = id(feature)
+            bounds = bounds_by_id.get(identity)
+            if identity in selected_ids or bounds is None:
+                continue
+            if any(
+                bounds_distance(bounds, candidate) <= connection_distance
+                for candidate in selected_bounds
+            ):
+                selected.append(feature)
+                selected_ids.add(identity)
+                selected_bounds.append(bounds)
+                changed = True
+    return [
+        feature for feature in features
+        if id(feature) in selected_ids
+    ]
 
 
 def point_inside_polygon(point, polygon):
