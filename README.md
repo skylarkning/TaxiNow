@@ -23,8 +23,8 @@ the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release)
 The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
 third-party notices.
 
-Current release: **V1.0 Beta 5**, internal build **102**
-(build date: July 30, 2026). The About dialog
+Current release: **V1.0 Beta 6**, internal build **103**
+(build date: July 31, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is a free-of-charge application for personal
 flight-simulator use only.

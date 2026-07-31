@@ -83,7 +83,7 @@ Use **Validate prerequisites** before the first build.
    package is intended.
 3. Use a new immutable version, for example `2026.07.30.2`.
 4. Enter the GitHub release tag that will host the ZIP files, for example
-   `v1.0.0-beta.5`.
+   `v1.0.0-beta.6`.
 5. Select a workspace on a drive with enough free space. Geofabrik PBF files,
    extracted features, normalized maps, quality reports, and ZIPs are retained
    so interrupted builds can resume.

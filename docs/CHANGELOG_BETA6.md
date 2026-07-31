@@ -1,9 +1,17 @@
-# TaxiNow V1.0 Beta 6 — development notes
+# TaxiNow V1.0 Beta 6 — Build 103
 
-Beta 6 is still in development. These notes distinguish completed work from
-planned work and are not final release notes.
+Release date: July 31, 2026
 
-## Completed
+## Upgrade instructions
+
+1. Close TaxiNow and uninstall the previous version before installing Beta 6.
+2. When the uninstaller asks about downloaded maps and user data, choose
+   **Yes / Keep data** so your existing airport assets remain available.
+3. Install `TaxiNow-V1.0-Beta-6-Build-103-Setup.exe`.
+
+Existing airport maps do not need to be downloaded again for this update.
+
+## Changelog
 
 - Correct runway-end designators from physical runway geometry instead of
   assuming that source references and LineString coordinates use the same
@@ -30,12 +38,20 @@ planned work and are not final release notes.
 
 ---
 
-# TaxiNow V1.0 Beta 6 — 开发记录
+# TaxiNow V1.0 Beta 6 — 内部版本 103
 
-Beta 6 仍在开发中。以下内容区分已经完成和计划后续完成的工作，并非最终发布
-日志。
+发布日期：2026 年 7 月 31 日
 
-## 已完成
+## 升级说明
+
+1. 安装 Beta 6 前，请先关闭 TaxiNow 并卸载旧版本。
+2. 卸载器询问是否保留已下载地图和用户数据时，请选择
+   **“是 / 保留数据”**，以继续使用已有机场资源。
+3. 安装 `TaxiNow-V1.0-Beta-6-Build-103-Setup.exe`。
+
+本次更新不需要重新下载已有机场地图。
+
+## 更新日志
 
 - 根据跑道真实几何方向匹配两端编号，不再假设数据源中的跑道编号顺序与坐标
   顺序一致。该修复可纠正 ZBAA、ZGGG 及其他机场中颠倒的跑道编号，同时保留
