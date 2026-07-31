@@ -1,8 +1,8 @@
 # Windows development environment
 
-Audit date: 2026-07-29  
+Audit date: 2026-07-29; MSFS 2020 compatibility update: 2026-07-31
 Machine: Windows 10/11 x64 (`10.0.26200`)  
-Audit scope: MSFS 2024 SimConnect integration and toolchain compatibility
+Audit scope: MSFS 2020/2024 SimConnect integration and toolchain compatibility
 
 ## Installed tools
 
@@ -28,8 +28,8 @@ prerequisites on a normal developer machine.
 
 | Simulator | Installation | Executable | Live process during audit |
 |---|---|---|---|
-| Microsoft Flight Simulator 2020 | `D:\XboxGames\Microsoft Flight Simulator` | `D:\XboxGames\Microsoft Flight Simulator\Content\FlightSimulator.exe` | No |
-| Microsoft Flight Simulator 2024 | `D:\XboxGames\Microsoft Flight Simulator 2024` | `D:\XboxGames\Microsoft Flight Simulator 2024\Content\FlightSimulator2024.exe` | Yes; live flight at CYYZ |
+| Microsoft Flight Simulator 2020 | Microsoft Store/Xbox package | `FlightSimulator.exe` | Yes on 2026-07-31; live flight at CYYZ Gate B19 |
+| Microsoft Flight Simulator 2024 | `D:\XboxGames\Microsoft Flight Simulator 2024` | `D:\XboxGames\Microsoft Flight Simulator 2024\Content\FlightSimulator2024.exe` | Yes on 2026-07-29; live flight at CYYZ |
 
 Both package/content trees are present. File-version resources on the protected
 Xbox executables did not expose a product version to PowerShell, so the
@@ -37,16 +37,16 @@ simulator build numbers remain to be recorded from the in-simulator UI.
 
 ## SimConnect SDK discovery
 
-One SDK installation was found:
+Two SDK installations are now available:
 
 ```text
 C:\MSFS SDK
-  version.txt                              0.24.5
-  SimConnect SDK\include\SimConnect.h
-  SimConnect SDK\lib\SimConnect.lib
-  SimConnect SDK\lib\SimConnect.dll
-  SimConnect SDK\lib\static\SimConnect.lib
-  SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll
+  managed wrapper assembly                 11.0.62651.3
+  SimConnect SDK\lib\SimConnect.dll        67,072 bytes
+
+C:\MSFS 2024 SDK
+  managed wrapper assembly                 12.2.0.0
+  SimConnect SDK\lib\SimConnect.dll        84,480 bytes
 ```
 
 The header contains the modern facility-data calls
@@ -55,10 +55,10 @@ The header contains the modern facility-data calls
 point/taxi path/taxi name/taxi parking/jetway/pavement facility types. The
 installation does **not** contain the official SimConnect sample source tree.
 
-The shared default path and version file do not identify whether another SDK was
-previously installed and overwritten. Until both SDK installers are run to
-edition-specific paths, this installation is treated as the only discovered SDK
-and not claimed as a verified 2020/2024 pair.
+TaxiNow prefers the MSFS 2024 client library because the same deployed client
+has now passed live telemetry tests against both simulator editions. The older
+SDK remains available for comparison but is not shipped alongside the newer
+assembly because both managed wrappers have the same assembly name.
 
 ## Compatibility matrix
 
@@ -67,8 +67,9 @@ failure.
 
 | Test | MSFS 2020 | MSFS 2024 | Finding |
 |---|---:|---:|---|
-| Open/Close connection | Not run | Pass | TaxiNow connected to the active MSFS 2024 flight through the official managed wrapper |
-| Request Data: required five variables | Not run | Pass | Latitude, longitude, true heading, on-ground state, and ground speed were received live |
+| Open/Close connection | Pass | Pass | The MSFS 2024 managed client connected to active flights in both simulator editions |
+| Request Data: required five variables | Pass | Pass | Latitude, longitude, true heading, on-ground state, and ground speed were received live |
+| Force one-shot position refresh | Pass | Pass | MSFS 2020 advanced the telemetry sequence immediately; the same request path was previously verified in MSFS 2024 |
 | Facility airport/runway data | Not run | Not run | Header/API surface discovered; live response not verified |
 | Facility taxi/parking/name data | Not run | Not run | Header/API surface discovered; live response not verified |
 | Connect before simulator starts | Not run | Not run | The source has a non-crashing disconnected state; interactive behavior still needs verification |
@@ -77,7 +78,12 @@ failure.
 MSFS 2024 accepted the TaxiNow client on 2026-07-29. The parked CYYZ sample was
 `43.6805474, -79.6166645`, true heading `136.56°`, on-ground `true`, and
 approximately zero ground speed. This position falls on the installed Gate 133
-parking feature. MSFS 2020 remains unverified.
+parking feature.
+
+MSFS 2020 accepted the same TaxiNow client on 2026-07-31. At CYYZ Gate B19 it
+returned `43.6846629, -79.6233418`, true heading `328.58°`, on-ground `true`,
+and essentially zero ground speed. The API reported `simulator: msfs2020`,
+`state: groundTracking`, and a force-refresh request advanced the live sequence.
 
 ## Desktop WebView finding
 
@@ -94,12 +100,9 @@ remains the preferred control.
    CMake tools for Windows before resuming the native bridge spike.
 2. Install Node.js LTS/Corepack/pnpm and Python 3.12 or 3.13/PyInstaller as
    system developer prerequisites.
-3. Reinstall each simulator SDK to a distinct path such as
-   `C:\MSFS SDK 2020` and `C:\MSFS SDK 2024`; record exact versions.
-4. Include the official SDK samples when installing, or retrieve them through
+3. Include the official SDK samples when installing, or retrieve them through
    each simulator's Developer Mode SDK workflow.
-5. With MSFS 2020 running, execute Open/Close and Request Data tests. With both
-   editions, execute Facility Data and restart/reconnect tests and record the
+4. With both editions, execute Facility Data and restart/reconnect tests and record the
    simulator build, SDK version, selected DLL, returned structures, and any
    packing or variable differences.
 
@@ -109,10 +112,11 @@ Automated smoke tests may set `TaxiNow:EnableTestShutdown=true` to expose a
 loopback-only graceful-stop endpoint. It is disabled by default and is not part
 of the production API.
 
-The current MSFS 2024 source uses Microsoft's managed SimConnect wrapper. The
-build discovers it through `MSFS_SDK_ROOT` or `C:\MSFS SDK`, then copies the
-managed wrapper and native `SimConnect.dll` into the application output. Calls
-are owned by one background thread because SimConnect is not thread-safe.
+The shared MSFS 2020/2024 source uses Microsoft's managed SimConnect wrapper.
+The build discovers it through `MSFS_SDK_ROOT`, `C:\MSFS 2024 SDK`, or
+`C:\MSFS SDK`, in that order, then copies the managed wrapper and native
+`SimConnect.dll` into the application output. Calls are owned by one background
+thread because SimConnect is not thread-safe.
 
 Position delivery is callback-driven rather than timer-polled. TaxiNow requests
 changed data on visual frames with an interval of four, retains at most sixteen

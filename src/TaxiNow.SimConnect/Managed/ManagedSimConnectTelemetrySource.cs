@@ -109,31 +109,9 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
         }
     }
 
-    private static bool IsMsfs2024Running()
-    {
-        try
-        {
-            var processes = Process.GetProcessesByName("FlightSimulator2024");
-            try
-            {
-                return processes.Length > 0;
-            }
-            finally
-            {
-                foreach (var process in processes)
-                {
-                    process.Dispose();
-                }
-            }
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     private static TelemetrySnapshot StatusSample(
         ref long sequence,
+        SimulatorEdition edition,
         bool connected,
         TrackingState state,
         Stopwatch clock)
@@ -141,7 +119,7 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
         var now = DateTimeOffset.UtcNow;
         return new TelemetrySnapshot(
             ++sequence,
-            SimulatorEdition.Msfs2024,
+            edition,
             connected,
             false,
             0,
@@ -191,25 +169,34 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
         var lastStatus = string.Empty;
         void PublishStatus(
             string key,
+            SimulatorEdition edition,
             bool connected,
             TrackingState state)
         {
-            if (key == lastStatus)
+            var editionKey = $"{edition}:{key}";
+            if (editionKey == lastStatus)
             {
                 return;
             }
 
-            lastStatus = key;
+            lastStatus = editionKey;
             writer.TryWrite(
-                StatusSample(ref sequence, connected, state, clock));
+                StatusSample(
+                    ref sequence,
+                    edition,
+                    connected,
+                    state,
+                    clock));
         }
 
         while (!stop.WaitOne(0))
         {
-            if (!IsMsfs2024Running())
+            var edition = SimulatorProcessDetector.GetRunningEdition();
+            if (edition == SimulatorEdition.Unknown)
             {
                 PublishStatus(
                     "simulator-not-running",
+                    SimulatorEdition.Unknown,
                     connected: false,
                     TrackingState.Disconnected);
                 stop.WaitOne(TimeSpan.FromSeconds(1));
@@ -218,9 +205,11 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
 
             PublishStatus(
                 "waiting-for-flight",
+                edition,
                 connected: false,
                 TrackingState.Connecting);
             using var notification = new AutoResetEvent(false);
+            var connectionStage = "opening connection";
             try
             {
                 using var connection = new FlightSimConnect(
@@ -229,6 +218,7 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     0,
                     notification,
                     0);
+                connectionStage = "configuring telemetry";
                 var quitReceived = false;
                 var simulationRunning = false;
                 UserAircraftData? lastPublished = null;
@@ -239,6 +229,7 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                 connection.OnRecvOpen += (_, _) =>
                     PublishStatus(
                         "flight-not-started",
+                        edition,
                         connected: true,
                         TrackingState.Connecting);
                 connection.OnRecvQuit += (_, _) => quitReceived = true;
@@ -263,6 +254,7 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                         positionHealthy = false;
                         PublishStatus(
                             "flight-not-started",
+                            edition,
                             connected: true,
                             TrackingState.Connecting);
                     }
@@ -295,11 +287,11 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
 
                     lastPublished = data;
                     lastPublishedAt = sampleTime;
-                    lastStatus = "position-synced";
+                    lastStatus = $"{edition}:position-synced";
                     var now = DateTimeOffset.UtcNow;
                     writer.TryWrite(new TelemetrySnapshot(
                         ++sequence,
-                        SimulatorEdition.Msfs2024,
+                        edition,
                         true,
                         data.OnGround != 0,
                         data.Latitude,
@@ -328,6 +320,7 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     0,
                     4,
                     0);
+                connectionStage = "receiving messages";
 
                 var handles = new[]
                 {
@@ -335,7 +328,8 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     refreshSignal.WaitHandle,
                     stop
                 };
-                while (!quitReceived && IsMsfs2024Running())
+                var nextProcessCheckAt = clock.ElapsedMilliseconds + 1_000;
+                while (!quitReceived)
                 {
                     var signaled = WaitHandle.WaitAny(
                         handles,
@@ -344,8 +338,14 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     {
                         return;
                     }
-                    if (signaled == 0)
+                    if (signaled == 0 ||
+                        signaled == WaitHandle.WaitTimeout)
                     {
+                        // MSFS 2020 can occasionally leave the managed
+                        // notification event unsignaled even though a
+                        // SimConnect message is waiting. The one-second
+                        // timeout keeps 2024 event-driven and provides a
+                        // low-cost compatibility pump for 2020.
                         connection.ReceiveMessage();
                     }
                     else if (signaled == 1)
@@ -361,48 +361,74 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                             0);
                     }
 
+                    var loopTime = clock.ElapsedMilliseconds;
+                    if (loopTime >= nextProcessCheckAt)
+                    {
+                        nextProcessCheckAt = loopTime + 1_000;
+                        if (!SimulatorProcessDetector.IsRunning(edition))
+                        {
+                            break;
+                        }
+                    }
+
                     if (simulationRunning &&
                         positionHealthy &&
                         lastDataReceivedAt >= 0 &&
-                        clock.ElapsedMilliseconds - lastDataReceivedAt > 4_000)
+                        loopTime - lastDataReceivedAt > 4_000)
                     {
                         lastPublished = null;
                         positionHealthy = false;
                         PublishStatus(
                             "flight-not-started",
+                            edition,
                             connected: true,
                             TrackingState.Connecting);
                     }
                 }
             }
-            catch (COMException)
+            catch (COMException error)
             {
+                Console.Error.WriteLine(
+                    $"TaxiNow SimConnect ({edition}) COM error " +
+                    $"while {connectionStage}, 0x{error.HResult:X8}: " +
+                    error.Message);
                 PublishStatus(
                     "flight-not-started",
+                    edition,
                     connected: false,
                     TrackingState.Connecting);
             }
-            catch (DllNotFoundException)
+            catch (DllNotFoundException error)
             {
+                Console.Error.WriteLine(
+                    $"TaxiNow SimConnect ({edition}) runtime error: " +
+                    error.Message);
                 PublishStatus(
                     "flight-not-started",
+                    edition,
                     connected: false,
                     TrackingState.Connecting);
             }
-            catch (BadImageFormatException)
+            catch (BadImageFormatException error)
             {
+                Console.Error.WriteLine(
+                    $"TaxiNow SimConnect ({edition}) architecture error: " +
+                    error.Message);
                 PublishStatus(
                     "flight-not-started",
+                    edition,
                     connected: false,
                     TrackingState.Connecting);
             }
 
+            var nextEdition = SimulatorProcessDetector.GetRunningEdition();
             PublishStatus(
-                IsMsfs2024Running()
+                nextEdition != SimulatorEdition.Unknown
                     ? "waiting-for-flight"
                     : "simulator-not-running",
+                nextEdition,
                 connected: false,
-                IsMsfs2024Running()
+                nextEdition != SimulatorEdition.Unknown
                     ? TrackingState.Connecting
                     : TrackingState.Disconnected);
             WaitHandle.WaitAny(
@@ -477,10 +503,12 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
         var clock = Stopwatch.StartNew();
         while (!stop.WaitOne(0))
         {
+            var edition = SimulatorProcessDetector.GetRunningEdition();
             writer.TryWrite(StatusSample(
                 ref sequence,
+                edition,
                 connected: false,
-                IsMsfs2024Running()
+                edition != SimulatorEdition.Unknown
                     ? TrackingState.Connecting
                     : TrackingState.Disconnected,
                 clock));

@@ -166,7 +166,7 @@ public static class TaxiNowHost
                 simulator = sample?.Simulator ??
                     (mode == "replay"
                         ? SimulatorEdition.Replay
-                        : SimulatorEdition.Msfs2024),
+                        : SimulatorEdition.Unknown),
                 state = sample?.State ?? TrackingState.Connecting,
                 connected = sample?.Connected ?? false,
                 selectedAirport = "CYYZ",
@@ -277,11 +277,11 @@ public static class TaxiNowHost
                 "replay",
                 StringComparison.OrdinalIgnoreCase)
                 ? "replay"
-                : "msfs2024";
+                : "msfs";
         }
 
         return string.IsNullOrWhiteSpace(configuration["TaxiNow:ReplayPath"])
-            ? "msfs2024"
+            ? "msfs"
             : "replay";
     }
 

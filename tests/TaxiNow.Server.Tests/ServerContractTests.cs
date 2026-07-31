@@ -50,6 +50,58 @@ public sealed class ServerContractTests
         Assert.Contains("\"hasPosition\":true", json);
     }
 
+    [Theory]
+    [InlineData("FlightSimulator", SimulatorEdition.Msfs2020)]
+    [InlineData("FlightSimulator.exe", SimulatorEdition.Msfs2020)]
+    [InlineData("FlightSimulator2024", SimulatorEdition.Msfs2024)]
+    [InlineData("FlightSimulator2024.exe", SimulatorEdition.Msfs2024)]
+    [InlineData("SomeOtherProcess", SimulatorEdition.Unknown)]
+    public void SimulatorDetection_RecognizesBothEditions(
+        string processName,
+        SimulatorEdition expected)
+    {
+        Assert.Equal(
+            expected,
+            TaxiNow.SimConnect.Managed.SimulatorProcessDetector.SelectEdition(
+                [processName]));
+    }
+
+    [Fact]
+    public void SimulatorDetection_Preserves2024PriorityWhenBothRun()
+    {
+        Assert.Equal(
+            SimulatorEdition.Msfs2024,
+            TaxiNow.SimConnect.Managed.SimulatorProcessDetector.SelectEdition(
+                ["FlightSimulator", "FlightSimulator2024"]));
+    }
+
+    [Fact]
+    public void TelemetryContract_SerializesMsfs2020Edition()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var sample = new TelemetrySnapshot(
+            1,
+            SimulatorEdition.Msfs2020,
+            true,
+            true,
+            43.68466,
+            -79.62334,
+            328.58,
+            0,
+            now,
+            now,
+            1,
+            State: TrackingState.GroundTracking);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+
+        var json = JsonSerializer.Serialize(sample, options);
+
+        Assert.Contains("\"simulator\":\"msfs2020\"", json);
+        Assert.Contains("\"state\":\"groundTracking\"", json);
+    }
+
     [Fact]
     public void IcaoDownload_IsNormalized()
     {

@@ -16,12 +16,13 @@ planned work and are not final release notes.
   reversed, and parallel runways.
 - Add bilingual FAQ guidance for X-Plane fallback terminal limitations,
   retrying an airport through OSM, and position refresh after simulator warp.
-
-## Planned later
-
-- Add and validate official Microsoft Flight Simulator 2020 support. This work
-  is intentionally deferred until after the runway-label correction and is
-  not included in the current change.
+- Add official Microsoft Flight Simulator 2020 ground-position support without
+  changing the existing MSFS 2024 telemetry path. TaxiNow now detects either
+  simulator, reports the accepted edition through the API, and keeps 2024 as
+  the deterministic preference if both editions are running.
+- Verify MSFS 2020 live at CYYZ Gate B19: SimConnect returned latitude,
+  longitude, true heading, on-ground state, and ground speed; normal tracking
+  and force refresh both passed.
 
 ---
 
@@ -40,8 +41,8 @@ Beta 6 仍在开发中。以下内容区分已经完成和计划后续完成的�
 - 新增南北向、东西向、原本顺序正确、顺序颠倒以及平行跑道的回归测试。
 - 新增中英双语常见问题，说明 X-Plane 后备数据的航站楼限制、如何重新尝试
   获取 OSM 数据，以及模拟器瞬移后如何刷新飞机位置。
-
-## 后续计划
-
-- 增加并验证 Microsoft Flight Simulator 2020 官方支持。该工作有意安排在
-  跑道编号修复之后，本次更改尚未包含 MSFS 2020 支持。
+- 新增 Microsoft Flight Simulator 2020 地面位置官方支持，不改动现有 MSFS
+  2024 遥测通道。TaxiNow 现可识别两代模拟器，通过 API 报告实际连接的版本；
+  如果两者同时运行，优先保持 MSFS 2024 连接。
+- 已在 CYYZ B19 机位完成 MSFS 2020 实机测试：SimConnect 成功返回经纬度、
+  真航向、地面状态和地速，正常跟踪和强制刷新均通过。

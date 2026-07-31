@@ -2,6 +2,7 @@
   <PropertyGroup>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <MsfsSdkRoot Condition="'$(MsfsSdkRoot)' == '' and '$(MSFS_SDK_ROOT)' != ''">$(MSFS_SDK_ROOT)</MsfsSdkRoot>
+    <MsfsSdkRoot Condition="'$(MsfsSdkRoot)' == '' and Exists('C:\MSFS 2024 SDK\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">C:\MSFS 2024 SDK</MsfsSdkRoot>
     <MsfsSdkRoot Condition="'$(MsfsSdkRoot)' == '' and Exists('C:\MSFS SDK\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">C:\MSFS SDK</MsfsSdkRoot>
     <DefineConstants Condition="Exists('$(MsfsSdkRoot)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">$(DefineConstants);TAXINOW_MANAGED_SIMCONNECT</DefineConstants>
   </PropertyGroup>

@@ -58,7 +58,8 @@ their surrounding white canvas and create the required output sizes.
 - Taxiway pavement is layered below runway pavement while yellow centerlines
   remain continuous above it. Long taxiway references repeat at collision-aware
   intervals using the SkyCharts marker-density convention.
-- Live MSFS 2024 ground-position tracking through SimConnect, with a
+- Live MSFS 2020 and MSFS 2024 ground-position tracking through SimConnect,
+  with a
   heading-oriented ownship icon and smooth SignalR/WebView animation. The icon
   is hidden when the aircraft leaves the selected airport's map perimeter.
 - Simulator status is visible in the header: red when MSFS is not running,
@@ -137,7 +138,7 @@ their surrounding white canvas and create the required output sizes.
   strict no-partial/no-warning publication gate, merges the public index, and
   writes exact TaxiNow-Release upload instructions. Map-pack generation no
   longer depends on GitHub Actions.
-- Official managed SimConnect integration for MSFS 2024, plus the native x64
+- Official managed SimConnect integration for MSFS 2020 and MSFS 2024, plus the native x64
   C ABI spike, JSONL recorder, and deterministic replay source.
 
 Live simulator compatibility is tracked in
@@ -173,11 +174,12 @@ The build packages the Python map pipeline as
 a separate Python installation at runtime. PyInstaller is downloaded into the
 ignored `artifacts` directory when needed.
 
-Live MSFS 2024 builds currently discover the SimConnect SDK from
-`MSFS_SDK_ROOT`, or from `C:\MSFS SDK` when the environment variable is not
-set. The build copies the required managed wrapper and native runtime beside
-TaxiNow. A build made without that SDK remains usable for maps and replay but
-cannot connect to the simulator.
+Live simulator builds discover the SimConnect SDK from `MSFS_SDK_ROOT`, then
+`C:\MSFS 2024 SDK`, and finally `C:\MSFS SDK`. The MSFS 2024 client library is
+preferred because it has been verified live against both MSFS 2020 and MSFS
+2024. The build copies the required managed wrapper and native runtime beside
+TaxiNow. A build made without an SDK remains usable for maps and replay but
+cannot connect to either simulator.
 
 Run the browser/server vertical slice:
 
@@ -212,7 +214,7 @@ provides prerequisite checks, clean upgrades, shortcuts, and uninstall support;
 the portable build remains useful for troubleshooting. See
 [`docs/DISTRIBUTION.md`](docs/DISTRIBUTION.md).
 
-Live MSFS 2024 telemetry is the default. To run without the simulator, select
+Live MSFS 2020/2024 telemetry is the default. To run without the simulator, select
 the deterministic replay source:
 
 ```powershell
