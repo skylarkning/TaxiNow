@@ -25,14 +25,20 @@ category:
 - FAA Airport Diagram GIS data is an authoritative US supplement for the
   airports it covers. The initial published set includes DCA/KDCA and contains
   buildings, taxiways, aprons, and runways, but it is not yet a global source.
+- Overture Maps provides global parent-building and building-part geometry.
+  Microsoft Global ML Building Footprints provides another broad geometric
+  fallback. Neither building-only source can reliably identify an airport
+  terminal or invent its public terminal number without aviation features or
+  a trustworthy nearby label.
 
 ## Decision
 
 TaxiNow uses a feature-level source policy:
 
 1. Terminal footprints and terminal names: OSM first; authoritative national
-   aviation GIS where available; X-Plane facade geometry only as a last-resort
-   visual supplement.
+   aviation GIS where available; Overture parent buildings, then Overture
+   building parts and Microsoft footprints under strict spatial promotion;
+   X-Plane facade geometry only as a last-resort visual supplement.
 2. Taxiways, aprons, and stands: OSM first; X-Plane Gateway fills missing
    operational detail.
 3. Runways and airport catalog: OSM with OurAirports fallback and validation.
@@ -45,12 +51,12 @@ query. Public OSM queries are serialized, regardless of the number of batch
 workers, to avoid self-throttling.
 
 Country and large-region downloads must move away from one public Overpass
-request per airport. The target design is:
+request per airport. The implemented design is:
 
 - build TaxiNow-normalized country or subdivision packs from official OSM
   extracts in a maintainer-controlled build pipeline;
 - split very large countries such as the United States by state;
-- publish a small signed manifest plus versioned compressed packs through the
+- publish a small checksum-verifiable index plus versioned compressed packs through the
   official TaxiNow release infrastructure;
 - let the client download independent packs concurrently, resume interrupted
   transfers, and skip already current airport assets;
@@ -67,17 +73,28 @@ rules:
   connect to an accepted terminal, contain a terminal label, or are supported
   by a nearby gate cluster;
 - FAA Airport Mapping building polygons supplement incomplete US terminals;
-- when an authoritative OSM or FAA terminal polygon exists, X-Plane terminal
+- Overture and Microsoft footprints are promoted only when a label, gate
+  cluster, or existing terminal connection supports them;
+- complete parent-building footprints suppress overlapping building parts,
+  preventing a fused source from recreating fragmented terminal geometry;
+- reliable nearby terminal/concourse names are copied to accepted unnamed
+  footprints, but numbers are never invented without a source label;
+- when an authoritative OSM, FAA, Overture, or Microsoft terminal polygon
+  exists, X-Plane terminal
   and hangar facade polygons are discarded while its taxi routes and parking
   positions remain eligible;
-- maps with invalid polygons, implausible bounds, or strong terminal
-  fragmentation indicators fail maintainer-side quality checks instead of
-  being published.
+- maps with invalid polygons or implausible bounds fail maintainer-side quality
+  checks; named-label and gate-footprint coverage remains visible in generated
+  reports.
 
 The client consumes a versioned `map-packs/index.json`, resumes interrupted
 pack transfers, verifies both the ZIP and every contained map with SHA-256,
 rejects unsafe archive paths, installs only requested airports, and falls back
 to the existing on-demand pipeline when a pack is unavailable or incomplete.
+The global planner uses the Geofabrik index to split large countries by
+available ISO 3166-2 extracts, emits bounded shards and per-airport quality
+reports, resumes completed regions, and records failed regions without
+stopping unrelated work.
 
 ## Consequences
 
@@ -90,6 +107,9 @@ to the existing on-demand pipeline when a pack is unavailable or incomplete.
   Overpass capacity constraint.
 - OSM attribution and ODbL obligations must remain attached to every derived
   pack and visible in TaxiNow.
+- No manual correction UI or private airport override database is maintained.
+  Some source defects will therefore remain unresolved, and TaxiNow cannot
+  guarantee complete or correct rendering for every airport worldwide.
 
 ## Primary references
 
@@ -103,3 +123,7 @@ to the existing on-demand pipeline when a pack is unavailable or incomplete.
   https://developer.x-plane.com/article/terminal-kit/
 - FAA Airport Diagram Open Data release:
   https://www.faa.gov/air_traffic/flight_info/aeronav/safety_alerts/media/ADDS_25-01_DPN_Open_Data_Release.pdf
+- Overture Buildings:
+  https://docs.overturemaps.org/guides/buildings/
+- Microsoft Global ML Building Footprints:
+  https://github.com/microsoft/GlobalMLBuildingFootprints

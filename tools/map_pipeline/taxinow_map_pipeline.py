@@ -329,28 +329,107 @@ def select_map_packs(
         and pack.get("url")
         and pack.get("sha256")
     ]
+
+    def newest(values: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not values:
+            return []
+        latest = max(
+            (
+                str(pack.get("generatedAt") or ""),
+                str(pack.get("version") or ""),
+            )
+            for pack in values
+        )
+        return [
+            pack for pack in values
+            if (
+                str(pack.get("generatedAt") or ""),
+                str(pack.get("version") or ""),
+            )
+            == latest
+        ]
+
     if region:
         exact = [
             pack for pack in candidates
             if str(pack.get("regionCode") or "").strip().upper() == region
         ]
         if exact:
-            return sorted(exact, key=lambda pack: str(pack.get("id") or ""))
+            return sorted(
+                newest(exact),
+                key=lambda pack: str(pack.get("id") or ""),
+            )
         return sorted(
-            [
+            newest([
                 pack for pack in candidates
                 if not str(pack.get("regionCode") or "").strip()
-            ],
+            ]),
             key=lambda pack: str(pack.get("id") or ""),
         )
     country_packs = [
         pack for pack in candidates
         if not str(pack.get("regionCode") or "").strip()
     ]
+    if country_packs:
+        selected = newest(country_packs)
+    else:
+        selected = []
+        region_codes = sorted({
+            str(pack.get("regionCode") or "").strip().upper()
+            for pack in candidates
+        })
+        for region_key in region_codes:
+            selected.extend(newest([
+                pack for pack in candidates
+                if str(pack.get("regionCode") or "").strip().upper()
+                == region_key
+            ]))
     return sorted(
-        country_packs or candidates,
+        selected,
         key=lambda pack: str(pack.get("id") or ""),
     )
+
+
+def select_map_packs_for_icao(
+    index: dict[str, Any],
+    icao: str,
+) -> list[dict[str, Any]]:
+    target = icao.strip().upper()
+    candidates = [
+        pack for pack in index.get("packs", [])
+        if isinstance(pack, dict)
+        and pack.get("url")
+        and pack.get("sha256")
+        and target in {
+            str(value).strip().upper()
+            for value in pack.get("icaos") or []
+        }
+    ]
+    if not candidates:
+        return []
+    latest = max(
+        (
+            str(pack.get("generatedAt") or ""),
+            str(pack.get("version") or ""),
+        )
+        for pack in candidates
+    )
+    candidates = [
+        pack for pack in candidates
+        if (
+            str(pack.get("generatedAt") or ""),
+            str(pack.get("version") or ""),
+        )
+        == latest
+    ]
+    return sorted(
+        candidates,
+        key=lambda pack: (
+            int(pack.get("airportCount") or 10**9),
+            int(pack.get("sizeBytes") or 10**18),
+            str(pack.get("id") or ""),
+        ),
+    )[:1]
 
 
 def sha256_file(path: pathlib.Path) -> str:
@@ -1514,6 +1593,40 @@ def handle(request: dict[str, Any]) -> None:
         if request.get("command") == "download_country"
         else 1
     )
+    if request.get("command") == "download_icao" and selected:
+        try:
+            pack_index = load_map_pack_index(cache)
+            packs = select_map_packs_for_icao(
+                pack_index,
+                selected[0].icao,
+            )
+            if packs:
+                pack_outputs, pack_bytes, pack_warnings = (
+                    acquire_regional_map_packs(
+                        protocol,
+                        packs,
+                        output,
+                        cache,
+                        {selected[0].icao},
+                        set(),
+                        1,
+                    )
+                )
+                outputs.extend(pack_outputs)
+                bytes_written += pack_bytes
+                warnings.extend(pack_warnings)
+                if pack_outputs:
+                    selected = []
+                    completed = 1
+                    warnings.append(
+                        "Installed the airport from a verified "
+                        "regional map pack."
+                    )
+        except Exception as error:
+            warnings.append(
+                "Regional map pack unavailable; continuing with "
+                f"on-demand sources ({error})."
+            )
     if request.get("command") == "download_country":
         country = str(request.get("countryCode") or "").strip().upper()
         region = str(request.get("regionCode") or "").strip().upper()
@@ -1780,6 +1893,65 @@ def upgrade_skycharts_data(
     }
     generated_at = str(source.get("generatedAt") or iso_now())
     source_revision = source.get("sourceRevision")
+    source_catalog = {
+        "OpenStreetMap regional extract": (
+            "https://www.openstreetmap.org/copyright",
+            "ODbL 1.0",
+        ),
+        "OpenStreetMap contributors": (
+            "https://www.openstreetmap.org/copyright",
+            "ODbL 1.0",
+        ),
+        "OurAirports": (
+            "https://ourairports.com/data/",
+            "Public domain",
+        ),
+        "FAA Airport Mapping": (
+            "https://adds-faa.opendata.arcgis.com/",
+            "United States government open data",
+        ),
+        "Overture Maps": (
+            "https://overturemaps.org/",
+            "ODbL 1.0",
+        ),
+        "Microsoft Global ML Building Footprints": (
+            "https://github.com/microsoft/GlobalMLBuildingFootprints",
+            "CDLA Permissive 2.0",
+        ),
+        "X-Plane Scenery Gateway operational detail": (
+            "https://gateway.x-plane.com/",
+            None,
+        ),
+    }
+    source_names = [
+        value.strip()
+        for value in source_name.split(" + ")
+        if value.strip()
+    ] or [source_name]
+    sources = []
+    for name in source_names:
+        url, license_name = source_catalog.get(
+            name,
+            (
+                source.get("sourceURL"),
+                (
+                    "ODbL 1.0"
+                    if "openstreetmap" in name.lower()
+                    else None
+                ),
+            ),
+        )
+        sources.append({
+            "name": name,
+            "url": url,
+            "license": license_name,
+            "retrievedAt": generated_at,
+            "revision": (
+                None
+                if source_revision is None
+                else str(source_revision)
+            ),
+        })
     result = {
         "schemaVersion": 2,
         "airport": {
@@ -1797,23 +1969,7 @@ def upgrade_skycharts_data(
             "bounds": bounds,
         },
         "generatedAt": generated_at,
-        "sources": [
-            {
-                "name": source_name,
-                "url": source.get("sourceURL"),
-                "license": (
-                    "ODbL 1.0"
-                    if "openstreetmap" in source_name.lower()
-                    else None
-                ),
-                "retrievedAt": generated_at,
-                "revision": (
-                    None
-                    if source_revision is None
-                    else str(source_revision)
-                ),
-            }
-        ],
+        "sources": sources,
         "counts": counts,
         "features": features,
     }

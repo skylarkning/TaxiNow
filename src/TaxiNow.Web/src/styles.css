@@ -758,6 +758,41 @@ footer {
   color: #4cf0d1;
 }
 
+.about-faq {
+  margin: 20px 0 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(147, 181, 198, 0.2);
+}
+
+.about-faq h2 {
+  margin: 0 0 10px;
+  color: #f0f7f8;
+  font-size: 15px;
+}
+
+.about-faq details {
+  margin: 8px 0;
+  border: 1px solid rgba(147, 181, 198, 0.22);
+  border-radius: 8px;
+  background: rgba(8, 22, 34, 0.62);
+}
+
+.about-faq summary {
+  padding: 10px 12px;
+  color: #dce9ed;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.about-faq details p {
+  margin: 0;
+  padding: 0 12px 12px;
+  color: #adc0c8;
+  font-size: 12px;
+}
+
 .about-chinese {
   margin-top: 0;
 }

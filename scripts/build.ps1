@@ -15,7 +15,9 @@ $pipelineScript = Join-Path $repositoryRoot 'tools\map_pipeline\taxinow_map_pipe
 $pipelineModule = Join-Path $repositoryRoot 'tools\map_pipeline\skycharts_airport_map.py'
 $pipelineSpec = Join-Path $pipelineRoot 'taxinow_map_pipeline.spec'
 $pipelineExecutable = Join-Path $pipelineRoot 'dist\taxinow-map-pipeline.exe'
-$pyInstallerRoot = Join-Path $repositoryRoot 'artifacts\pyinstaller-runtime'
+$pyInstallerRoot = Join-Path `
+    $repositoryRoot `
+    'artifacts\pyinstaller-runtime-6.21.0-clean'
 
 function Resolve-Tool {
     param(

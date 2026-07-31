@@ -23,11 +23,13 @@ separately from normalized assets.
 The acquisition layer reuses and refactors the same-maintainer SkyCharts airport
 map generator. It coordinates smaller OpenStreetMap/Overpass queries, rebuilds
 OSM relations, and can use FAA Airport Mapping data for US terminal/building
-gaps. X-Plane Scenery Gateway can supplement missing taxi routes and parking
-positions, but its modular facade geometry is excluded whenever an
-authoritative OSM/FAA terminal footprint exists. OurAirports provides the
-catalog and the runway-only final fallback. TaxiNow then converts the result
-into its validated schema v2 asset.
+gaps. Maintainer-built packs can additionally fuse Overture parent buildings
+and Microsoft Global ML Building Footprints. Complete parent outlines are
+preferred over overlapping building parts, and reliable nearby terminal labels
+are propagated onto accepted unnamed footprints. X-Plane Scenery Gateway can
+supplement missing taxi routes and parking positions, but its modular facade
+geometry is excluded whenever a stronger terminal footprint exists.
+OurAirports provides the catalog and runway-only final fallback.
 Country jobs can include an optional ISO 3166-2 region code such as `CA-ON`.
 They can also set `maxParallel` to `1`, `2`, `4`, `8`, or `16`. The pipeline
 uses a bounded worker pool and aggregates progress, speed, and ETA across
@@ -63,10 +65,27 @@ python .\tools\map_pipeline\map_pack_builder.py from-geofabrik `
   --country CA --region CA-BC
 ```
 
-Add `--with-overture` only on a maintainer machine with the official
-`overturemaps` CLI installed. Overture building footprints are passed through
-the same strict gate/label/connectivity promotion rules; they are not imported
-as terminals solely because they fall inside an airport bounding box.
+Add `--with-overture --with-microsoft` on a maintainer machine. Install the
+official Overture client with
+`pip install -r requirements-map-pack.txt`. Both sources pass through strict
+gate/label/connectivity promotion rules; a building is not imported as a
+terminal merely because it falls inside an airport bounding box.
+
+Plan or build worldwide regional packs with:
+
+```powershell
+python .\tools\map_pipeline\global_map_pack_builder.py plan `
+  --output .\artifacts\global-packs\plan.json
+python .\tools\map_pipeline\global_map_pack_builder.py build `
+  --plan .\artifacts\global-packs\plan.json `
+  --output .\artifacts\global-packs\output `
+  --version 2026.07.30.1 `
+  --base-url https://example.invalid/immutable-map-pack-directory
+```
+
+The global build is resumable by region, shards large outputs, emits a merged
+client index and quality reports, and records failures without stopping
+unrelated regions.
 
 See [the map-pack maintainer guide](../../docs/MAP_PACKS.md) for publishing and
 quality-gate details.

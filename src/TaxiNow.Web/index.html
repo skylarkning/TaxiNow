@@ -594,6 +594,48 @@
           to verify TaxiNow's security and privacy. Review access does not
           grant modification, disclosure, or redistribution rights.
         </p>
+        <section class="about-faq" aria-label="Frequently asked questions">
+          <h2>Frequently asked questions and technical limitations</h2>
+          <details>
+            <summary>Can TaxiNow guarantee every airport map is correct?</summary>
+            <p>
+              No. TaxiNow combines OpenStreetMap, official aviation GIS where
+              available, open global building footprints, OurAirports, and
+              selected X-Plane operational details. Source coverage, age, and
+              precision vary by airport and country. TaxiNow cannot guarantee
+              that every runway, taxiway, stand, terminal outline, or label is
+              complete or correct. TaxiNow does not maintain manual
+              per-airport drawing corrections.
+            </p>
+          </details>
+          <details>
+            <summary>Why can a terminal shape or “Terminal X” label be missing?</summary>
+            <p>
+              Some source datasets contain only an unnamed building footprint,
+              only a terminal name point, or neither. TaxiNow attempts to match
+              buildings to gates, aprons, terminal labels, and nearby accepted
+              terminal geometry, but it will not invent a terminal number when
+              no reliable name or number exists.
+            </p>
+          </details>
+          <details>
+            <summary>How do fast country downloads work?</summary>
+            <p>
+              Where an official TaxiNow regional pack exists, the app downloads
+              a preprocessed, compressed, checksum-verified pack and then uses
+              on-demand sources only for airports missing from that pack.
+              Countries not yet preprocessed can still take considerably
+              longer.
+            </p>
+          </details>
+          <details>
+            <summary>Is TaxiNow suitable for real-world navigation?</summary>
+            <p>
+              No. Maps may be incomplete, outdated, inferred, or inaccurate.
+              TaxiNow is exclusively for personal flight-simulator use.
+            </p>
+          </details>
+        </section>
         <p class="about-version">
           Version: <strong id="about-version">V1.0 Beta 4</strong>
           (Build date: <span id="about-build-date">July 30, 2026</span>).
@@ -643,6 +685,39 @@
             安全与隐私为目的，向开发者申请有限审查访问。
             审查权限不包含修改、披露或再发布授权。
           </p>
+          <section class="about-faq" aria-label="常见问题与技术限制">
+            <h2>常见问题与技术限制</h2>
+            <details>
+              <summary>TaxiNow 能保证全球每一座机场都正确绘制吗？</summary>
+              <p>
+                不能。TaxiNow 会融合 OpenStreetMap、可用的官方航空 GIS、开放的全球
+                建筑轮廓、OurAirports 及部分 X-Plane 运行细节。不同国家和机场的数据
+                覆盖、更新时间与精度并不一致，因此无法保证每一条跑道、滑行道、机位、
+                航站楼轮廓或文字标注都完整且正确。TaxiNow 不维护逐机场的人工绘图修正。
+              </p>
+            </details>
+            <details>
+              <summary>为什么航站楼形状或“Terminal X”标注仍可能缺失？</summary>
+              <p>
+                部分来源只有无名称的建筑轮廓，部分只有航站楼名称点，也可能两者都没有。
+                TaxiNow 会根据登机口、机坪、航站楼名称及相邻可信轮廓自动匹配，但在没有
+                可靠名称或编号时不会凭空编造“Terminal X”。
+              </p>
+            </details>
+            <details>
+              <summary>按国家高速下载是如何实现的？</summary>
+              <p>
+                如果官方已发布对应地区地图包，应用会下载经过预处理、压缩及校验的地图包，
+                只对地图包未覆盖的机场使用按需来源。尚未完成预处理的国家仍可能需要较长时间。
+              </p>
+            </details>
+            <details>
+              <summary>TaxiNow 可以用于真实飞行导航吗？</summary>
+              <p>
+                不可以。地图可能不完整、过时、包含推断或存在误差；TaxiNow 仅限个人模拟飞行。
+              </p>
+            </details>
+          </section>
           <p class="about-version">
             版本：<strong id="about-version-zh">V1.0 Beta 4</strong>
             （构建日期：<span id="about-build-date-zh">2026年7月30日</span>）。

@@ -12,33 +12,62 @@ Feature priority is applied per feature class:
 1. OSM provides terminal footprints/names, taxiways, aprons, gates, and stands.
 2. FAA Airport Mapping supplements incomplete US buildings and, when necessary,
    taxiway/apron polygons.
-3. Overture may supplement building footprints during maintainer builds, but
-   only buildings connected to a terminal label, gate cluster, or accepted
-   terminal polygon are promoted.
-4. X-Plane Gateway supplements operational taxi routes and parking positions.
+3. Overture Buildings and Building Parts supplement missing global footprints.
+   Complete parent-building outlines are preferred; overlapping building parts
+   are discarded so modular pieces cannot redraw a continuous terminal as
+   fragments. A candidate must still be supported by a terminal label, gate
+   cluster, or accepted terminal polygon.
+4. Microsoft Global ML Building Footprints provide a second global geometric
+   fallback. Tiles are cached by quadkey and go through the same strict spatial
+   promotion rules; an airport bounding box alone is never enough.
+5. X-Plane Gateway supplements operational taxi routes and parking positions.
    Its terminal/hangar facade polygons are excluded whenever an authoritative
-   OSM/FAA terminal footprint exists.
-5. OurAirports provides catalog metadata and runway fallback.
+   OSM/FAA/Overture/Microsoft terminal footprint exists.
+6. OurAirports provides catalog metadata and runway fallback.
 
 This prevents the modular 3D facade pieces used by X-Plane scenery from
 appearing as fragmented 2D terminal buildings at airports such as CYVR.
 
-## Build workflow
+## Global preprocessing workflow
 
-1. Download the smallest appropriate Geofabrik extract. Split large countries
-   such as the United States by state.
-2. Run `map_pack_builder.py from-geofabrik`. This requires `osmium` on the
-   maintainer machine.
-3. Review every blocking quality failure. Do not publish a pack merely by
-   suppressing the check.
-4. Inspect high-complexity airports and any terminal-fragmentation warnings.
-5. Publish the ZIP as a release asset.
-6. Add its metadata and immutable release URL to
-   `TaxiNow-Release/map-packs/index.json`.
+`global_map_pack_builder.py` turns the Geofabrik index and bundled OurAirports
+catalog into a repeatable worldwide build plan. Large countries are split into
+province/state extracts when complete subdivision coverage is available.
+Outputs are split at 250 airports or 250 MiB uncompressed by default, so client
+downloads can resume and run concurrently without one enormous country file.
+
+```powershell
+python .\tools\map_pipeline\global_map_pack_builder.py plan `
+  --output .\artifacts\global-packs\plan.json
+
+python .\tools\map_pipeline\global_map_pack_builder.py build `
+  --plan .\artifacts\global-packs\plan.json `
+  --output .\artifacts\global-packs\output `
+  --version 2026.07.30.1 `
+  --base-url https://github.com/skylarkning/TaxiNow-Release/releases/download/v1.0.0-beta.4
+```
+
+The build is resumable by region. It preserves completed metadata, caches
+Geofabrik PBFs and Microsoft footprint tiles, writes per-airport quality
+reports, records failed regions in `failures.json`, and continues processing
+other regions. Individual airports that fail validation are rejected and
+recorded without invalidating the rest of the regional pack.
+
+For a bounded run, pass `--country US` to `plan`, or `--only US-CA` to `build`.
+The manual **Build regional map packs** GitHub Actions workflow exposes the
+same country/subdivision build and uploads the ZIPs, metadata, index, and
+quality reports as a workflow artifact. Publishing remains a deliberate
+maintainer action because release URLs must be immutable and every ZIP hash in
+the index must match the uploaded bytes.
+
+Maintainer requirements are Python 3.12+, `osmium-tool`, and
+`pip install -r tools/map_pipeline/requirements-map-pack.txt`.
 
 The builder rejects maps with no runway, invalid polygons, or implausible
-bounds. It records non-blocking quality warnings in the map so later pack
-builds can be audited.
+bounds. Terminal-label and gate-footprint coverage are recorded for auditing.
+There is intentionally no manual correction database or editor: repeatable
+source fusion is preferred, and unresolved source defects remain explicit
+quality warnings.
 
 ## Client guarantees
 
@@ -48,14 +77,23 @@ builds can be audited.
 - archive path-traversal rejection;
 - schema-v2 validation before installation;
 - already installed airports skipped during country/region jobs;
+- only the newest complete shard set is selected from an index;
 - automatic fallback to on-demand sources for airports absent from the pack.
 
 The public Overpass path remains serialized. Increasing the worker selector
 does not bypass community-service limits; it benefits independent regional
 pack transfers and non-OSM work.
 
-## Pilot coverage
+## Coverage and limitations
 
 The first Beta 4 pilot packs contain CYVR (`CA-BC`) and KDCA (`US-DC`) so the
 transport, validation, and terminal-fusion behavior can be exercised before
-larger province/state packs are published.
+larger province/state packs are published. The preprocessing implementation is
+global, but a country becomes a fast client download only after its generated
+packs are uploaded and added to the public index.
+
+No source has complete and current terminal geometry and names for every
+airport. Building-only sources cannot reliably invent a `Terminal X` number.
+TaxiNow therefore transfers a nearby reliable terminal/concourse name to an
+accepted footprint, but leaves it unnamed when no trustworthy label exists.
+The app and quality reports explicitly disclose this limitation.

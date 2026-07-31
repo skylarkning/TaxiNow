@@ -11,6 +11,8 @@ from unittest import mock
 
 import taxinow_map_pipeline as pipeline
 import skycharts_airport_map as skycharts
+import map_pack_builder
+import global_map_pack_builder
 
 
 class CapturingProtocol(pipeline.Protocol):
@@ -731,6 +733,432 @@ class RegionalMapPackTests(unittest.TestCase):
         with self.assertRaises(pipeline.PipelineError):
             pipeline.safe_pack_member("../KDCA.json")
 
+    def test_icao_prefers_smallest_pack_containing_airport(self):
+        index = {
+            "schemaVersion": 1,
+            "packs": [
+                {
+                    "id": "large",
+                    "airportCount": 200,
+                    "sizeBytes": 1000,
+                    "icaos": ["CYVR"],
+                    "url": "https://example.test/large.zip",
+                    "sha256": "a",
+                },
+                {
+                    "id": "small",
+                    "airportCount": 20,
+                    "sizeBytes": 500,
+                    "icaos": ["CYVR"],
+                    "url": "https://example.test/small.zip",
+                    "sha256": "b",
+                },
+            ],
+        }
+
+        packs = pipeline.select_map_packs_for_icao(index, "cyvr")
+
+        self.assertEqual(["small"], [pack["id"] for pack in packs])
+
+    def test_country_selection_uses_only_newest_complete_shard_set(self):
+        index = {
+            "packs": [
+                {
+                    "id": "old",
+                    "countryCode": "CA",
+                    "version": "1",
+                    "generatedAt": "2026-07-29T00:00:00Z",
+                    "url": "https://example.test/old.zip",
+                    "sha256": "a",
+                },
+                *[
+                    {
+                        "id": f"new-{part}",
+                        "countryCode": "CA",
+                        "version": "2",
+                        "generatedAt": "2026-07-30T00:00:00Z",
+                        "url": f"https://example.test/new-{part}.zip",
+                        "sha256": "b",
+                    }
+                    for part in (1, 2)
+                ],
+                {
+                    "id": "bc-new",
+                    "countryCode": "CA",
+                    "regionCode": "CA-BC",
+                    "version": "2",
+                    "generatedAt": "2026-07-30T01:00:00Z",
+                    "url": "https://example.test/bc.zip",
+                    "sha256": "c",
+                },
+            ],
+        }
+
+        packs = pipeline.select_map_packs(index, "CA", None)
+
+        self.assertEqual(["new-1", "new-2"], [pack["id"] for pack in packs])
+
+    def test_country_selection_keeps_newest_pack_for_each_subdivision(self):
+        index = {
+            "packs": [
+                {
+                    "id": "bc",
+                    "countryCode": "CA",
+                    "regionCode": "CA-BC",
+                    "version": "1",
+                    "generatedAt": "2026-07-30T00:00:00Z",
+                    "url": "https://example.test/bc.zip",
+                    "sha256": "a",
+                },
+                {
+                    "id": "on",
+                    "countryCode": "CA",
+                    "regionCode": "CA-ON",
+                    "version": "1",
+                    "generatedAt": "2026-07-30T01:00:00Z",
+                    "url": "https://example.test/on.zip",
+                    "sha256": "b",
+                },
+            ],
+        }
+
+        packs = pipeline.select_map_packs(index, "CA", None)
+
+        self.assertEqual(["bc", "on"], [pack["id"] for pack in packs])
+
+
+class OpenBuildingFusionTests(unittest.TestCase):
+    def test_external_building_is_promoted_and_named_from_terminal_anchor(self):
+        result = {
+            "center": [-123.18, 49.19],
+            "features": [
+                {
+                    "kind": "terminal",
+                    "name": "Terminal 1",
+                    "label": "Terminal 1",
+                    "points": [[-123.18, 49.19]],
+                },
+                *[
+                    {
+                        "kind": "gate",
+                        "points": [[-123.1802 + index * 0.0001, 49.1901]],
+                    }
+                    for index in range(3)
+                ],
+            ],
+        }
+        building = {
+            "type": "way",
+            "id": "overture-1",
+            "tags": {
+                "building": "yes",
+                "taxinow:source": "Overture Maps",
+            },
+            "geometry": [
+                {"lon": -123.181, "lat": 49.1895},
+                {"lon": -123.179, "lat": 49.1895},
+                {"lon": -123.179, "lat": 49.1905},
+                {"lon": -123.181, "lat": 49.1905},
+                {"lon": -123.181, "lat": 49.1895},
+            ],
+        }
+
+        promoted = skycharts.promote_terminal_buildings(
+            [building],
+            result,
+            source_name="Overture Maps",
+        )
+
+        self.assertEqual(1, len(promoted))
+        self.assertEqual("terminal", promoted[0]["tags"]["building"])
+        self.assertEqual("Terminal 1", promoted[0]["tags"]["name"])
+
+    def test_terminal_completeness_reports_uncovered_label(self):
+        result = {
+            "center": [0, 0],
+            "features": [
+                {
+                    "kind": "terminal",
+                    "name": "Terminal 2",
+                    "points": [[0.02, 0.02]],
+                },
+                {
+                    "kind": "terminal",
+                    "name": "Terminal 1",
+                    "points": [
+                        [-0.001, -0.001],
+                        [0.001, -0.001],
+                        [0.001, 0.001],
+                        [-0.001, 0.001],
+                        [-0.001, -0.001],
+                    ],
+                },
+            ],
+        }
+
+        metrics = skycharts.terminal_completeness_metrics(result)
+
+        self.assertEqual(1, metrics["namedLabels"])
+        self.assertEqual(0, metrics["coveredLabels"])
+
+    def test_terminal_name_is_propagated_to_nearby_unnamed_polygon(self):
+        result = {
+            "center": [0, 0],
+            "features": [
+                {
+                    "kind": "terminal",
+                    "name": "Terminal 2",
+                    "label": "Terminal 2",
+                    "points": [[0, 0]],
+                },
+                {
+                    "kind": "terminal",
+                    "points": [
+                        [-0.001, -0.001],
+                        [0.001, -0.001],
+                        [0.001, 0.001],
+                        [-0.001, 0.001],
+                        [-0.001, -0.001],
+                    ],
+                },
+            ],
+        }
+
+        skycharts.propagate_terminal_names(result)
+
+        self.assertEqual(
+            "Terminal 2",
+            result["features"][1]["label"],
+        )
+
+    def test_building_part_is_not_added_over_complete_terminal(self):
+        result = {
+            "center": [0, 0],
+            "features": [
+                {
+                    "kind": "terminal",
+                    "name": "Terminal 1",
+                    "points": [
+                        [-0.002, -0.002],
+                        [0.002, -0.002],
+                        [0.002, 0.002],
+                        [-0.002, 0.002],
+                        [-0.002, -0.002],
+                    ],
+                },
+                {
+                    "kind": "gate",
+                    "points": [[0, 0]],
+                },
+                {
+                    "kind": "gate",
+                    "points": [[0.0001, 0]],
+                },
+            ],
+        }
+        complete_terminal = {
+            "type": "way",
+            "id": "terminal",
+            "tags": {"aeroway": "terminal"},
+            "geometry": [
+                {"lon": -0.002, "lat": -0.002},
+                {"lon": 0.002, "lat": -0.002},
+                {"lon": 0.002, "lat": 0.002},
+                {"lon": -0.002, "lat": 0.002},
+                {"lon": -0.002, "lat": -0.002},
+            ],
+        }
+        building_part = {
+            "type": "way",
+            "id": "part",
+            "tags": {
+                "building": "yes",
+                "taxinow:building_type": "building_part",
+                "taxinow:source": "Overture Maps",
+            },
+            "geometry": [
+                {"lon": -0.001, "lat": -0.001},
+                {"lon": 0.001, "lat": -0.001},
+                {"lon": 0.001, "lat": 0.001},
+                {"lon": -0.001, "lat": 0.001},
+                {"lon": -0.001, "lat": -0.001},
+            ],
+        }
+
+        promoted = skycharts.promote_terminal_buildings(
+            [complete_terminal, building_part],
+            result,
+            source_name="Overture Maps",
+        )
+
+        self.assertEqual([], promoted)
+
+
+class MapPackBuilderTests(unittest.TestCase):
+    def test_map_partitions_respect_airport_limit(self):
+        maps = [
+            (f"C{i:03d}", b"x" * 10)
+            for i in range(5)
+        ]
+
+        partitions = map_pack_builder.partition_maps(
+            maps,
+            maximum_airports=2,
+            maximum_uncompressed_bytes=1024 * 1024,
+        )
+
+        self.assertEqual([2, 2, 1], [len(value) for value in partitions])
+
+    def test_overture_reader_marks_building_parts(self):
+        feature = {
+            "type": "Feature",
+            "id": "part-1",
+            "properties": {"names": {"primary": "Terminal 1"}},
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[
+                    [0, 0],
+                    [1, 0],
+                    [1, 1],
+                    [0, 1],
+                    [0, 0],
+                ]],
+            },
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            path = pathlib.Path(temporary) / "part.geojson"
+            path.write_text(
+                json.dumps({
+                    "type": "FeatureCollection",
+                    "features": [feature],
+                }),
+                encoding="utf-8",
+            )
+            elements = map_pack_builder.read_overture_buildings(
+                path,
+                "building_part",
+            )
+
+        self.assertEqual("building_part", elements[0]["tags"]["taxinow:building_type"])
+        self.assertEqual("Overture Maps", elements[0]["tags"]["taxinow:source"])
+
+    def test_microsoft_quadkeys_cover_small_bbox(self):
+        keys = map_pack_builder.quadkeys_for_bounds(
+            (49.18, -123.20, 49.21, -123.16)
+        )
+
+        self.assertTrue(keys)
+        self.assertTrue(all(len(value) == 9 for value in keys))
+
+
+class GlobalMapPackPlannerTests(unittest.TestCase):
+    def test_large_country_uses_complete_subdivision_extracts(self):
+        airports = [
+            pipeline.Airport(
+                "KAAA",
+                "A",
+                "US",
+                "US-CA",
+                None,
+                0,
+                0,
+                "large_airport",
+            ),
+            pipeline.Airport(
+                "KBBB",
+                "B",
+                "US",
+                "US-NY",
+                None,
+                0,
+                0,
+                "large_airport",
+            ),
+        ]
+        records = [
+            {
+                "id": "us",
+                "name": "United States",
+                "countries": ["US"],
+                "regions": [],
+                "pbfUrl": "https://example.test/us.pbf",
+            },
+            {
+                "id": "ca",
+                "name": "California",
+                "countries": [],
+                "regions": ["US-CA"],
+                "pbfUrl": "https://example.test/ca.pbf",
+            },
+            {
+                "id": "ny",
+                "name": "New York",
+                "countries": [],
+                "regions": ["US-NY"],
+                "pbfUrl": "https://example.test/ny.pbf",
+            },
+        ]
+
+        plan = global_map_pack_builder.create_plan(
+            records,
+            airports,
+            split_threshold=1,
+        )
+
+        self.assertEqual(
+            ["US-CA", "US-NY"],
+            [region["regionCode"] for region in plan["regions"]],
+        )
+
+    def test_nearly_complete_subdivision_coverage_uses_country_fallback(self):
+        airports = [
+            pipeline.Airport(
+                f"K{index:03d}",
+                str(index),
+                "US",
+                region,
+                None,
+                0,
+                0,
+                "small_airport",
+            )
+            for index, region in enumerate(
+                ["US-CA", "US-NY", "US-TX", "US-U-A"]
+            )
+        ]
+        records = [
+            {
+                "id": "us",
+                "name": "United States",
+                "countries": ["US"],
+                "regions": [],
+                "pbfUrl": "https://example.test/us.pbf",
+            },
+            *[
+                {
+                    "id": region.lower(),
+                    "name": region,
+                    "countries": [],
+                    "regions": [region],
+                    "pbfUrl": f"https://example.test/{region}.pbf",
+                }
+                for region in ("US-CA", "US-NY", "US-TX")
+            ],
+        ]
+
+        plan = global_map_pack_builder.create_plan(
+            records,
+            airports,
+            split_threshold=1,
+        )
+        fallback = next(
+            region for region in plan["regions"]
+            if region["regionCode"] == "US-U-A"
+        )
+
+        self.assertEqual("country-fallback", fallback["extractScope"])
+        self.assertEqual("https://example.test/us.pbf", fallback["pbfUrl"])
+
 
 class SkyChartsUpgradeTests(unittest.TestCase):
     def test_numeric_source_revision_is_normalized_to_string(self):
@@ -758,6 +1186,46 @@ class SkyChartsUpgradeTests(unittest.TestCase):
         )
 
         self.assertEqual("4", upgraded["sources"][0]["revision"])
+
+    def test_fused_sources_keep_individual_license_attribution(self):
+        upgraded = pipeline.upgrade_skycharts_data(
+            {
+                "schemaVersion": 1,
+                "ident": "CYVR",
+                "name": "Vancouver International Airport",
+                "source": (
+                    "OpenStreetMap regional extract + Overture Maps + "
+                    "Microsoft Global ML Building Footprints"
+                ),
+                "center": [-123.18, 49.19],
+                "features": [
+                    {
+                        "kind": "runway",
+                        "points": [
+                            [-123.19, 49.18],
+                            [-123.17, 49.20],
+                        ],
+                    }
+                ],
+            },
+            "CA",
+            "CA-BC",
+            "Richmond",
+        )
+
+        licenses = {
+            source["name"]: source["license"]
+            for source in upgraded["sources"]
+        }
+        self.assertEqual(
+            "ODbL 1.0",
+            licenses["OpenStreetMap regional extract"],
+        )
+        self.assertEqual("ODbL 1.0", licenses["Overture Maps"])
+        self.assertEqual(
+            "CDLA Permissive 2.0",
+            licenses["Microsoft Global ML Building Footprints"],
+        )
 
 
 if __name__ == "__main__":

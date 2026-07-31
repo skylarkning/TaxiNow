@@ -1,0 +1,76 @@
+name: Build regional map packs
+
+on:
+  workflow_dispatch:
+    inputs:
+      country:
+        description: Two-letter ISO country/region code
+        required: true
+        default: CA
+      subdivision:
+        description: Optional ISO province/state code, for example CA-BC
+        required: false
+      version:
+        description: Immutable map-pack version
+        required: true
+        default: 2026.07.30.1
+      base_url:
+        description: Final HTTPS directory that will contain the ZIP files
+        required: true
+        default: https://github.com/skylarkning/TaxiNow-Release/releases/download/v1.0.0-beta.4
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tools/map_pipeline/requirements-map-pack.txt
+
+      - name: Install preprocessing tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes osmium-tool
+          python -m pip install --requirement tools/map_pipeline/requirements-map-pack.txt
+
+      - name: Create preprocessing plan
+        run: |
+          python tools/map_pipeline/global_map_pack_builder.py plan \
+            --country "${{ inputs.country }}" \
+            --output artifacts/map-packs/plan.json
+
+      - name: Build verified regional packs
+        shell: bash
+        run: |
+          args=(
+            python tools/map_pipeline/global_map_pack_builder.py build
+            --plan artifacts/map-packs/plan.json
+            --output artifacts/map-packs/output
+            --version "${{ inputs.version }}"
+            --base-url "${{ inputs.base_url }}"
+          )
+          if [[ -n "${{ inputs.subdivision }}" ]]; then
+            args+=(--only "${{ inputs.subdivision }}")
+          fi
+          "${args[@]}"
+
+      - name: Upload packs, index, and quality reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: TaxiNow-MapPacks-${{ inputs.country }}-${{ inputs.version }}
+          path: |
+            artifacts/map-packs/output/index.json
+            artifacts/map-packs/output/failures.json
+            artifacts/map-packs/output/packs/*.zip
+            artifacts/map-packs/output/metadata/*.json
+            artifacts/map-packs/output/quality/*.json
+          if-no-files-found: error
+          retention-days: 14

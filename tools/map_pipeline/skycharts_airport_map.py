@@ -44,7 +44,7 @@ AIRPORT_QUERY_MARGIN_METRES = 1200
 AIRPORT_FEATURE_DISTANCE_METRES = 1200
 NON_OSM_CACHE_MAX_AGE_DAYS = 1 / 48
 UNAVAILABLE_CACHE_REVISION = 3
-OSM_SOURCE_REVISION = 8
+OSM_SOURCE_REVISION = 9
 XPLANE_SOURCE_REVISION = 4
 XPLANE_GATEWAY_AIRPORT_URL = "https://gateway.x-plane.com/apiv1/airport/{ident}"
 XPLANE_GATEWAY_SCENERY_URL = "https://gateway.x-plane.com/apiv1/scenery/{scenery_id}"
@@ -1233,6 +1233,23 @@ def airport_map_quality(result):
         warnings.append(
             "terminal geometry is highly fragmented and mostly unnamed"
         )
+    completeness = terminal_completeness_metrics(result)
+    if completeness["namedLabels"] and completeness["coveredLabels"] < completeness["namedLabels"]:
+        warnings.append(
+            "%d of %d named terminal labels have no nearby footprint"
+            % (
+                completeness["namedLabels"] - completeness["coveredLabels"],
+                completeness["namedLabels"],
+            )
+        )
+    if (
+        completeness["gateAnchors"] >= 8
+        and completeness["gateCoverage"] < 0.72
+    ):
+        warnings.append(
+            "terminal footprints cover only %.0f%% of gate anchors"
+            % (completeness["gateCoverage"] * 100)
+        )
     bounds = (result or {}).get("bounds") or {}
     try:
         center_latitude = float((result or {})["center"][1])
@@ -1485,6 +1502,101 @@ def uncovered_terminal_label_points(result, maximum_distance=180):
     return uncovered
 
 
+def terminal_completeness_metrics(result):
+    """Return auditable terminal label and gate-footprint coverage metrics."""
+    features = list((result or {}).get("features") or [])
+    polygons = [
+        feature for feature in features
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) >= 3
+    ]
+    labels = [
+        feature for feature in features
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) == 1
+        and (feature.get("label") or feature.get("name") or feature.get("ref"))
+    ]
+    gates = [
+        feature for feature in features
+        if feature.get("kind") in {"gate", "parking_position"}
+        and feature.get("points")
+    ]
+    latitude = float((result or {}).get("center", [0, 0])[1])
+
+    def covered(point, maximum_distance):
+        return any(
+            point_inside_polygon(point, polygon["points"])
+            or min(
+                point_segment_distance(point, start, end, latitude)
+                for start, end in zip(
+                    polygon["points"],
+                    polygon["points"][1:],
+                )
+            )
+            <= maximum_distance
+            for polygon in polygons
+        )
+
+    covered_labels = sum(
+        covered(label["points"][0], 180)
+        for label in labels
+    )
+    covered_gates = sum(
+        covered(gate["points"][0], 180)
+        for gate in gates
+    )
+    return {
+        "terminalPolygons": len(polygons),
+        "namedLabels": len(labels),
+        "coveredLabels": covered_labels,
+        "gateAnchors": len(gates),
+        "coveredGateAnchors": covered_gates,
+        "gateCoverage": (
+            covered_gates / len(gates)
+            if gates
+            else 1.0
+        ),
+    }
+
+
+def propagate_terminal_names(result, maximum_distance=260):
+    """Copy reliable terminal/concourse point names onto nearby footprints."""
+    features = list((result or {}).get("features") or [])
+    labels = [
+        feature for feature in features
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) == 1
+        and terminal_anchor_name(feature)
+    ]
+    polygons = [
+        feature for feature in features
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) >= 3
+    ]
+    latitude = float((result or {}).get("center", [0, 0])[1])
+    for polygon in polygons:
+        if polygon.get("label") or polygon.get("name") or polygon.get("ref"):
+            continue
+        matches = []
+        for label in labels:
+            point = label["points"][0]
+            distance = point_polygon_distance(
+                point,
+                polygon["points"],
+                latitude,
+            )
+            if distance <= maximum_distance:
+                matches.append((distance, terminal_anchor_name(label)))
+        if not matches:
+            continue
+        name = min(matches, key=lambda value: value[0])[1]
+        polygon["name"] = name
+        label = terminal_label({"name": name})
+        if label:
+            polygon["label"] = label
+    return result
+
+
 def merge_osm_elements(primary, supplements):
     merged = list(primary or [])
     seen = {
@@ -1525,14 +1637,39 @@ def polygon_distance(left, right, latitude):
     )
 
 
-def promote_osm_terminal_buildings(osm_elements, result):
-    """Promote strict spatially matched OSM buildings to terminal footprints.
+def polygons_overlap_or_contain(left, right):
+    """Return true when either footprint contains a vertex of the other."""
+    return any(point_inside_polygon(point, right) for point in left[:-1]) or any(
+        point_inside_polygon(point, left) for point in right[:-1]
+    )
+
+
+def terminal_anchor_name(feature):
+    value = str(
+        feature.get("label")
+        or feature.get("name")
+        or feature.get("ref")
+        or ""
+    ).strip()
+    return value or None
+
+
+def promote_terminal_buildings(
+    elements,
+    result,
+    *,
+    source_name=None,
+    label_distance=190,
+    gate_distance=95,
+    connection_distance=35,
+):
+    """Promote spatially supported open building footprints to terminals.
 
     Some airports model a terminal as one outer ``building=yes`` footprint
-    plus named concourse/building parts. Querying only ``building=terminal``
-    leaves those airports fragmented. Generic buildings are accepted only when
-    they are anchored by a named terminal point, several gates, or a terminal
-    polygon already accepted from OSM.
+    plus named concourse/building parts. Overture and Microsoft ML Buildings
+    also supply useful outer footprints without aviation semantics. A generic
+    building is accepted only when supported by a terminal/concourse label,
+    multiple gate anchors, or a short connection to an accepted terminal.
     """
     latitude = float(result["center"][1])
     features = list(result.get("features") or [])
@@ -1549,13 +1686,16 @@ def promote_osm_terminal_buildings(osm_elements, result):
     ]
     accepted = [
         geometry_pairs(element)
-        for element in expanded_osm_elements(osm_elements)
+        for element in expanded_osm_elements(elements)
         if feature_kind(element.get("tags") or {}) == "terminal"
         and len(geometry_pairs(element)) >= 3
     ]
     candidates = []
-    for element in expanded_osm_elements(osm_elements):
+    for element in expanded_osm_elements(elements):
         tags = dict(element.get("tags") or {})
+        element_source = str(tags.get("taxinow:source") or "")
+        if source_name and element_source != source_name:
+            continue
         building = str(tags.get("building") or "").lower()
         if not building or feature_kind(tags):
             continue
@@ -1563,10 +1703,11 @@ def promote_osm_terminal_buildings(osm_elements, result):
         if (
             building in {
                 "hangar", "garage", "garages", "parking", "industrial",
-                "warehouse", "office", "hotel", "train_station",
+                "warehouse", "office", "hotel", "train_station", "service",
+                "transportation",
             }
             or re.search(
-                r"(?:parking|garage|hotel|station|rental|office|hangar)",
+                r"(?:parking|garage|hotel|station|rental|office|hangar|cargo|freight)",
                 name,
                 re.IGNORECASE,
             )
@@ -1574,6 +1715,20 @@ def promote_osm_terminal_buildings(osm_elements, result):
             continue
         polygon = geometry_pairs(element)
         if len(polygon) < 4 or polygon[0] != polygon[-1]:
+            continue
+        is_building_part = (
+            str(tags.get("taxinow:building_type") or "").lower()
+            == "building_part"
+            or str(tags.get("building:part") or "").lower()
+            in {"yes", "1", "true"}
+        )
+        # A building part is useful only when no continuous parent footprint
+        # was accepted. Rendering both recreates the fragmented terminal
+        # appearance that the fusion pipeline is intended to remove.
+        if is_building_part and any(
+            polygons_overlap_or_contain(polygon, terminal)
+            for terminal in accepted
+        ):
             continue
         candidates.append((element, tags, polygon))
 
@@ -1584,6 +1739,17 @@ def promote_osm_terminal_buildings(osm_elements, result):
         changed = False
         next_remaining = []
         for element, tags, polygon in remaining:
+            is_building_part = (
+                str(tags.get("taxinow:building_type") or "").lower()
+                == "building_part"
+                or str(tags.get("building:part") or "").lower()
+                in {"yes", "1", "true"}
+            )
+            if is_building_part and any(
+                polygons_overlap_or_contain(polygon, terminal)
+                for terminal in accepted
+            ):
+                continue
             matching_label = next(
                 (
                     label for label in labels
@@ -1592,29 +1758,32 @@ def promote_osm_terminal_buildings(osm_elements, result):
                         polygon,
                         latitude,
                     )
-                    <= 120
+                    <= label_distance
                 ),
                 None,
             )
             nearby_gates = sum(
-                point_polygon_distance(gate, polygon, latitude) <= 55
+                point_polygon_distance(gate, polygon, latitude)
+                <= gate_distance
                 for gate in gates
             )
             connected = any(
-                polygon_distance(polygon, terminal, latitude) <= 18
+                polygon_distance(polygon, terminal, latitude)
+                <= connection_distance
                 for terminal in accepted
             )
-            if matching_label or nearby_gates >= 3 or connected:
+            if matching_label or nearby_gates >= 2 or connected:
                 promoted = dict(element)
                 promoted_tags = dict(tags)
                 promoted_tags["building"] = "terminal"
                 promoted_tags["aeroway"] = "terminal"
-                promoted_tags["taxinow:source"] = "OpenStreetMap"
+                promoted_tags["taxinow:source"] = (
+                    element_source or source_name or "OpenStreetMap"
+                )
+                promoted_tags["operator"] = promoted_tags["taxinow:source"]
                 if matching_label:
-                    promoted_tags["name"] = str(
-                        matching_label.get("label")
-                        or matching_label.get("name")
-                        or matching_label.get("ref")
+                    promoted_tags["name"] = terminal_anchor_name(
+                        matching_label
                     )
                 promoted["tags"] = promoted_tags
                 supplements.append(promoted)
@@ -1624,6 +1793,18 @@ def promote_osm_terminal_buildings(osm_elements, result):
                 next_remaining.append((element, tags, polygon))
         remaining = next_remaining
     return supplements
+
+
+def promote_osm_terminal_buildings(osm_elements, result):
+    """Compatibility wrapper for the OSM-focused interactive pipeline."""
+    return promote_terminal_buildings(
+        osm_elements,
+        result,
+        source_name=None,
+        label_distance=150,
+        gate_distance=70,
+        connection_distance=25,
+    )
 
 
 def faa_designator_name(designator):
@@ -1874,8 +2055,7 @@ def normalize(raw, airport, source="OpenStreetMap contributors", source_url="htt
         "minLat": minimum_lat - latitude_padding,
         "maxLat": maximum_lat + latitude_padding,
     }
-    counts = feature_counts(features)
-    return {
+    normalized = {
         "schemaVersion": 1,
         "ident": airport["ident"],
         "name": airport["name"],
@@ -1884,9 +2064,12 @@ def normalize(raw, airport, source="OpenStreetMap contributors", source_url="htt
         "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(),
         "source": source,
         "sourceURL": source_url,
-        "counts": counts,
         "features": features,
     }
+    propagate_terminal_names(normalized)
+    counts = feature_counts(features)
+    normalized["counts"] = counts
+    return normalized
 
 
 def cache_is_fresh(path, maximum_age_days):
