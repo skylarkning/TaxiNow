@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ApplicationIcon>..\..\src\TaxiNow.App\Assets\TaxiNow.ico</ApplicationIcon>
+    <AssemblyName>TaxiNow.MapPackBuilder</AssemblyName>
+    <RootNamespace>TaxiNow.MapPackBuilder</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="..\..\src\TaxiNow.App\Assets\TaxiNow.ico"
+              Link="TaxiNow.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\map_pipeline\global_map_pack_builder.py"
+             Link="pipeline\global_map_pack_builder.py"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\map_pipeline\map_pack_builder.py"
+             Link="pipeline\map_pack_builder.py"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\map_pipeline\skycharts_airport_map.py"
+             Link="pipeline\skycharts_airport_map.py"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\map_pipeline\taxinow_map_pipeline.py"
+             Link="pipeline\taxinow_map_pipeline.py"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\map_pipeline\validate_map_pack_release.py"
+             Link="pipeline\validate_map_pack_release.py"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\map_pipeline\requirements-map-pack.txt"
+             Link="pipeline\requirements-map-pack.txt"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\map_pipeline\environment-map-pack-windows.yml"
+             Link="pipeline\environment-map-pack-windows.yml"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

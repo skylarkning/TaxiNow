@@ -330,6 +330,17 @@ class OpenStreetMapPriorityTests(unittest.TestCase):
             'nwr["building"]["name"~"terminal|concourse|satellite",i]',
             query,
         )
+        self.assertIn("out body geom;", query)
+        self.assertNotIn("out tags geom;", query)
+
+    def test_terminal_detail_query_keeps_relation_members(self):
+        query = skycharts.overpass_terminal_query(
+            (40.04, 116.55, 40.12, 116.64),
+        )
+
+        self.assertIn('nwr["aeroway"="terminal"]', query)
+        self.assertIn("out body geom;", query)
+        self.assertNotIn("out tags geom;", query)
 
     def test_named_terminal_buildings_exclude_parking_garages(self):
         self.assertEqual(
@@ -724,6 +735,29 @@ class AirportSelectionTests(unittest.TestCase):
 
 
 class RegionalMapPackTests(unittest.TestCase):
+    def test_withdrawn_pilot_archives_are_removed_before_index_load(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = pipeline.SourceCache(pathlib.Path(directory))
+            pack_root = cache.root / "map-packs"
+            pack_root.mkdir(parents=True)
+            for name in pipeline.REVOKED_MAP_PACK_ARCHIVES:
+                (pack_root / name).write_bytes(b"withdrawn")
+            empty_index = json.dumps({
+                "schemaVersion": 1,
+                "packs": [],
+            }).encode("utf-8")
+
+            with mock.patch.object(
+                pipeline,
+                "request_bytes",
+                return_value=empty_index,
+            ):
+                result = pipeline.load_map_pack_index(cache)
+
+            self.assertEqual([], result["packs"])
+            for name in pipeline.REVOKED_MAP_PACK_ARCHIVES:
+                self.assertFalse((pack_root / name).exists())
+
     def test_region_prefers_exact_subdivision_pack(self):
         index = {
             "schemaVersion": 1,
@@ -964,6 +998,76 @@ class OpenBuildingFusionTests(unittest.TestCase):
 
         self.assertEqual(1, metrics["namedLabels"])
         self.assertEqual(0, metrics["coveredLabels"])
+
+    def test_terminal_completeness_prefers_gates_over_remote_parking(self):
+        terminal = {
+            "kind": "terminal",
+            "points": [
+                [-0.001, -0.001],
+                [0.001, -0.001],
+                [0.001, 0.001],
+                [-0.001, 0.001],
+                [-0.001, -0.001],
+            ],
+        }
+        result = {
+            "center": [0, 0],
+            "features": [
+                terminal,
+                *[
+                    {
+                        "kind": "gate",
+                        "points": [[0.0001 * index, 0]],
+                    }
+                    for index in range(8)
+                ],
+                *[
+                    {
+                        "kind": "parking_position",
+                        "points": [[0.05 + 0.001 * index, 0.05]],
+                    }
+                    for index in range(20)
+                ],
+            ],
+        }
+
+        metrics = skycharts.terminal_completeness_metrics(result)
+
+        self.assertEqual(8, metrics["gateAnchors"])
+        self.assertEqual(1.0, metrics["gateCoverage"])
+
+    def test_terminal_completeness_ignores_fbo_company_point(self):
+        result = {
+            "center": [-123.18, 49.19],
+            "features": [
+                {
+                    "kind": "terminal",
+                    "name": "Jim Pattison Airways",
+                    "points": [[-123.1577, 49.1804]],
+                },
+                {
+                    "kind": "terminal",
+                    "name": "Concourse A",
+                    "points": [[-123.18, 49.19]],
+                },
+                {
+                    "kind": "terminal",
+                    "name": "Main Terminal",
+                    "points": [
+                        [-123.181, 49.189],
+                        [-123.179, 49.189],
+                        [-123.179, 49.191],
+                        [-123.181, 49.191],
+                        [-123.181, 49.189],
+                    ],
+                },
+            ],
+        }
+
+        metrics = skycharts.terminal_completeness_metrics(result)
+
+        self.assertEqual(1, metrics["namedLabels"])
+        self.assertEqual(1, metrics["coveredLabels"])
 
     def test_terminal_name_is_propagated_to_nearby_unnamed_polygon(self):
         result = {

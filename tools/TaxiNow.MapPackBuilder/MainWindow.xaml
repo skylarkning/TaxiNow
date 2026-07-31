@@ -1,0 +1,200 @@
+<Window x:Class="TaxiNow.MapPackBuilder.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="TaxiNow Local Map Pack Builder"
+        Width="1040"
+        Height="820"
+        MinWidth="900"
+        MinHeight="700"
+        WindowStartupLocation="CenterScreen">
+  <Grid Margin="22">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <StackPanel Grid.Row="0" Margin="0,0,0,18">
+      <TextBlock Text="TaxiNow Local Map Pack Builder"
+                 FontSize="28"
+                 FontWeight="SemiBold" />
+      <TextBlock Margin="0,5,0,0"
+                 Foreground="{StaticResource SecondaryText}"
+                 Text="Build verified country or province/state packages locally, then publish only after the strict quality gate passes." />
+    </StackPanel>
+
+    <Border Grid.Row="1"
+            Background="{StaticResource PanelBackground}"
+            BorderBrush="{StaticResource PanelBorder}"
+            BorderThickness="1"
+            CornerRadius="10"
+            Padding="18"
+            Margin="0,0,0,16">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="18" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Grid.Column="0">
+          <Label Content="Python executable (taxinow-map-packs environment)" />
+          <DockPanel>
+            <Button DockPanel.Dock="Right"
+                    Content="Browse…"
+                    Click="BrowsePython_Click"
+                    Margin="8,0,0,0" />
+            <TextBox x:Name="PythonPathTextBox" />
+          </DockPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Row="0" Grid.Column="2">
+          <Label Content="osmium.exe (optional when already on PATH)" />
+          <DockPanel>
+            <Button DockPanel.Dock="Right"
+                    Content="Browse…"
+                    Click="BrowseOsmium_Click"
+                    Margin="8,0,0,0" />
+            <TextBox x:Name="OsmiumPathTextBox" />
+          </DockPanel>
+        </StackPanel>
+
+        <Grid Grid.Row="1" Grid.Column="0" Margin="0,14,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="12" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0">
+            <Label Content="Country/Region (ISO two-letter code)" />
+            <TextBox x:Name="CountryTextBox"
+                     Text="CA"
+                     MaxLength="2" />
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+            <Label Content="Province/State (optional, e.g. CA-BC)" />
+            <TextBox x:Name="SubdivisionTextBox"
+                     Text="CA-BC" />
+          </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" Grid.Column="2" Margin="0,14,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="12" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0">
+            <Label Content="Immutable pack version" />
+            <TextBox x:Name="VersionTextBox" />
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+            <Label Content="GitHub release tag" />
+            <TextBox x:Name="ReleaseTagTextBox"
+                     Text="v1.0.0-beta.5" />
+          </StackPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="2"
+                    Grid.Column="0"
+                    Grid.ColumnSpan="3"
+                    Margin="0,14,0,0">
+          <Label Content="Build workspace and output directory" />
+          <DockPanel>
+            <Button DockPanel.Dock="Right"
+                    Content="Browse…"
+                    Click="BrowseOutput_Click"
+                    Margin="8,0,0,0" />
+            <TextBox x:Name="OutputPathTextBox" />
+          </DockPanel>
+        </StackPanel>
+
+        <DockPanel Grid.Row="3"
+                   Grid.Column="0"
+                   Grid.ColumnSpan="3"
+                   Margin="0,17,0,0">
+          <StackPanel Orientation="Horizontal"
+                      DockPanel.Dock="Left">
+            <CheckBox x:Name="OvertureCheckBox"
+                      Content="Use Overture terminal-building supplement"
+                      IsChecked="True" />
+            <CheckBox x:Name="MicrosoftCheckBox"
+                      Content="Use Microsoft building-footprint supplement"
+                      IsChecked="True" />
+            <CheckBox x:Name="ForceCheckBox"
+                      Content="Force rebuild completed region" />
+          </StackPanel>
+        </DockPanel>
+      </Grid>
+    </Border>
+
+    <Border Grid.Row="2"
+            Background="{StaticResource PanelBackground}"
+            BorderBrush="{StaticResource PanelBorder}"
+            BorderThickness="1"
+            CornerRadius="10"
+            Padding="16">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+          <TextBlock Text="Build log"
+                     FontSize="16"
+                     FontWeight="SemiBold" />
+          <TextBlock x:Name="StatusTextBlock"
+                     DockPanel.Dock="Right"
+                     Foreground="{StaticResource Accent}"
+                     Text="Ready" />
+        </DockPanel>
+        <TextBox x:Name="LogTextBox"
+                 Grid.Row="1"
+                 IsReadOnly="True"
+                 AcceptsReturn="True"
+                 TextWrapping="NoWrap"
+                 VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Auto"
+                 FontFamily="Cascadia Mono, Consolas"
+                 FontSize="12" />
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="3" Margin="0,16,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Grid.Column="0" Orientation="Horizontal">
+        <Button Content="Validate prerequisites"
+                Click="ValidatePrerequisites_Click" />
+        <Button Content="Open environment guide"
+                Click="OpenEnvironmentGuide_Click" />
+        <Button x:Name="OpenOutputButton"
+                Content="Open output"
+                Click="OpenOutput_Click" />
+        <Button x:Name="OpenPublishingButton"
+                Content="Open publishing instructions"
+                Click="OpenPublishing_Click" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal">
+        <Button x:Name="CancelButton"
+                Content="Cancel"
+                Click="Cancel_Click"
+                IsEnabled="False" />
+        <Button x:Name="BuildButton"
+                Style="{StaticResource PrimaryButton}"
+                Content="Build and validate map packs"
+                Click="Build_Click"
+                Margin="0" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</Window>

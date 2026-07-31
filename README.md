@@ -23,7 +23,7 @@ the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release)
 The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
 third-party notices.
 
-Current release: **V1.0 Beta 5**, internal build **101**
+Current release: **V1.0 Beta 5**, internal build **102**
 (build date: July 30, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is a free-of-charge application for personal
@@ -133,6 +133,10 @@ their surrounding white canvas and create the required output sizes.
   and records failed regions without stopping unrelated builds. Country
   downloads become fast as their generated packs are published to the official
   index; unpublished countries retain the slower on-demand fallback.
+- A self-contained Windows maintainer GUI runs those builds locally, applies a
+  strict no-partial/no-warning publication gate, merges the public index, and
+  writes exact TaxiNow-Release upload instructions. Map-pack generation no
+  longer depends on GitHub Actions.
 - Official managed SimConnect integration for MSFS 2024, plus the native x64
   C ABI spike, JSONL recorder, and deterministic replay source.
 

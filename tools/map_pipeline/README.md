@@ -87,8 +87,13 @@ The global build is resumable by region, shards large outputs, emits a merged
 client index and quality reports, and records failures without stopping
 unrelated regions.
 
-See [the map-pack maintainer guide](../../docs/MAP_PACKS.md) for publishing and
-quality-gate details.
+For normal maintainer use, build the Windows
+[Local Map Pack Builder](../../docs/LOCAL_MAP_PACK_BUILDER.md). It wraps these
+commands, validates prerequisites, blocks partial/warning-bearing releases,
+merges the generated index with existing public packs, and writes detailed
+GitHub upload instructions. See the
+[map-pack maintainer guide](../../docs/MAP_PACKS.md) for source and
+quality-policy details.
 
 To convert an existing SkyCharts schema-v1 map without downloading it:
 

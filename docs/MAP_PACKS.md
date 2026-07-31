@@ -54,11 +54,13 @@ other regions. Individual airports that fail validation are rejected and
 recorded without invalidating the rest of the regional pack.
 
 For a bounded run, pass `--country US` to `plan`, or `--only US-CA` to `build`.
-The manual **Build regional map packs** GitHub Actions workflow exposes the
-same country/subdivision build and uploads the ZIPs, metadata, index, and
-quality reports as a workflow artifact. Publishing remains a deliberate
-maintainer action because release URLs must be immutable and every ZIP hash in
-the index must match the uploaded bytes.
+Map-pack generation is intentionally local rather than a GitHub Actions job.
+The Windows
+[Local Map Pack Builder](LOCAL_MAP_PACK_BUILDER.md) runs the same commands,
+retains resumable source data on the maintainer PC, applies a strict
+publication gate, and produces the exact GitHub upload instructions.
+Publishing remains a deliberate maintainer action because release URLs must be
+immutable and every ZIP hash in the index must match the uploaded bytes.
 
 Maintainer requirements are Python 3.12+, `osmium-tool`, and
 `pip install -r tools/map_pipeline/requirements-map-pack.txt`.
@@ -86,11 +88,11 @@ pack transfers and non-OSM work.
 
 ## Coverage and limitations
 
-The first Beta 4 pilot packs contain CYVR (`CA-BC`) and KDCA (`US-DC`) so the
-transport, validation, and terminal-fusion behavior can be exercised before
-larger province/state packs are published. The preprocessing implementation is
-global, but a country becomes a fast client download only after its generated
-packs are uploaded and added to the public index.
+The incomplete Beta 4 CYVR (`CA-BC`) and KDCA (`US-DC`) pilot packs were
+withdrawn from the public index and deleted from the GitHub Release. No
+regional package is discoverable until a complete country or subdivision run
+passes the local strict publication gate, its ZIPs are uploaded, and its
+entries are added to the public index.
 
 No source has complete and current terminal geometry and names for every
 airport. Building-only sources cannot reliably invent a `Terminal X` number.

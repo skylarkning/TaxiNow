@@ -1,0 +1,9 @@
+name: taxinow-map-packs
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - osmium-tool=1.19
+  - pip
+  - pip:
+      - overturemaps==1.0.1

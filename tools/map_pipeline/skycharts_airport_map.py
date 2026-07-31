@@ -45,7 +45,7 @@ AIRPORT_FEATURE_DISTANCE_METRES = 1200
 AIRPORT_FEATURE_CONNECTION_METRES = 90
 NON_OSM_CACHE_MAX_AGE_DAYS = 1 / 48
 UNAVAILABLE_CACHE_REVISION = 3
-OSM_SOURCE_REVISION = 9
+OSM_SOURCE_REVISION = 10
 XPLANE_SOURCE_REVISION = 4
 XPLANE_GATEWAY_AIRPORT_URL = "https://gateway.x-plane.com/apiv1/airport/{ident}"
 XPLANE_GATEWAY_SCENERY_URL = "https://gateway.x-plane.com/apiv1/scenery/{scenery_id}"
@@ -258,7 +258,7 @@ def overpass_query(latitude, longitude, radius=5500, bounds=None):
   nwr["building"~"^(terminal|hangar)$"]({bbox});
   nwr["building"]["name"~"terminal|concourse|satellite",i]({bbox});
 );
-out tags geom;""".format(bbox=bbox)
+out body geom;""".format(bbox=bbox)
 
 
 def overpass_terminal_query(bounds):
@@ -269,7 +269,7 @@ def overpass_terminal_query(bounds):
   nwr["aeroway"="terminal"]({bbox});
   nwr["building"]({bbox});
 );
-out tags geom;""".format(bbox=bbox)
+out body geom;""".format(bbox=bbox)
 
 
 def coordinate_bounds(latitude, longitude, radius):
@@ -1281,6 +1281,21 @@ def terminal_label(tags):
     return "Terminal " + value
 
 
+def is_passenger_terminal_label(feature):
+    """Exclude FBO/company aeroway points from terminal completeness checks."""
+    value = str(
+        feature.get("label")
+        or feature.get("name")
+        or feature.get("ref")
+        or ""
+    ).strip()
+    return bool(re.search(
+        r"(?:terminal|concourse|satellite|航站楼|候机楼|航站)",
+        value,
+        re.IGNORECASE,
+    ))
+
+
 def local_xy(point, latitude):
     return (
         point[0] * 111320.0 * math.cos(math.radians(latitude)),
@@ -1533,7 +1548,7 @@ def uncovered_terminal_label_points(result, maximum_distance=180):
         feature for feature in features
         if feature.get("kind") == "terminal"
         and len(feature.get("points") or []) == 1
-        and (feature.get("label") or feature.get("name") or feature.get("ref"))
+        and is_passenger_terminal_label(feature)
     ]
     latitude = float((result or {}).get("center", [0, 0])[1])
     uncovered = []
@@ -1567,13 +1582,19 @@ def terminal_completeness_metrics(result):
         feature for feature in features
         if feature.get("kind") == "terminal"
         and len(feature.get("points") or []) == 1
-        and (feature.get("label") or feature.get("name") or feature.get("ref"))
+        and is_passenger_terminal_label(feature)
     ]
     gates = [
         feature for feature in features
-        if feature.get("kind") in {"gate", "parking_position"}
+        if feature.get("kind") == "gate"
         and feature.get("points")
     ]
+    if len(gates) < 8:
+        gates = [
+            feature for feature in features
+            if feature.get("kind") == "parking_position"
+            and feature.get("points")
+        ]
     latitude = float((result or {}).get("center", [0, 0])[1])
 
     def covered(point, maximum_distance):
@@ -1619,7 +1640,7 @@ def propagate_terminal_names(result, maximum_distance=260):
         feature for feature in features
         if feature.get("kind") == "terminal"
         and len(feature.get("points") or []) == 1
-        and terminal_anchor_name(feature)
+        and is_passenger_terminal_label(feature)
     ]
     polygons = [
         feature for feature in features
@@ -1730,7 +1751,7 @@ def promote_terminal_buildings(
         feature for feature in features
         if feature.get("kind") == "terminal"
         and len(feature.get("points") or []) == 1
-        and (feature.get("label") or feature.get("name") or feature.get("ref"))
+        and is_passenger_terminal_label(feature)
     ]
     gates = [
         feature["points"][0]

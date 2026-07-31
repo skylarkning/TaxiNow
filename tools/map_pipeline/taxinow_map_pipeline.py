@@ -69,6 +69,11 @@ MAP_PACK_INDEX_URLS = (
 MAP_PACK_INDEX_MAXIMUM_AGE = timedelta(hours=6)
 MAP_PACK_REQUEST_TIMEOUT = 90
 MAP_PACK_SCHEMA_VERSION = 1
+MAP_PACK_INDEX_CACHE_REVISION = "v2-withdrawn-incomplete-pilots"
+REVOKED_MAP_PACK_ARCHIVES = (
+    "ca-bc-pilot-2026.07.30.1.zip",
+    "us-dc-pilot-2026.07.30.1.zip",
+)
 
 
 @dataclass(frozen=True)
@@ -279,7 +284,16 @@ def request_bytes(
 
 
 def load_map_pack_index(cache: SourceCache) -> dict[str, Any]:
-    key = SourceCache.key("taxinow-map-pack-index", "v1")
+    # Beta 4 briefly published incomplete CA-BC/CYVR and US-DC/KDCA pilots.
+    # A new cache identity makes every updated client fetch the withdrawn
+    # public index immediately instead of reusing its six-hour stale copy.
+    key = SourceCache.key(
+        "taxinow-map-pack-index",
+        MAP_PACK_INDEX_CACHE_REVISION,
+    )
+    pack_root = cache.root / "map-packs"
+    for archive_name in REVOKED_MAP_PACK_ARCHIVES:
+        (pack_root / archive_name).unlink(missing_ok=True)
     raw = cache.read_bytes(key, MAP_PACK_INDEX_MAXIMUM_AGE)
     if raw is None:
         stale = cache.read_bytes_stale(key)
