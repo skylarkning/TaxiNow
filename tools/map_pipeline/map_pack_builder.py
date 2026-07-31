@@ -283,14 +283,53 @@ def download_resumable(url: str, destination: pathlib.Path) -> pathlib.Path:
     raise AssertionError("unreachable")
 
 
-def run_osmium(arguments: list[str]) -> None:
-    executable = shutil.which("osmium")
+def run_osmium(
+    arguments: list[str],
+    *,
+    operation: str | None = None,
+) -> None:
+    # On Windows, shutil.which("osmium") can return a path ending in
+    # "osmium.EXE". osmium-tool 1.19 interprets that upper-case argv[0]
+    # basename as a subcommand and exits with code 2. Asking for the complete
+    # lower-case file name preserves the argv[0] spelling expected by osmium.
+    executable = shutil.which("osmium.exe")
     if not executable:
         raise RuntimeError(
             "The osmium command is required for from-geofabrik. "
             "Install osmium-tool in the maintainer build environment."
         )
-    subprocess.run([executable, *arguments], check=True)
+    label = operation or " ".join(arguments[:2])
+    print(f"OSM processing: {label}", flush=True)
+    try:
+        subprocess.run([executable, *arguments], check=True)
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(
+            f"OSM processing failed during {label} "
+            f"(osmium exit code {error.returncode})."
+        ) from error
+
+
+def osmium_file_is_readable(path: pathlib.Path) -> bool:
+    executable = shutil.which("osmium.exe")
+    if not executable or not path.is_file() or path.stat().st_size == 0:
+        return False
+    result = subprocess.run(
+        [executable, "fileinfo", str(path)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
+
+
+def osmium_cache_is_current(
+    source: pathlib.Path,
+    cache: pathlib.Path,
+) -> bool:
+    return (
+        osmium_file_is_readable(cache)
+        and cache.stat().st_mtime_ns >= source.stat().st_mtime_ns
+    )
 
 
 def geojson_geometry_elements(
@@ -619,17 +658,41 @@ def build_maps_from_geofabrik(
             if with_microsoft
             else None
         )
-        filtered = work / "airport-features.osm.pbf"
-        run_osmium([
-            "tags-filter",
-            str(pbf),
-            "nwr/aeroway",
-            "nwr/building",
-            "nwr/building:part",
-            "-o",
-            str(filtered),
-            "--overwrite",
-        ])
+        # This is the expensive country-wide pass. Keep the result beside the
+        # downloaded Geofabrik extract so an interrupted build can resume
+        # without scanning every building in the country again.
+        filtered = pbf.with_name(
+            f"{pbf.stem}.taxinow-airport-features.osm.pbf"
+        )
+        if osmium_cache_is_current(pbf, filtered):
+            print(
+                f"Reusing verified OSM airport-feature cache: {filtered}",
+                flush=True,
+            )
+        else:
+            filtered.unlink(missing_ok=True)
+            run_osmium(
+                [
+                    "tags-filter",
+                    str(pbf),
+                    "nwr/aeroway",
+                    "nwr/building",
+                    "nwr/building:part",
+                    "-o",
+                    str(filtered),
+                    "--overwrite",
+                ],
+                operation=(
+                    f"country-wide airport feature index for "
+                    f"{country_code.upper()}"
+                ),
+            )
+            if not osmium_file_is_readable(filtered):
+                filtered.unlink(missing_ok=True)
+                raise RuntimeError(
+                    "OSM processing produced an unreadable country-wide "
+                    "airport-feature cache."
+                )
         skycharts.ROOT = work
         skycharts_work = work / "work"
         skycharts_work.mkdir(parents=True, exist_ok=True)
@@ -663,24 +726,43 @@ def build_maps_from_geofabrik(
             )
             extract = work / f"{airport.icao}.osm.pbf"
             sequence = work / f"{airport.icao}.geojsonseq"
-            run_osmium([
-                "extract",
-                "--bbox",
-                f"{west},{south},{east},{north}",
-                str(filtered),
-                "-o",
-                str(extract),
-                "--overwrite",
-            ])
-            run_osmium([
-                "export",
-                str(extract),
-                "-f",
-                "geojsonseq",
-                "-o",
-                str(sequence),
-                "--overwrite",
-            ])
+            try:
+                run_osmium(
+                    [
+                        "extract",
+                        "--bbox",
+                        f"{west},{south},{east},{north}",
+                        str(filtered),
+                        "-o",
+                        str(extract),
+                        "--overwrite",
+                    ],
+                    operation=f"airport extraction for {airport.icao}",
+                )
+                run_osmium(
+                    [
+                        "export",
+                        str(extract),
+                        "-f",
+                        "geojsonseq",
+                        "-o",
+                        str(sequence),
+                        "--overwrite",
+                    ],
+                    operation=f"airport geometry export for {airport.icao}",
+                )
+            except RuntimeError as error:
+                message = str(error)
+                print(f"Skipping {airport.icao}: {message}", flush=True)
+                quality_records.append({
+                    "icao": airport.icao,
+                    "status": "rejected",
+                    "errors": [message],
+                    "warnings": [],
+                    "terminalCompleteness": {},
+                    "sources": source_names,
+                })
+                continue
             elements = read_geojson_sequence(sequence)
             if runway_raw.get("elements"):
                 elements = skycharts.merge_osm_elements(
@@ -693,7 +775,17 @@ def build_maps_from_geofabrik(
                     airport_record,
                     source=" + ".join(source_names),
                 )
-            except skycharts.AirportMapError:
+            except skycharts.AirportMapError as error:
+                message = f"Airport normalization failed: {error}"
+                print(f"Skipping {airport.icao}: {message}", flush=True)
+                quality_records.append({
+                    "icao": airport.icao,
+                    "status": "rejected",
+                    "errors": [message],
+                    "warnings": [],
+                    "terminalCompleteness": {},
+                    "sources": source_names,
+                })
                 continue
             promoted = skycharts.promote_osm_terminal_buildings(
                 elements,

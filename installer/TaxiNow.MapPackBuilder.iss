@@ -12,11 +12,11 @@
 #endif
 
 #define ProductName "TaxiNow Local Map Pack Builder"
-#define ProductDisplayName "TaxiNow Local Map Pack Builder (Build 103)"
-#define ProductVersion "1.0.0.103"
+#define ProductDisplayName "TaxiNow Local Map Pack Builder (Build 104)"
+#define ProductVersion "1.0.0.104"
 #define ProductPublisher "Sky Ning"
 #define ProductExeName "TaxiNow.MapPackBuilder.exe"
-#define SetupBaseFilename "TaxiNow-Local-Map-Pack-Builder-Build-103-Setup"
+#define SetupBaseFilename "TaxiNow-Local-Map-Pack-Builder-Build-104-Setup"
 
 [Setup]
 AppId={{E78A7A6A-A234-4BBF-875B-0C284972E6F0}
@@ -46,7 +46,7 @@ InfoAfterFile={#RepoRoot}\NOTICE
 VersionInfoVersion={#ProductVersion}
 VersionInfoProductVersion={#ProductVersion}
 VersionInfoCompany={#ProductPublisher}
-VersionInfoDescription=TaxiNow Local Map Pack Builder Build 103 Installer
+VersionInfoDescription=TaxiNow Local Map Pack Builder Build 104 Installer
 VersionInfoProductName={#ProductName}
 CloseApplications=yes
 CloseApplicationsFilter={#ProductExeName}

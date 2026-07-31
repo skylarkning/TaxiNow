@@ -4,9 +4,14 @@ Beta 4 is intentionally skipped as a public upgrade target. The Beta 4 work
 and the additional fixes completed afterward have been consolidated into this
 Beta 5 release. Users should update directly from Beta 3 to Beta 5 Build 102.
 
-**Map Pack Builder hotfix:** Builder Build 103 includes the bundled airport
-and runway catalogs that were accidentally omitted from the initial Build 102
-installer. TaxiNow itself remains Build 102.
+**Map Pack Builder hotfix:** Builder Build 104 includes the bundled airport
+and runway catalogs omitted from the initial Build 102 installer. It also
+keeps the expensive country-wide OSM feature index for resumable retries,
+identifies each airport extraction stage in the log, and records an individual
+airport extraction failure instead of immediately aborting the complete
+regional preprocessing run. Build 104 also fixes the Windows osmium-tool
+launcher incompatibility that caused every regional build to exit with code 2.
+TaxiNow itself remains Build 102.
 
 ## Highlights since Beta 3
 
@@ -55,8 +60,11 @@ installer. TaxiNow itself remains Build 102.
 Beta 4 有意不作为公开升级目标单独发布。Beta 4 的全部更新以及此后完成的
 修复已经合并到 Beta 5。用户应当直接从 Beta 3 升级至 Beta 5 Build 102。
 
-**地图包生成器热修复：**Builder Build 103 补回了初版 Build 102 安装器中
-误漏的机场和跑道目录数据。TaxiNow 主程序仍为 Build 102。
+**地图包生成器热修复：**Builder Build 104 补回了初版 Build 102 安装器中
+误漏的机场和跑道目录数据；全国 OSM 特征索引现在可在重试时断点复用，日志会
+明确显示每座机场的提取阶段，单座机场提取异常也会被记录，而不会立即中断整个
+地区的预处理。Build 104 同时修复了 Windows 下 osmium-tool 启动器兼容问题；
+该问题会导致所有地区构建以退出码 2 失败。TaxiNow 主程序仍为 Build 102。
 
 ## 相比 Beta 3 的主要更新
 

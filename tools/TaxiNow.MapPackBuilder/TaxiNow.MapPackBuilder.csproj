@@ -10,8 +10,8 @@
     <ApplicationIcon>..\..\src\TaxiNow.App\Assets\TaxiNow.ico</ApplicationIcon>
     <AssemblyName>TaxiNow.MapPackBuilder</AssemblyName>
     <RootNamespace>TaxiNow.MapPackBuilder</RootNamespace>
-    <FileVersion>1.0.0.103</FileVersion>
-    <InformationalVersion>1.0.0-beta.5-map-pack-builder+build.103</InformationalVersion>
+    <FileVersion>1.0.0.104</FileVersion>
+    <InformationalVersion>1.0.0-beta.5-map-pack-builder+build.104</InformationalVersion>
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="..\..\src\TaxiNow.App\Assets\TaxiNow.ico"

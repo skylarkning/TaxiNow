@@ -4,13 +4,15 @@ set "REPO_ROOT=%~dp0.."
 set "OUTPUT=%REPO_ROOT%\artifacts\map-pack-builder"
 set "ZIP=%REPO_ROOT%\artifacts\TaxiNow-Local-Map-Pack-Builder.zip"
 set "INSTALLER_OUTPUT=%REPO_ROOT%\artifacts\map-pack-builder-installer"
-set "INSTALLER=%INSTALLER_OUTPUT%\TaxiNow-Local-Map-Pack-Builder-Build-103-Setup.exe"
+set "INSTALLER=%INSTALLER_OUTPUT%\TaxiNow-Local-Map-Pack-Builder-Build-104-Setup.exe"
 set "PREREQUISITES=%REPO_ROOT%\artifacts\prerequisites"
 set "MICROMAMBA=%PREREQUISITES%\micromamba.exe"
 set "MICROMAMBA_DOWNLOAD=%PREREQUISITES%\micromamba-win-64.exe"
 set "MICROMAMBA_URL=https://github.com/mamba-org/micromamba-releases/releases/download/2.8.1-1/micromamba-win-64.exe"
 set "MICROMAMBA_SHA256=B645A5259CB92B5869B0E60943390DD0D362CAE45BC7E2F5BA8C7E4A4B06C7AA"
 set "ISCC=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+
+if exist "%OUTPUT%" rmdir /s /q "%OUTPUT%"
 
 dotnet publish "%REPO_ROOT%\tools\TaxiNow.MapPackBuilder\TaxiNow.MapPackBuilder.csproj" ^
   --configuration Release ^
