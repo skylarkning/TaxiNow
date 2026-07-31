@@ -31,7 +31,10 @@ import {
   type GeographicBounds,
   type InterpolatedOwnship
 } from "./interpolation";
-import { buildRunwayDecorations } from "./runwayGeometry";
+import {
+  buildRunwayDecorations,
+  runwayEndDesignators
+} from "./runwayGeometry";
 import {
   formatDownloadPercentage,
   isIndeterminateDownload,
@@ -2287,7 +2290,11 @@ function createFallbackRunwayLabels(
     return [];
   }
   const along = { x: dx / length, y: dy / length };
-  const references = (feature.ref ?? "").split("/");
+  const references = runwayEndDesignators(
+    feature.ref,
+    feature.points[0]!,
+    feature.points.at(-1)!
+  );
   const labels: SVGTextElement[] = [];
   for (const endIndex of [0, 1] as const) {
     const text = references[endIndex] ?? references[0] ?? "";

@@ -48,7 +48,11 @@ export function buildRunwayDecorations(
       localLine(runway, threshold + width, 0, runway.length - threshold - width, 0)
     ));
 
-    const designators = (feature.ref ?? "").split("/");
+    const designators = runwayEndDesignators(
+      feature.ref,
+      feature.points[0]!,
+      feature.points.at(-1)!
+    );
     for (const end of [0, 1] as const) {
       const direction = end === 0 ? 1 : -1;
       const origin = end === 0 ? 0 : runway.length;
@@ -106,6 +110,75 @@ export function buildRunwayDecorations(
     markings: { type: "FeatureCollection", features: markings },
     labels: { type: "FeatureCollection", features: labels }
   };
+}
+
+/**
+ * Return runway designators in geometric endpoint order.
+ *
+ * OSM and supplemental sources do not guarantee that a `05/23` reference is
+ * ordered the same way as the LineString coordinates. The designator painted
+ * at an endpoint describes the direction travelled from that threshold into
+ * the runway, so compare both possible assignments with the physical runway
+ * bearings instead of trusting source order.
+ */
+export function runwayEndDesignators(
+  reference: string | null | undefined,
+  start: [number, number],
+  end: [number, number]
+): [string, string] {
+  const values = (reference ?? "")
+    .split("/")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (values.length !== 2) {
+    const first = values[0] ?? "";
+    return [first, values[1] ?? first];
+  }
+
+  const firstBearing = designatorBearing(values[0]!);
+  const secondBearing = designatorBearing(values[1]!);
+  if (firstBearing === null || secondBearing === null) {
+    return [values[0]!, values[1]!];
+  }
+
+  const physical = coordinateBearing(start, end);
+  const reciprocal = (physical + 180) % 360;
+  const sourceOrderScore =
+    angularDistance(firstBearing, physical) +
+    angularDistance(secondBearing, reciprocal);
+  const reversedOrderScore =
+    angularDistance(secondBearing, physical) +
+    angularDistance(firstBearing, reciprocal);
+  return reversedOrderScore < sourceOrderScore
+    ? [values[1]!, values[0]!]
+    : [values[0]!, values[1]!];
+}
+
+function designatorBearing(value: string): number | null {
+  const match = /^(\d{1,2})(?:[LCR])?$/i.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+  const number = Number(match[1]);
+  if (!Number.isInteger(number) || number < 1 || number > 36) {
+    return null;
+  }
+  return (number % 36) * 10;
+}
+
+function coordinateBearing(
+  start: [number, number],
+  end: [number, number]
+): number {
+  const latitude = (start[1] + end[1]) / 2;
+  const dx = (end[0] - start[0]) * Math.cos(latitude * Math.PI / 180);
+  const dy = end[1] - start[1];
+  return (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+}
+
+function angularDistance(left: number, right: number): number {
+  const difference = Math.abs(left - right) % 360;
+  return Math.min(difference, 360 - difference);
 }
 
 function localRunway(
