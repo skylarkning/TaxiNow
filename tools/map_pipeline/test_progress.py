@@ -1,9 +1,12 @@
+import hashlib
+import json
 import os
 import pathlib
 import tempfile
 import threading
 import time
 import unittest
+import zipfile
 from unittest import mock
 
 import taxinow_map_pipeline as pipeline
@@ -339,6 +342,46 @@ class OpenStreetMapPriorityTests(unittest.TestCase):
             "name": "Terminal 1 Parking Garage",
         }))
 
+    def test_generic_osm_building_is_promoted_by_terminal_label(self):
+        generic = {
+            "type": "way",
+            "id": "outer-terminal",
+            "tags": {"building": "yes"},
+            "geometry": [
+                {"lon": -123.180, "lat": 49.190},
+                {"lon": -123.178, "lat": 49.190},
+                {"lon": -123.178, "lat": 49.192},
+                {"lon": -123.180, "lat": 49.192},
+                {"lon": -123.180, "lat": 49.190},
+            ],
+        }
+        result = {
+            "center": [-123.179, 49.191],
+            "features": [{
+                "kind": "terminal",
+                "name": "Domestic Terminal",
+                "points": [[-123.179, 49.191]],
+            }],
+        }
+
+        promoted = skycharts.promote_osm_terminal_buildings(
+            [generic],
+            result,
+        )
+
+        self.assertEqual(1, len(promoted))
+        self.assertEqual("terminal", promoted[0]["tags"]["building"])
+        self.assertEqual(
+            "Domestic Terminal",
+            promoted[0]["tags"]["name"],
+        )
+
+    def test_faa_designator_discards_gate_range_from_terminal_name(self):
+        self.assertEqual(
+            "Terminal 1",
+            skycharts.faa_designator_name("TERMINAL 1 A1-A9"),
+        )
+
     def test_uncovered_terminal_label_requests_focused_osm_detail(self):
         result = {
             "center": [-77.04, 38.85],
@@ -612,6 +655,81 @@ class AirportSelectionTests(unittest.TestCase):
             ["CYUL", "CYYZ"],
             [airport.icao for airport in selected],
         )
+
+
+class RegionalMapPackTests(unittest.TestCase):
+    def test_region_prefers_exact_subdivision_pack(self):
+        index = {
+            "schemaVersion": 1,
+            "packs": [
+                {
+                    "id": "US",
+                    "countryCode": "US",
+                    "url": "https://example.test/us.zip",
+                    "sha256": "a",
+                },
+                {
+                    "id": "US-DC",
+                    "countryCode": "US",
+                    "regionCode": "US-DC",
+                    "url": "https://example.test/dc.zip",
+                    "sha256": "b",
+                },
+            ],
+        }
+
+        packs = pipeline.select_map_packs(index, "US", "US-DC")
+
+        self.assertEqual(["US-DC"], [pack["id"] for pack in packs])
+
+    def test_pack_extraction_validates_and_skips_installed_airports(self):
+        map_data = {
+            "schemaVersion": 2,
+            "airport": {"icao": "KDCA"},
+            "features": [],
+        }
+        payload = json.dumps(map_data).encode("utf-8")
+        manifest = {
+            "schemaVersion": 1,
+            "maps": [{
+                "icao": "KDCA",
+                "path": "maps/KDCA.json",
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }],
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            archive = root / "pack.zip"
+            with zipfile.ZipFile(archive, "w") as bundle:
+                bundle.writestr(
+                    "manifest.json",
+                    json.dumps(manifest),
+                )
+                bundle.writestr("maps/KDCA.json", payload)
+
+            outputs, written = pipeline.extract_map_pack(
+                archive,
+                root / "output",
+                {"KDCA"},
+                set(),
+            )
+            skipped, skipped_bytes = pipeline.extract_map_pack(
+                archive,
+                root / "skipped",
+                {"KDCA"},
+                {"KDCA"},
+            )
+
+        self.assertEqual(["KDCA.json"], [
+            pathlib.Path(path).name for path in outputs
+        ])
+        self.assertEqual(len(payload), written)
+        self.assertEqual([], skipped)
+        self.assertEqual(0, skipped_bytes)
+
+    def test_pack_rejects_path_traversal(self):
+        with self.assertRaises(pipeline.PipelineError):
+            pipeline.safe_pack_member("../KDCA.json")
 
 
 class SkyChartsUpgradeTests(unittest.TestCase):

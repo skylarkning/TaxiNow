@@ -88,6 +88,11 @@ their surrounding white canvas and create the required output sizes.
   terminal anchors without a nearby footprint trigger a small OSM
   terminal-only repair query, while per-gate-cluster coverage detects a
   missing secondary terminal that a large main terminal would otherwise hide.
+  Generic building parts are promoted only when supported by a terminal label,
+  gate cluster, or connected accepted footprint. FAA Airport Mapping data can
+  supplement incomplete US terminals. X-Plane Gateway terminal facades are
+  excluded whenever an authoritative OSM/FAA footprint exists, preventing
+  fragmented modular scenery pieces from replacing continuous terminals.
 - English and Simplified Chinese are selectable from the header. Download
   guidance, statuses, controls, dialogs, and the downloaded-asset hierarchy
   are localized.
@@ -113,10 +118,11 @@ their surrounding white canvas and create the required output sizes.
   can open the map.
 - JSON-lines Python acquisition pipeline with the proven SkyCharts
   airport-geometry acquisition logic, country/ICAO jobs, caching, coordinated
-  OpenStreetMap queries, X-Plane Scenery Gateway detail fallback, and an
-  OurAirports runway fallback. Country/region and province/state downloads skip
-  ICAOs that are already installed and acquire every remaining airport in the
-  selected scope.
+  OpenStreetMap queries, FAA building supplementation, X-Plane Scenery Gateway
+  operational-detail fallback, and an OurAirports runway fallback.
+  Country/region and province/state downloads first use verified, resumable
+  regional map packs when available, then acquire only missing airports
+  on-demand. Already installed ICAOs are skipped.
 - Official managed SimConnect integration for MSFS 2024, plus the native x64
   C ABI spike, JSONL recorder, and deterministic replay source.
 

@@ -15,6 +15,7 @@ import math
 import os
 import pathlib
 import random
+import re
 import sys
 import tempfile
 import threading
@@ -22,6 +23,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
@@ -61,6 +63,12 @@ ALLOWED_PARALLEL_DOWNLOADS = {1, 2, 4, 8, 16}
 CATALOG_MAXIMUM_AGE = timedelta(days=7)
 CATALOG_REQUEST_TIMEOUT = 30
 CATALOG_ATTEMPTS_PER_URL = 2
+MAP_PACK_INDEX_URLS = (
+    "https://raw.githubusercontent.com/skylarkning/TaxiNow-Release/main/map-packs/index.json",
+)
+MAP_PACK_INDEX_MAXIMUM_AGE = timedelta(hours=6)
+MAP_PACK_REQUEST_TIMEOUT = 90
+MAP_PACK_SCHEMA_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -268,6 +276,378 @@ def request_bytes(
             time.sleep(delay + random.random() * 0.25)
             delay = min(delay * 2, 8)
     raise AssertionError("unreachable")
+
+
+def load_map_pack_index(cache: SourceCache) -> dict[str, Any]:
+    key = SourceCache.key("taxinow-map-pack-index", "v1")
+    raw = cache.read_bytes(key, MAP_PACK_INDEX_MAXIMUM_AGE)
+    if raw is None:
+        stale = cache.read_bytes_stale(key)
+        errors: list[str] = []
+        for url in MAP_PACK_INDEX_URLS:
+            try:
+                raw = request_bytes(
+                    url,
+                    timeout=30,
+                    attempts=2,
+                )
+                cache.write_bytes(key, raw)
+                break
+            except PipelineError as error:
+                errors.append(str(error))
+        if raw is None:
+            if stale is None:
+                raise PipelineError(
+                    "Regional map-pack index is unavailable: "
+                    + "; ".join(errors)
+                )
+            raw = stale
+    try:
+        index = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise PipelineError("Regional map-pack index is invalid.") from error
+    if (
+        not isinstance(index, dict)
+        or int(index.get("schemaVersion") or 0) != MAP_PACK_SCHEMA_VERSION
+        or not isinstance(index.get("packs"), list)
+    ):
+        raise PipelineError("Regional map-pack index schema is unsupported.")
+    return index
+
+
+def select_map_packs(
+    index: dict[str, Any],
+    country_code: str,
+    region_code: str | None,
+) -> list[dict[str, Any]]:
+    country = country_code.strip().upper()
+    region = (region_code or "").strip().upper()
+    candidates = [
+        pack for pack in index.get("packs", [])
+        if isinstance(pack, dict)
+        and str(pack.get("countryCode") or "").strip().upper() == country
+        and pack.get("url")
+        and pack.get("sha256")
+    ]
+    if region:
+        exact = [
+            pack for pack in candidates
+            if str(pack.get("regionCode") or "").strip().upper() == region
+        ]
+        if exact:
+            return sorted(exact, key=lambda pack: str(pack.get("id") or ""))
+        return sorted(
+            [
+                pack for pack in candidates
+                if not str(pack.get("regionCode") or "").strip()
+            ],
+            key=lambda pack: str(pack.get("id") or ""),
+        )
+    country_packs = [
+        pack for pack in candidates
+        if not str(pack.get("regionCode") or "").strip()
+    ]
+    return sorted(
+        country_packs or candidates,
+        key=lambda pack: str(pack.get("id") or ""),
+    )
+
+
+def sha256_file(path: pathlib.Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def download_file_resumable(
+    url: str,
+    destination: pathlib.Path,
+    expected_sha256: str,
+    expected_size: int | None = None,
+    progress_callback=None,
+) -> pathlib.Path:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.is_file():
+        digest = sha256_file(destination)
+        if digest.lower() == expected_sha256.lower():
+            if progress_callback:
+                size = destination.stat().st_size
+                progress_callback(size, size, 0.0, 0.0)
+            return destination
+        destination.unlink()
+
+    partial = destination.with_suffix(destination.suffix + ".part")
+    delay = 1.0
+    for attempt in range(3):
+        offset = partial.stat().st_size if partial.exists() else 0
+        headers = {
+            "User-Agent": USER_AGENT,
+            "Accept": "application/zip,application/octet-stream,*/*",
+        }
+        if offset:
+            headers["Range"] = f"bytes={offset}-"
+        request = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=MAP_PACK_REQUEST_TIMEOUT,
+            ) as response:
+                status = getattr(response, "status", response.getcode())
+                append = offset > 0 and status == 206
+                if offset and not append:
+                    offset = 0
+                total_header = response.headers.get("Content-Length")
+                try:
+                    response_size = (
+                        int(total_header) if total_header else None
+                    )
+                except (TypeError, ValueError):
+                    response_size = None
+                total = expected_size or (
+                    offset + response_size if response_size is not None else None
+                )
+                started = time.monotonic()
+                downloaded = offset
+                with partial.open("ab" if append else "wb") as stream:
+                    while True:
+                        chunk = response.read(128 * 1024)
+                        if not chunk:
+                            break
+                        stream.write(chunk)
+                        downloaded += len(chunk)
+                        elapsed = max(time.monotonic() - started, 0.001)
+                        transferred = max(downloaded - offset, 0)
+                        speed = transferred / elapsed
+                        if progress_callback:
+                            progress_callback(
+                                downloaded,
+                                total,
+                                speed,
+                                (
+                                    (total - downloaded) / speed
+                                    if total and speed > 0
+                                    else None
+                                ),
+                            )
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            digest = sha256_file(partial)
+            if digest.lower() != expected_sha256.lower():
+                partial.unlink(missing_ok=True)
+                raise PipelineError(
+                    "Regional map-pack checksum verification failed."
+                )
+            os.replace(partial, destination)
+            return destination
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            ConnectionResetError,
+            ConnectionAbortedError,
+            BrokenPipeError,
+            http.client.IncompleteRead,
+            OSError,
+        ) as error:
+            if attempt + 1 == 3:
+                raise PipelineError(
+                    f"Regional map-pack download failed: {error}"
+                ) from error
+            time.sleep(delay + random.random() * 0.25)
+            delay = min(delay * 2, 8)
+    raise AssertionError("unreachable")
+
+
+def safe_pack_member(name: str) -> pathlib.PurePosixPath:
+    member = pathlib.PurePosixPath(name)
+    if (
+        member.is_absolute()
+        or ".." in member.parts
+        or not member.parts
+    ):
+        raise PipelineError("Regional map pack contains an unsafe path.")
+    return member
+
+
+def extract_map_pack(
+    archive_path: pathlib.Path,
+    output_directory: pathlib.Path,
+    allowed_icaos: set[str],
+    excluded_icaos: set[str],
+) -> tuple[list[str], int]:
+    outputs: list[str] = []
+    bytes_written = 0
+    with zipfile.ZipFile(archive_path) as archive:
+        try:
+            pack_manifest = json.loads(
+                archive.read("manifest.json").decode("utf-8")
+            )
+        except (KeyError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise PipelineError(
+                "Regional map pack does not contain a valid manifest."
+            ) from error
+        if (
+            int(pack_manifest.get("schemaVersion") or 0)
+            != MAP_PACK_SCHEMA_VERSION
+            or not isinstance(pack_manifest.get("maps"), list)
+        ):
+            raise PipelineError("Regional map-pack manifest is unsupported.")
+        for entry in pack_manifest["maps"]:
+            if not isinstance(entry, dict):
+                continue
+            icao = str(entry.get("icao") or "").strip().upper()
+            if (
+                icao not in allowed_icaos
+                or icao in excluded_icaos
+            ):
+                continue
+            member = safe_pack_member(str(entry.get("path") or ""))
+            try:
+                payload = archive.read(member.as_posix())
+            except KeyError as error:
+                raise PipelineError(
+                    f"Regional map pack is missing {member.as_posix()}."
+                ) from error
+            expected = str(entry.get("sha256") or "").lower()
+            if expected and hashlib.sha256(payload).hexdigest() != expected:
+                raise PipelineError(
+                    f"Regional map entry {icao} failed checksum verification."
+                )
+            map_data: dict[str, Any] = {}
+            try:
+                map_data = json.loads(payload.decode("utf-8"))
+                map_icao = str(
+                    (map_data.get("airport") or {}).get("icao") or ""
+                ).strip().upper()
+            except (UnicodeDecodeError, json.JSONDecodeError, AttributeError):
+                map_icao = ""
+            if (
+                int(map_data.get("schemaVersion") or 0) != 2
+                or map_icao != icao
+            ):
+                raise PipelineError(
+                    f"Regional map entry {icao} is not a valid schema-v2 map."
+                )
+            path = output_directory / f"{icao}.json"
+            atomic_write(path, payload)
+            outputs.append(str(path))
+            bytes_written += len(payload)
+    return outputs, bytes_written
+
+
+def acquire_regional_map_packs(
+    protocol: Protocol,
+    packs: list[dict[str, Any]],
+    output_directory: pathlib.Path,
+    cache: SourceCache,
+    selected_icaos: set[str],
+    excluded_icaos: set[str],
+    max_parallel: int,
+) -> tuple[list[str], int, list[str]]:
+    if not packs:
+        return [], 0, []
+    pack_root = cache.root / "map-packs"
+    pack_root.mkdir(parents=True, exist_ok=True)
+    states_lock = threading.Lock()
+    states: dict[str, dict[str, Any]] = {}
+    warnings: list[str] = []
+
+    def acquire(pack: dict[str, Any]):
+        pack_id = re.sub(
+            r"[^A-Za-z0-9_.-]+",
+            "-",
+            str(pack.get("id") or "map-pack"),
+        )
+        version = re.sub(
+            r"[^A-Za-z0-9_.-]+",
+            "-",
+            str(pack.get("version") or "current"),
+        )
+        state = {
+            "downloaded": 0,
+            "total": int(pack.get("sizeBytes") or 0) or None,
+            "speed": 0.0,
+            "eta": None,
+        }
+        with states_lock:
+            states[pack_id] = state
+
+        def progress(downloaded, total, speed, eta):
+            with states_lock:
+                state.update(
+                    downloaded=downloaded,
+                    total=total,
+                    speed=speed,
+                    eta=eta,
+                )
+
+        archive_path = pack_root / f"{pack_id}-{version}.zip"
+        download_file_resumable(
+            str(pack["url"]),
+            archive_path,
+            str(pack["sha256"]),
+            int(pack.get("sizeBytes") or 0) or None,
+            progress,
+        )
+        return extract_map_pack(
+            archive_path,
+            output_directory,
+            selected_icaos,
+            excluded_icaos,
+        )
+
+    outputs: list[str] = []
+    bytes_written = 0
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=max(1, min(max_parallel, len(packs))),
+        thread_name_prefix="TaxiNow-pack",
+    ) as executor:
+        future_packs = {
+            executor.submit(acquire, pack): pack
+            for pack in packs
+        }
+        pending = set(future_packs)
+        while pending:
+            done, remaining = concurrent.futures.wait(
+                pending,
+                timeout=0.25,
+                return_when=concurrent.futures.FIRST_COMPLETED,
+            )
+            pending = set(remaining)
+            for future in done:
+                pack = future_packs[future]
+                try:
+                    pack_outputs, pack_bytes = future.result()
+                    outputs.extend(pack_outputs)
+                    bytes_written += pack_bytes
+                except Exception as error:
+                    pack_name = str(
+                        (pack or {}).get("id") or "regional pack"
+                    )
+                    warnings.append(f"{pack_name}: {error}")
+            with states_lock:
+                snapshots = [dict(value) for value in states.values()]
+            downloaded = sum(int(value["downloaded"]) for value in snapshots)
+            totals = [
+                int(value["total"])
+                for value in snapshots
+                if value.get("total")
+            ]
+            speed = sum(float(value["speed"]) for value in snapshots)
+            protocol.progress(
+                "downloading_map_pack",
+                len(outputs),
+                max(len(selected_icaos), 1),
+                None,
+                "TaxiNow Regional Map Pack",
+                bytes_written,
+                warnings,
+                bytes_downloaded=downloaded,
+                download_bytes_total=sum(totals) if totals else None,
+                download_bytes_per_second=speed,
+            )
+    return sorted(set(outputs)), bytes_written, warnings
 
 
 def bundled_catalog(name: str) -> bytes | None:
@@ -848,12 +1228,15 @@ def download_airports_parallel(
     cache: SourceCache,
     max_parallel: int,
     warnings: list[str],
+    initial_completed: int = 0,
+    overall_total: int | None = None,
 ) -> tuple[list[str], int, list[str]]:
-    total = len(airports)
-    if total == 0:
+    work_total = len(airports)
+    total = overall_total or work_total
+    if work_total == 0:
         return [], 0, warnings
 
-    worker_count = max(1, min(max_parallel, total))
+    worker_count = max(1, min(max_parallel, work_total))
     state_lock = threading.Lock()
     states: dict[str, dict[str, Any]] = {
         airport.icao: {
@@ -958,7 +1341,7 @@ def download_airports_parallel(
                 for _, state in active
             )
             aggregate_percentage = (
-                (completed + partial) * 100.0 / total
+                (initial_completed + completed + partial) * 100.0 / total
             )
             active_names = [icao for icao, _ in active]
             current_icao = ", ".join(active_names[:3])
@@ -978,12 +1361,12 @@ def download_airports_parallel(
                 if state.get("download_bytes_total") is not None
             ]
             elapsed = max(time.monotonic() - batch_started, 0.001)
-            eta_sample_minimum = min(4, total)
+            eta_sample_minimum = min(4, work_total)
             if (
                 completed >= eta_sample_minimum
-                and completed < total
+                and completed < work_total
             ):
-                eta = elapsed / completed * (total - completed)
+                eta = elapsed / completed * (work_total - completed)
             else:
                 eta = None
             phases = {str(state["phase"]) for _, state in active}
@@ -997,7 +1380,7 @@ def download_airports_parallel(
             )
             protocol.progress(
                 phase,
-                completed,
+                initial_completed + completed,
                 total,
                 current_icao or None,
                 " + ".join(sources) or "OpenStreetMap",
@@ -1119,6 +1502,18 @@ def handle(request: dict[str, Any]) -> None:
     completed = 0
     bytes_written = 0
     warnings: list[str] = []
+    outputs: list[str] = []
+    excluded: set[str] = set()
+    requested_parallel = int(request.get("maxParallel") or 1)
+    if requested_parallel not in ALLOWED_PARALLEL_DOWNLOADS:
+        raise PipelineError(
+            "maxParallel must be 1, 2, 4, 8, or 16."
+        )
+    max_parallel = (
+        requested_parallel
+        if request.get("command") == "download_country"
+        else 1
+    )
     if request.get("command") == "download_country":
         country = str(request.get("countryCode") or "").strip().upper()
         region = str(request.get("regionCode") or "").strip().upper()
@@ -1139,26 +1534,64 @@ def handle(request: dict[str, Any]) -> None:
                 f"Skipped {skipped} already installed airport"
                 f"{'' if skipped == 1 else 's'}."
             )
-    outputs: list[str] = []
-    requested_parallel = int(request.get("maxParallel") or 1)
-    if requested_parallel not in ALLOWED_PARALLEL_DOWNLOADS:
-        raise PipelineError(
-            "maxParallel must be 1, 2, 4, 8, or 16."
-        )
-    max_parallel = (
-        requested_parallel
-        if request.get("command") == "download_country"
-        else 1
-    )
-    if max_parallel > 1:
-        outputs, bytes_written, warnings = download_airports_parallel(
+
+        if selected:
+            try:
+                pack_index = load_map_pack_index(cache)
+                packs = select_map_packs(
+                    pack_index,
+                    country,
+                    region or None,
+                )
+                if packs:
+                    pack_outputs, pack_bytes, pack_warnings = (
+                        acquire_regional_map_packs(
+                            protocol,
+                            packs,
+                            output,
+                            cache,
+                            {airport.icao for airport in selected},
+                            excluded,
+                            max_parallel,
+                        )
+                    )
+                    outputs.extend(pack_outputs)
+                    bytes_written += pack_bytes
+                    warnings.extend(pack_warnings)
+                    packed_icaos = {
+                        pathlib.Path(path).stem.upper()
+                        for path in pack_outputs
+                    }
+                    if packed_icaos:
+                        selected = [
+                            airport for airport in selected
+                            if airport.icao not in packed_icaos
+                        ]
+                        completed = len(packed_icaos)
+                        warnings.append(
+                            f"Installed {len(packed_icaos)} airport"
+                            f"{'' if len(packed_icaos) == 1 else 's'} "
+                            "from verified regional map packs."
+                        )
+            except Exception as error:
+                warnings.append(
+                    "Regional map packs unavailable; continuing with "
+                    f"on-demand sources ({error})."
+                )
+
+    if max_parallel > 1 and selected:
+        acquired, acquired_bytes, warnings = download_airports_parallel(
             protocol,
             selected,
             output,
             cache,
             max_parallel,
             warnings,
+            initial_completed=completed,
+            overall_total=total,
         )
+        outputs.extend(acquired)
+        bytes_written += acquired_bytes
         completed = total
     else:
         for airport in selected:
@@ -1384,6 +1817,8 @@ def upgrade_skycharts_data(
         "counts": counts,
         "features": features,
     }
+    if source.get("qualityWarnings"):
+        result["qualityWarnings"] = list(source["qualityWarnings"])
     return result
 
 

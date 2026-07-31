@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted for incremental implementation after V1.0 Beta 4.
+Implemented incrementally in V1.0 Beta 4.
 
 ## Context
 
@@ -59,6 +59,25 @@ request per airport. The target design is:
 
 This permits real parallel file downloads without attempting to bypass public
 OSM service limits.
+
+The Beta 4 implementation additionally enforces these terminal-specific
+rules:
+
+- generic OSM building footprints are promoted to terminals only when they
+  connect to an accepted terminal, contain a terminal label, or are supported
+  by a nearby gate cluster;
+- FAA Airport Mapping building polygons supplement incomplete US terminals;
+- when an authoritative OSM or FAA terminal polygon exists, X-Plane terminal
+  and hangar facade polygons are discarded while its taxi routes and parking
+  positions remain eligible;
+- maps with invalid polygons, implausible bounds, or strong terminal
+  fragmentation indicators fail maintainer-side quality checks instead of
+  being published.
+
+The client consumes a versioned `map-packs/index.json`, resumes interrupted
+pack transfers, verifies both the ZIP and every contained map with SHA-256,
+rejects unsafe archive paths, installs only requested airports, and falls back
+to the existing on-demand pipeline when a pack is unavailable or incomplete.
 
 ## Consequences
 

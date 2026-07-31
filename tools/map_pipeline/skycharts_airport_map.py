@@ -44,13 +44,23 @@ AIRPORT_QUERY_MARGIN_METRES = 1200
 AIRPORT_FEATURE_DISTANCE_METRES = 1200
 NON_OSM_CACHE_MAX_AGE_DAYS = 1 / 48
 UNAVAILABLE_CACHE_REVISION = 3
-OSM_SOURCE_REVISION = 7
+OSM_SOURCE_REVISION = 8
 XPLANE_SOURCE_REVISION = 4
 XPLANE_GATEWAY_AIRPORT_URL = "https://gateway.x-plane.com/apiv1/airport/{ident}"
 XPLANE_GATEWAY_SCENERY_URL = "https://gateway.x-plane.com/apiv1/scenery/{scenery_id}"
 XPLANE_GATEWAY_SOURCE_URL = "https://gateway.x-plane.com/"
 XPLANE_REQUEST_TIMEOUT = 15
 XPLANE_FAILURE_COOLDOWN = 120
+FAA_AM_SERVICE_ROOT = (
+    "https://services6.arcgis.com/ssFJjBXIUyZDrSYZ/arcgis/rest/services"
+)
+FAA_AM_SERVICES = {
+    "building": "AM_Building",
+    "taxiway": "AM_Taxiway",
+    "apron": "AM_Apron",
+}
+FAA_AM_SOURCE_URL = "https://adds-faa.opendata.arcgis.com/"
+FAA_REQUEST_TIMEOUT = 20
 TRANSIENT_UNAVAILABLE_SECONDS = 15 * 60
 MISSING_DATA_SECONDS = 7 * 24 * 60 * 60
 MAP_KINDS = (
@@ -230,6 +240,7 @@ def airport_record(ident, airports_csv=None, progress=None):
             "name": row.get("name") or ident,
             "latitude": latitude,
             "longitude": longitude,
+            "country_code": (row.get("iso_country") or "").strip().upper(),
         }
     raise AirportMapError("Airport %s was not found in the airport index" % ident)
 
@@ -255,8 +266,7 @@ def overpass_terminal_query(bounds):
     return """[out:json][timeout:20];
 (
   nwr["aeroway"="terminal"]({bbox});
-  nwr["building"="terminal"]({bbox});
-  nwr["building"]["name"~"terminal|concourse|satellite",i]({bbox});
+  nwr["building"]({bbox});
 );
 out tags geom;""".format(bbox=bbox)
 
@@ -1136,6 +1146,9 @@ def expanded_osm_elements(elements):
 
 
 def feature_kind(tags):
+    taxi_now_kind = tags.get("taxinow:kind")
+    if taxi_now_kind in MAP_KINDS or taxi_now_kind == "pavement":
+        return taxi_now_kind
     kind = tags.get("aeroway")
     if kind in MAP_KINDS:
         return kind
@@ -1176,6 +1189,64 @@ def map_detail_score(result):
     return (counts.get("runway", 0) * 2 + taxiways * 3 + stands * 2
             + counts.get("apron", 0) + counts.get("terminal", 0) * 4
             + counts.get("hangar", 0))
+
+
+def airport_map_quality(result):
+    """Return blocking errors and non-blocking warnings for normalized maps."""
+    features = list((result or {}).get("features") or [])
+    counts = (result or {}).get("counts") or {}
+    errors = []
+    warnings = []
+    if counts.get("runway", 0) == 0:
+        errors.append("no runway geometry")
+    invalid_polygons = [
+        feature for feature in features
+        if feature.get("kind") in {"apron", "terminal", "hangar", "pavement"}
+        and len(feature.get("points") or []) > 1
+        and (
+            len(feature.get("points") or []) < 4
+            or feature["points"][0] != feature["points"][-1]
+        )
+    ]
+    if invalid_polygons:
+        errors.append(
+            "%d invalid polygon%s"
+            % (
+                len(invalid_polygons),
+                "" if len(invalid_polygons) == 1 else "s",
+            )
+        )
+    terminals = [
+        feature for feature in features
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) >= 4
+    ]
+    unnamed_terminals = [
+        feature for feature in terminals
+        if not (
+            feature.get("name")
+            or feature.get("label")
+            or feature.get("ref")
+        )
+    ]
+    if len(unnamed_terminals) >= 8 and len(unnamed_terminals) > len(terminals) * 0.6:
+        warnings.append(
+            "terminal geometry is highly fragmented and mostly unnamed"
+        )
+    bounds = (result or {}).get("bounds") or {}
+    try:
+        center_latitude = float((result or {})["center"][1])
+        width = (
+            float(bounds["maxLon"]) - float(bounds["minLon"])
+        ) * 111320.0 * math.cos(math.radians(center_latitude))
+        height = (
+            float(bounds["maxLat"]) - float(bounds["minLat"])
+        ) * 111320.0
+        if math.hypot(width, height) > 30000:
+            errors.append("airport bounds exceed 30 km")
+    except (KeyError, TypeError, ValueError):
+        errors.append("invalid airport bounds")
+    return errors, warnings
 
 
 def terminal_label(tags):
@@ -1427,6 +1498,259 @@ def merge_osm_elements(primary, supplements):
         seen.add(identity)
         merged.append(element)
     return merged
+
+
+def geometry_pairs(element):
+    return [
+        pair for pair in (
+            point_pair(value) for value in element.get("geometry", [])
+        )
+        if pair
+    ]
+
+
+def point_polygon_distance(point, polygon, latitude):
+    if point_inside_polygon(point, polygon):
+        return 0.0
+    return min(
+        point_segment_distance(point, start, end, latitude)
+        for start, end in zip(polygon, polygon[1:])
+    )
+
+
+def polygon_distance(left, right, latitude):
+    return min(
+        min(point_polygon_distance(point, right, latitude) for point in left),
+        min(point_polygon_distance(point, left, latitude) for point in right),
+    )
+
+
+def promote_osm_terminal_buildings(osm_elements, result):
+    """Promote strict spatially matched OSM buildings to terminal footprints.
+
+    Some airports model a terminal as one outer ``building=yes`` footprint
+    plus named concourse/building parts. Querying only ``building=terminal``
+    leaves those airports fragmented. Generic buildings are accepted only when
+    they are anchored by a named terminal point, several gates, or a terminal
+    polygon already accepted from OSM.
+    """
+    latitude = float(result["center"][1])
+    features = list(result.get("features") or [])
+    labels = [
+        feature for feature in features
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) == 1
+        and (feature.get("label") or feature.get("name") or feature.get("ref"))
+    ]
+    gates = [
+        feature["points"][0]
+        for feature in features
+        if feature.get("kind") == "gate" and feature.get("points")
+    ]
+    accepted = [
+        geometry_pairs(element)
+        for element in expanded_osm_elements(osm_elements)
+        if feature_kind(element.get("tags") or {}) == "terminal"
+        and len(geometry_pairs(element)) >= 3
+    ]
+    candidates = []
+    for element in expanded_osm_elements(osm_elements):
+        tags = dict(element.get("tags") or {})
+        building = str(tags.get("building") or "").lower()
+        if not building or feature_kind(tags):
+            continue
+        name = str(tags.get("name") or "")
+        if (
+            building in {
+                "hangar", "garage", "garages", "parking", "industrial",
+                "warehouse", "office", "hotel", "train_station",
+            }
+            or re.search(
+                r"(?:parking|garage|hotel|station|rental|office|hangar)",
+                name,
+                re.IGNORECASE,
+            )
+        ):
+            continue
+        polygon = geometry_pairs(element)
+        if len(polygon) < 4 or polygon[0] != polygon[-1]:
+            continue
+        candidates.append((element, tags, polygon))
+
+    supplements = []
+    remaining = list(candidates)
+    changed = True
+    while changed:
+        changed = False
+        next_remaining = []
+        for element, tags, polygon in remaining:
+            matching_label = next(
+                (
+                    label for label in labels
+                    if point_polygon_distance(
+                        label["points"][0],
+                        polygon,
+                        latitude,
+                    )
+                    <= 120
+                ),
+                None,
+            )
+            nearby_gates = sum(
+                point_polygon_distance(gate, polygon, latitude) <= 55
+                for gate in gates
+            )
+            connected = any(
+                polygon_distance(polygon, terminal, latitude) <= 18
+                for terminal in accepted
+            )
+            if matching_label or nearby_gates >= 3 or connected:
+                promoted = dict(element)
+                promoted_tags = dict(tags)
+                promoted_tags["building"] = "terminal"
+                promoted_tags["aeroway"] = "terminal"
+                promoted_tags["taxinow:source"] = "OpenStreetMap"
+                if matching_label:
+                    promoted_tags["name"] = str(
+                        matching_label.get("label")
+                        or matching_label.get("name")
+                        or matching_label.get("ref")
+                    )
+                promoted["tags"] = promoted_tags
+                supplements.append(promoted)
+                accepted.append(polygon)
+                changed = True
+            else:
+                next_remaining.append((element, tags, polygon))
+        remaining = next_remaining
+    return supplements
+
+
+def faa_designator_name(designator):
+    value = re.sub(r"\s+", " ", str(designator or "").strip())
+    match = re.search(r"\bTERMINAL\s+([A-Z0-9]+)\b", value, re.IGNORECASE)
+    if match:
+        return "Terminal " + match.group(1).upper()
+    if re.search(r"\bGENERAL AVIATION TERMINAL\b", value, re.IGNORECASE):
+        return "General Aviation Terminal"
+    return value.title() if value else None
+
+
+def geojson_polygon_rings(geometry):
+    geometry_type = str((geometry or {}).get("type") or "")
+    coordinates = (geometry or {}).get("coordinates") or []
+    if geometry_type == "Polygon":
+        return coordinates[:1]
+    if geometry_type == "MultiPolygon":
+        return [
+            polygon[0]
+            for polygon in coordinates
+            if polygon
+        ]
+    return []
+
+
+def faa_airport_mapping_elements(ident, kinds=("building",), progress=None):
+    elements = []
+    for kind in kinds:
+        service = FAA_AM_SERVICES[kind]
+        where = urllib.parse.quote("ICAO_ID='%s'" % ident.upper())
+        url = (
+            "%s/%s/FeatureServer/0/query?"
+            "where=%s&outFields=*&returnGeometry=true&outSR=4326&f=geojson"
+            % (FAA_AM_SERVICE_ROOT, service, where)
+        )
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/geo+json,application/json",
+                "User-Agent": "TaxiNow/1.0 airport-map downloader",
+            },
+        )
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=FAA_REQUEST_TIMEOUT,
+            ) as response:
+                payload = response.read()
+            collection = json.loads(payload.decode("utf-8"))
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            OSError,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ) as error:
+            raise AirportMapError(
+                "FAA Airport Mapping data is unavailable: %s"
+                % short_network_error(error)
+            ) from error
+        for feature_index, feature in enumerate(
+            collection.get("features") or []
+        ):
+            properties = feature.get("properties") or {}
+            designator = str(properties.get("DESIGNATOR") or "").strip()
+            if kind == "building":
+                if not re.search(
+                    r"\b(?:TERMINAL|CONCOURSE)\b",
+                    designator,
+                    re.IGNORECASE,
+                ):
+                    continue
+                tags = {
+                    "building": "terminal",
+                    "aeroway": "terminal",
+                    "name": faa_designator_name(designator),
+                    "operator": "Federal Aviation Administration",
+                    "taxinow:source": "FAA Airport Mapping",
+                }
+            elif kind == "taxiway":
+                tags = {
+                    "taxinow:kind": "pavement",
+                    "ref": designator,
+                    "surface": properties.get("SURFACE"),
+                    "operator": "Federal Aviation Administration",
+                    "taxinow:source": "FAA Airport Mapping",
+                }
+            else:
+                tags = {
+                    "aeroway": "apron",
+                    "name": designator,
+                    "surface": properties.get("SURFACE"),
+                    "operator": "Federal Aviation Administration",
+                    "taxinow:source": "FAA Airport Mapping",
+                }
+            for ring_index, ring in enumerate(
+                geojson_polygon_rings(feature.get("geometry"))
+            ):
+                geometry = [
+                    {"lon": float(point[0]), "lat": float(point[1])}
+                    for point in ring
+                    if isinstance(point, list) and len(point) >= 2
+                ]
+                if len(geometry) < 4:
+                    continue
+                elements.append({
+                    "type": "way",
+                    "id": "faa-%s-%s-%s" % (
+                        kind,
+                        properties.get("OBJECTID", feature_index),
+                        ring_index,
+                    ),
+                    "tags": {
+                        key: value for key, value in tags.items()
+                        if value not in (None, "")
+                    },
+                    "geometry": geometry,
+                })
+    if elements:
+        report_progress(
+            progress,
+            "downloading_fallback",
+            84,
+            "FAA Airport Mapping",
+        )
+    return elements
 
 
 def raw_point_inside_polygon(point, geometry):
@@ -1691,10 +2015,19 @@ def build_airport_map(
                 result["osmRevision"] = OSM_SOURCE_REVISION
             except AirportMapError:
                 result = None
-    if result is not None and uncovered_terminal_label_points(result):
+    terminal_detail_needed = (
+        result is not None
+        and (
+            uncovered_terminal_label_points(result)
+            or needs_terminal_supplement(result)
+        )
+    )
+    if terminal_detail_needed:
         # Broad airport queries can be expensive on a busy Overpass instance.
-        # If named terminal anchors survived but their building polygons did
-        # not, retry only terminal geometry before falling back to X-Plane.
+        # Retry terminal anchors plus all building footprints in the compact
+        # runway-derived bounds, then promote only strictly spatially matched
+        # buildings. This reconstructs terminals made from building parts
+        # without importing unrelated urban buildings.
         try:
             report_progress(
                 progress,
@@ -1712,6 +2045,16 @@ def build_airport_map(
                     osm_elements,
                     terminal_elements,
                 )
+                preliminary = normalize(
+                    {"elements": osm_elements},
+                    airport,
+                    source="OpenStreetMap contributors",
+                )
+                promoted = promote_osm_terminal_buildings(
+                    osm_elements,
+                    preliminary,
+                )
+                osm_elements = merge_osm_elements(osm_elements, promoted)
                 source = (
                     "OpenStreetMap contributors + OurAirports"
                     if runway_raw.get("elements")
@@ -1727,7 +2070,70 @@ def build_airport_map(
             # The original map is still usable; the Gateway supplement below
             # remains available if the focused OSM request also fails.
             pass
-    if result is not None and needs_terminal_supplement(result):
+
+    faa_elements = []
+    result_counts = (result or {}).get("counts") or {}
+    faa_kinds = []
+    if (
+        result is not None
+        and airport.get("country_code") == "US"
+    ):
+        if needs_terminal_supplement(result):
+            faa_kinds.append("building")
+        if (
+            result_counts.get("taxiway", 0)
+            + result_counts.get("taxilane", 0)
+            == 0
+        ):
+            faa_kinds.append("taxiway")
+        if result_counts.get("apron", 0) == 0:
+            faa_kinds.append("apron")
+    if faa_kinds:
+        try:
+            faa_raw_elements = faa_airport_mapping_elements(
+                ident,
+                tuple(faa_kinds),
+                progress,
+            )
+            terminal_supplements = gateway_terminal_supplements(
+                osm_elements,
+                faa_raw_elements,
+                overlap_distance=20,
+            )
+            non_terminal_faa = [
+                element for element in faa_raw_elements
+                if feature_kind(element.get("tags") or {}) != "terminal"
+            ]
+            faa_elements = terminal_supplements + non_terminal_faa
+            if faa_elements:
+                osm_elements = merge_osm_elements(
+                    osm_elements,
+                    faa_elements,
+                )
+                source_parts = ["OpenStreetMap contributors"]
+                if runway_raw.get("elements"):
+                    source_parts.append("OurAirports")
+                source_parts.append("FAA Airport Mapping")
+                result = normalize(
+                    {"elements": osm_elements},
+                    airport,
+                    source=" + ".join(source_parts),
+                    source_url=FAA_AM_SOURCE_URL,
+                )
+                result["osmRevision"] = OSM_SOURCE_REVISION
+        except AirportMapError:
+            pass
+
+    authoritative_terminals = [
+        feature for feature in (result or {}).get("features", [])
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) >= 3
+    ]
+    if (
+        result is not None
+        and needs_terminal_supplement(result)
+        and not authoritative_terminals
+    ):
         try:
             report_progress(
                 progress,
@@ -1765,12 +2171,31 @@ def build_airport_map(
     if needs_gateway_detail:
         try:
             gateway_raw = gateway_raw or xplane_gateway_raw(ident, progress)
-            gateway_elements = list(gateway_raw.get("elements", []))
+            authoritative_terminals = [
+                element for element in osm_elements
+                if feature_kind(element.get("tags") or {}) == "terminal"
+            ]
+            gateway_elements = [
+                element for element in gateway_raw.get("elements", [])
+                if (
+                    feature_kind(element.get("tags") or {}) not in {
+                        "terminal", "hangar"
+                    }
+                    or not authoritative_terminals
+                )
+            ]
             gateway_augmented = False
-            osm_buildings = [element for element in (raw or {}).get("elements", [])
-                             if feature_kind(element.get("tags") or {}) in ("terminal", "hangar")]
-            if osm_buildings:
-                gateway_elements.extend(osm_buildings)
+            authoritative_features = [
+                element for element in osm_elements
+                if feature_kind(element.get("tags") or {}) in {
+                    "terminal", "hangar", "apron", "pavement"
+                }
+            ]
+            if authoritative_features:
+                gateway_elements = merge_osm_elements(
+                    gateway_elements,
+                    authoritative_features,
+                )
             if not any(feature_kind((element.get("tags") or {})) == "runway" for element in gateway_elements):
                 if runway_raw.get("elements"):
                     gateway_elements.extend(runway_raw["elements"])
@@ -1778,13 +2203,15 @@ def build_airport_map(
             sources = ["X-Plane Scenery Gateway"]
             if gateway_augmented:
                 sources.append("OurAirports")
-            if osm_buildings:
+            if authoritative_features:
                 sources.insert(0, "OpenStreetMap contributors")
+            if faa_elements:
+                sources.insert(1, "FAA Airport Mapping")
             source = " + ".join(sources)
             gateway_result = normalize({"elements": gateway_elements}, airport, source=source,
                                        source_url=XPLANE_GATEWAY_SOURCE_URL)
             gateway_result["sourceRevision"] = XPLANE_SOURCE_REVISION
-            if osm_buildings:
+            if authoritative_features:
                 gateway_result["osmRevision"] = OSM_SOURCE_REVISION
             if result is None or map_detail_score(gateway_result) > map_detail_score(result):
                 result = gateway_result
@@ -1812,6 +2239,14 @@ def build_airport_map(
             retry_seconds = MISSING_DATA_SECONDS
         write_unavailable_marker(unavailable_path, reason, retry_seconds)
         raise AirportMapError(reason)
+    quality_errors, quality_warnings = airport_map_quality(result)
+    if quality_errors:
+        raise AirportMapError(
+            "Airport map failed geometry quality checks for %s: %s"
+            % (ident, "; ".join(quality_errors))
+        )
+    if quality_warnings:
+        result["qualityWarnings"] = quality_warnings
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=ident + "-", suffix=".json", dir=str(cache_dir)
     )

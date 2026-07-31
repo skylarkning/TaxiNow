@@ -238,6 +238,9 @@
                   For the fastest setup, download only the airports you need
                   by ICAO, or enter a province/state to narrow a country batch.
                   Already installed airports are skipped automatically.
+                  When an official TaxiNow regional pack is available, it is
+                  verified and installed first; only missing airports use
+                  on-demand sources.
                 </p>
                 <p>
                   Typical planning range using public OSM: US 8–40 hours;
@@ -251,7 +254,8 @@
                 <strong>大批量下载需要一定时间。</strong>
                 <p>
                   建议优先按 ICAO 下载实际需要的机场，也可以填写省/州来缩小整国批量范围；
-                  已经安装的机场会自动跳过。
+                  已经安装的机场会自动跳过。如有官方 TaxiNow 地区地图包，应用会先校验并
+                  安装地图包，仅对包内缺少的机场使用在线按需来源。
                 </p>
                 <p>
                   使用公共 OSM 时的常见规划区间：美国 8–40 小时；加拿大/澳大利亚
@@ -323,16 +327,18 @@
                       Public OSM servers use per-user request slots and
                       cooldowns, so several simultaneous OSM queries are often
                       slower than one. TaxiNow now serializes OSM requests to
-                      avoid self-throttling. Higher values can still overlap
-                      cached work, conversion, and fallback sources, but use
-                      more CPU and memory. Use 1 unless you have a specific
-                      reason to increase it.
+                      avoid self-throttling. Regional map-pack files can be
+                      downloaded safely in parallel. Higher values can also
+                      overlap cached work, conversion, and fallback sources,
+                      but use more CPU and memory. Use 1 for on-demand OSM;
+                      higher values are useful when regional packs are listed.
                     </span>
                     <span lang="zh-Hans">
                       公共 OSM 服务器按用户分配请求槽位并设置冷却时间，因此多个 OSM
                       请求同时运行往往比单个请求更慢。TaxiNow 现在会串行发送 OSM
-                      请求以避免自我限流。较高数值仍可并行处理缓存、数据转换和后备来源，
-                      但会占用更多 CPU 和内存；如无特殊需要，请选择 1。
+                      请求以避免自我限流；地区地图包文件可以安全地并行下载。较高数值还可
+                      并行处理缓存、数据转换和后备来源，但会占用更多 CPU 和内存。按需
+                      OSM 建议选择 1；存在地区地图包时可提高该数值。
                     </span>
                   </span>
                 </span>
