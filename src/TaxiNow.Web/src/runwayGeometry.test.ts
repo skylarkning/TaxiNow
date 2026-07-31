@@ -66,4 +66,12 @@ describe("buildRunwayDecorations", () => {
       [-79.98, 25.0]
     )).toEqual(["09", "27"]);
   });
+
+  it("uses numeric headings while preserving source annotations", () => {
+    expect(runwayEndDesignators(
+      "07/25(NOTINUSE)",
+      [120.0, 30.0],
+      [119.99, 29.99]
+    )).toEqual(["25(NOTINUSE)", "07"]);
+  });
 });

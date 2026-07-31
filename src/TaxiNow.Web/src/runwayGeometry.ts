@@ -155,7 +155,10 @@ export function runwayEndDesignators(
 }
 
 function designatorBearing(value: string): number | null {
-  const match = /^(\d{1,2})(?:[LCR])?$/i.exec(value.trim());
+  // Some otherwise usable sources append an operational annotation or a
+  // non-standard suffix (for example `25(NOTINUSE)` or `11H`). Preserve the
+  // displayed text, but use its leading runway number for endpoint matching.
+  const match = /^(?:RWY\s*)?(\d{1,2})/i.exec(value.trim());
   if (!match) {
     return null;
   }
