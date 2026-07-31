@@ -40,6 +40,12 @@ public partial class MainWindow : Window
         var candidates = new[]
         {
             Path.Combine(
+                Environment.GetFolderPath(
+                    Environment.SpecialFolder.LocalApplicationData),
+                "TaxiNow Map Pack Builder",
+                "environment",
+                "python.exe"),
+            Path.Combine(
                 profile,
                 "miniforge3",
                 "envs",

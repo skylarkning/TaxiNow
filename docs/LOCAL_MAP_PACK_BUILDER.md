@@ -5,7 +5,23 @@ same resumable Geofabrik-based pipeline on the maintainer PC, blocks partial or
 warning-bearing releases, and produces exact upload instructions only after
 the build passes validation.
 
-## 1. Build the GUI
+## 1. Install or build the GUI
+
+For normal use, run the standard Windows installer:
+
+```text
+artifacts\map-pack-builder-installer\TaxiNow-Local-Map-Pack-Builder-Build-102-Setup.exe
+```
+
+It adds a Start menu shortcut, offers an optional desktop shortcut, and
+provides a standard Windows uninstaller. The recommended installer task
+automatically downloads and installs the isolated Python 3.12, `osmium-tool`,
+and Overture Maps environment. Generated extracts and map packs are stored in
+the workspace selected inside the application and are preserved when the
+builder itself is uninstalled. Uninstalling the builder removes its managed
+dependency environment and package cache.
+
+To rebuild the installer from source:
 
 From `C:\Users\admin\Documents\TaxiNow`, double-click
 `scripts\build-map-pack-builder.cmd`, or run:
@@ -14,9 +30,10 @@ From `C:\Users\admin\Documents\TaxiNow`, double-click
 cmd /c .\scripts\build-map-pack-builder.cmd
 ```
 
-The self-contained tool is created at:
+The installer, self-contained folder, and portable ZIP are created at:
 
 ```text
+artifacts\map-pack-builder-installer\TaxiNow-Local-Map-Pack-Builder-Build-102-Setup.exe
 artifacts\map-pack-builder\TaxiNow.MapPackBuilder.exe
 artifacts\TaxiNow-Local-Map-Pack-Builder.zip
 ```
@@ -24,10 +41,19 @@ artifacts\TaxiNow-Local-Map-Pack-Builder.zip
 Keep the published folder together or distribute the generated ZIP. The `.cmd`
 launcher avoids PowerShell execution-policy restrictions.
 
-## 2. Install the local preprocessing environment
+## 2. Map processing environment
 
-Install Miniforge or Miniconda for Windows, then create the dedicated
-environment from the file bundled beside the GUI:
+The standard installer creates the dedicated environment automatically at:
+
+```text
+%LOCALAPPDATA%\TaxiNow Map Pack Builder\environment
+```
+
+No separate Python or Conda installation is required. The dependency step
+requires internet access to the conda-forge package service.
+
+For a portable/manual installation, install Miniforge or Miniconda for Windows,
+then create the same environment from the file bundled beside the GUI:
 
 ```powershell
 conda env create --file `

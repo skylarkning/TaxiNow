@@ -37,5 +37,8 @@
     <Content Include="..\map_pipeline\environment-map-pack-windows.yml"
              Link="pipeline\environment-map-pack-windows.yml"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\map_pipeline\install_map_pack_environment.cmd"
+             Link="pipeline\install_map_pack_environment.cmd"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
