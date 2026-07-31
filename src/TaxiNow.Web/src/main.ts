@@ -197,6 +197,8 @@ function applyProductMetadata(status: AppStatus): void {
     status.displayVersion;
   document.querySelector("#about-build-date")!.textContent =
     status.buildDate;
+  document.querySelector("#about-build-id")!.textContent =
+    String(status.internalBuildId);
   const chineseVersion = document.querySelector("#about-version-zh");
   if (chineseVersion) {
     chineseVersion.textContent = status.displayVersion;
@@ -212,6 +214,10 @@ function applyProductMetadata(status: AppStatus): void {
         day: "numeric",
         timeZone: "UTC"
       }).format(parsedBuildDate);
+  }
+  const chineseBuildId = document.querySelector("#about-build-id-zh");
+  if (chineseBuildId) {
+    chineseBuildId.textContent = String(status.internalBuildId);
   }
 }
 

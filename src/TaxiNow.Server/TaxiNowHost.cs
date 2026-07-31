@@ -139,8 +139,9 @@ public static class TaxiNowHost
             return Results.Ok(new
             {
                 product = "TaxiNow",
-                version = "1.0.0-beta.4",
-                displayVersion = "V1.0 Beta 4",
+                version = "1.0.0-beta.5",
+                displayVersion = "V1.0 Beta 5",
+                internalBuildId = 100,
                 buildDate = "July 30, 2026",
                 apiVersion = 1,
                 localUrl = localUrls[0],

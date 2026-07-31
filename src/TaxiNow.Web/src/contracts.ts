@@ -76,6 +76,7 @@ export interface AppStatus {
   product: string;
   version: string;
   displayVersion: string;
+  internalBuildId: number;
   buildDate: string;
   apiVersion: number;
   localUrl: string;
