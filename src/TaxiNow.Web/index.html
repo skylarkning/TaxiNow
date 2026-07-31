@@ -596,7 +596,7 @@
         </p>
         <section class="about-faq" aria-label="Frequently asked questions">
           <h2>Frequently asked questions and technical limitations</h2>
-          <details>
+          <details id="faq-map-correctness">
             <summary>Can TaxiNow guarantee every airport map is correct?</summary>
             <p>
               No. TaxiNow combines OpenStreetMap, official aviation GIS where
@@ -616,6 +616,37 @@
               buildings to gates, aprons, terminal labels, and nearby accepted
               terminal geometry, but it will not invent a terminal number when
               no reliable name or number exists.
+            </p>
+          </details>
+          <details>
+            <summary>Why do I see missing or broken terminal buildings?</summary>
+            <p>
+              First check the map source shown in the attribution at the
+              bottom of the map. If it shows X-Plane Scenery Gateway, TaxiNow
+              fell back because it could not obtain usable OpenStreetMap data
+              for that download. Delete the airport from Downloaded Asset and
+              download it again. A retry can sometimes reach the OSM service
+              successfully and produce more complete terminal geometry.
+            </p>
+            <p>
+              If several downloads still use X-Plane Scenery Gateway, usable
+              OSM airport data is probably unavailable for that airport.
+              X-Plane airport data is primarily operational scenery data and
+              may contain missing, unnamed, or fragmented terminal shapes.
+              See also
+              <a href="#faq-map-correctness">Can TaxiNow guarantee every
+              airport map is correct?</a>
+            </p>
+          </details>
+          <details>
+            <summary>Why is my aircraft position out of sync after using warp?</summary>
+            <p>
+              This can be normal because the simulator may not publish the
+              updated aircraft position immediately after a warp or teleport.
+              First click the position-refresh button above the zoom controls.
+              If the position is still stale, begin moving the aircraft; the
+              map should update when the simulator sends its next position
+              changes.
             </p>
           </details>
           <details>
@@ -689,7 +720,7 @@
           </p>
           <section class="about-faq" aria-label="常见问题与技术限制">
             <h2>常见问题与技术限制</h2>
-            <details>
+            <details id="faq-map-correctness-zh">
               <summary>TaxiNow 能保证全球每一座机场都正确绘制吗？</summary>
               <p>
                 不能。TaxiNow 会融合 OpenStreetMap、可用的官方航空 GIS、开放的全球
@@ -704,6 +735,33 @@
                 部分来源只有无名称的建筑轮廓，部分只有航站楼名称点，也可能两者都没有。
                 TaxiNow 会根据登机口、机坪、航站楼名称及相邻可信轮廓自动匹配，但在没有
                 可靠名称或编号时不会凭空编造“Terminal X”。
+              </p>
+            </details>
+            <details>
+              <summary>为什么航站楼会缺失、破碎或显示不完整？</summary>
+              <p>
+                请先查看地图底部版权信息中显示的数据源。如果其中显示
+                X-Plane Scenery Gateway，说明 TaxiNow 本次下载未能取得可用的
+                OpenStreetMap 数据，因此使用了后备数据。请先在“已下载资源”中
+                删除该机场并重新下载。有时重试可以成功连接 OSM 服务，并获得
+                更完整的航站楼图形。
+              </p>
+              <p>
+                如果连续多次重新下载后仍然使用 X-Plane Scenery Gateway，通常
+                表示该机场目前没有可用的 OSM 机场数据。X-Plane 机场数据主要
+                用于运行和场景设施，航站楼图形可能缺失、无名称或由多个碎片
+                组成。另请参阅
+                <a href="#faq-map-correctness-zh">“TaxiNow 能保证全球每一座机场
+                都正确绘制吗？”</a>
+              </p>
+            </details>
+            <details>
+              <summary>使用瞬移后，为什么飞机位置没有同步？</summary>
+              <p>
+                这是正常现象。模拟器在瞬移或传送后可能不会立即发布新的飞机
+                位置。请先点击缩放按钮上方的“刷新飞机位置”按钮。如果仍未
+                更新，请开始移动飞机；模拟器发送下一次位置变化后，地图应当
+                自动恢复同步。
               </p>
             </details>
             <details>

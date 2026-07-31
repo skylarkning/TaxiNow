@@ -14,6 +14,8 @@ planned work and are not final release notes.
   downloaded again.
 - Add regression coverage for north/south, east/west, correctly ordered,
   reversed, and parallel runways.
+- Add bilingual FAQ guidance for X-Plane fallback terminal limitations,
+  retrying an airport through OSM, and position refresh after simulator warp.
 
 ## Planned later
 
@@ -36,6 +38,8 @@ Beta 6 仍在开发中。以下内容区分已经完成和计划后续完成的�
 - MapLibre 主渲染和兼容备用渲染均已采用相同修复。用户不需要重新下载已有
   机场地图。
 - 新增南北向、东西向、原本顺序正确、顺序颠倒以及平行跑道的回归测试。
+- 新增中英双语常见问题，说明 X-Plane 后备数据的航站楼限制、如何重新尝试
+  获取 OSM 数据，以及模拟器瞬移后如何刷新飞机位置。
 
 ## 后续计划
 
