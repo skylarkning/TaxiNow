@@ -81,6 +81,11 @@ their surrounding white canvas and create the required output sizes.
   distance, and an off-route warning, while reusing the existing low-overhead
   SimConnect position stream. Routing is advisory only and never overrides
   ATC instructions, airport signs, closures, or pilot judgment.
+- An experimental custom-route editor accepts ordered, comma-separated
+  taxiways ending in a runway or gate, for example
+  `D, E, H, T1, RWY01L`. TaxiNow validates identifiers against the active map,
+  highlights valid custom routes, suggests likely typo corrections, and offers
+  automatic route finding when the requested sequence cannot be connected.
 - Schema v2 validation and a schema v1 adapter.
 - Visible map downloader and asset manager for ICAO, country/region, and
   optional province/state downloads, with byte-level progress, transfer speed,

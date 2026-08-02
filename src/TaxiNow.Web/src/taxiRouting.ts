@@ -40,6 +40,7 @@ export interface TaxiRoute {
   turnCount: number;
   summary: string;
   destination: TaxiDestination;
+  custom?: boolean;
 }
 
 export interface TaxiRouteProgress {
@@ -304,6 +305,99 @@ export function planTaxiRoutes(
   return routes.sort((left, right) => left.score - right.score);
 }
 
+export function listTaxiwayRefs(graph: TaxiGraph): string[] {
+  const refs = new Set<string>();
+  for (const node of graph.nodes) {
+    for (const edge of node.edges) {
+      if (edge.ref) {
+        refs.add(edge.ref);
+      }
+    }
+  }
+  return [...refs].sort((left, right) => left.localeCompare(right, undefined, {
+    numeric: true,
+    sensitivity: "base"
+  }));
+}
+
+export function suggestTaxiwayRefs(
+  graph: TaxiGraph,
+  requested: string,
+  maximum = 3
+): string[] {
+  const normalized = normalizeTaxiwayRef(requested);
+  if (!normalized) {
+    return [];
+  }
+  return suggestReferences(normalized, listTaxiwayRefs(graph), maximum);
+}
+
+export function suggestReferences(
+  requested: string,
+  available: string[],
+  maximum = 3
+): string[] {
+  const normalized = requested.trim().toUpperCase();
+  return available
+    .map((ref) => ({
+      ref,
+      distance: editDistance(normalized, ref),
+      prefixMatch: ref[0] === normalized[0]
+    }))
+    .filter((candidate) =>
+      candidate.ref.startsWith(normalized) ||
+      normalized.startsWith(candidate.ref) ||
+      candidate.distance <= Math.max(1, Math.floor(normalized.length / 3))
+    )
+    .sort((left, right) =>
+      left.distance - right.distance ||
+      Number(right.prefixMatch) - Number(left.prefixMatch) ||
+      left.ref.localeCompare(right.ref, undefined, { numeric: true })
+    )
+    .slice(0, Math.max(0, maximum))
+    .map((candidate) => candidate.ref);
+}
+
+export function planCustomTaxiRoute(
+  graph: TaxiGraph,
+  start: Coordinate,
+  destination: TaxiDestination,
+  requestedRefs: string[],
+  startLabel = "Aircraft"
+): TaxiRoute | null {
+  const requiredRefs = requestedRefs
+    .map(normalizeTaxiwayRef)
+    .filter(Boolean);
+  if (graph.nodes.length === 0 || requiredRefs.length === 0) {
+    return null;
+  }
+  const available = new Set(listTaxiwayRefs(graph));
+  if (requiredRefs.some((ref) => !available.has(ref))) {
+    return null;
+  }
+  const startNode = nearestNode(graph, start);
+  const destinationNode = nearestNode(graph, destination.coordinate);
+  if (startNode === null || destinationNode === null) {
+    return null;
+  }
+  const result = searchCustomRoute(
+    graph,
+    startNode,
+    destinationNode,
+    requiredRefs
+  );
+  if (!result) {
+    return null;
+  }
+  const route = makeRoute(graph, result, start, destination, startLabel, 0);
+  return {
+    ...route,
+    id: "taxi-route-custom",
+    custom: true,
+    summary: [startLabel, ...requiredRefs, destination.label].join(" → ")
+  };
+}
+
 export function updateTaxiRouteProgress(
   route: TaxiRoute,
   position: Coordinate,
@@ -514,6 +608,132 @@ function searchRoute(
   };
 }
 
+function searchCustomRoute(
+  graph: TaxiGraph,
+  startNode: number,
+  destinationNode: number,
+  requiredRefs: string[]
+): SearchResult | null {
+  interface CustomState extends SearchState {
+    progress: number;
+  }
+  const queue: CustomState[] = [];
+  const best = new Map<string, number>();
+  const previous = new Map<string, { state: string; edge: GraphEdge }>();
+  const initial: CustomState = {
+    node: startNode,
+    previousNode: null,
+    previousRef: "",
+    progress: 0,
+    cost: 0,
+    distanceMeters: 0,
+    key: `${startNode}|||0`
+  };
+  queue.push(initial);
+  best.set(initial.key, 0);
+  let finalState: CustomState | null = null;
+
+  while (queue.length > 0) {
+    queue.sort((left, right) => left.cost - right.cost);
+    const current = queue.shift()!;
+    if (current.cost > (best.get(current.key) ?? Number.POSITIVE_INFINITY)) {
+      continue;
+    }
+    if (
+      current.node === destinationNode &&
+      current.progress === requiredRefs.length
+    ) {
+      finalState = current;
+      break;
+    }
+    const node = graph.nodes[current.node]!;
+    for (const edge of node.edges) {
+      if (edge.to === current.previousNode) {
+        continue;
+      }
+      const expected = requiredRefs[current.progress] ?? null;
+      const lastMatched = current.progress > 0
+        ? requiredRefs[current.progress - 1]!
+        : "";
+      let nextProgress = current.progress;
+      let sequencePenalty = 0;
+      if (expected && edge.ref === expected) {
+        nextProgress++;
+      } else if (!edge.ref || edge.ref === lastMatched) {
+        // Unnamed connectors and continuation along the current taxiway are
+        // permitted without changing the requested sequence.
+      } else if (requiredRefs.slice(current.progress + 1).includes(edge.ref)) {
+        // Airport datasets may contain overlapping centerlines that expose a
+        // later taxiway name before the aircraft reaches the intended turn.
+        // Keep the edge as a costly connector; it does not advance the user's
+        // requested sequence until the preceding taxiways have been matched.
+        sequencePenalty = 900;
+      } else if (
+        current.progress > 1 &&
+        requiredRefs.slice(0, current.progress - 1).includes(edge.ref)
+      ) {
+        sequencePenalty = 650;
+      } else {
+        // Real airport data often contains short apron links or overlapping
+        // centerlines with additional names. Keep them possible, but strongly
+        // prefer a path that follows only the requested taxiways.
+        sequencePenalty = current.progress === 0 ? 90 : 320;
+      }
+      const nextNode = graph.nodes[edge.to]!;
+      const turnPenalty = current.previousNode === null
+        ? 0
+        : calculateTurnPenalty(
+          graph.nodes[current.previousNode]!,
+          node,
+          nextNode
+        );
+      const refChangePenalty = current.previousRef && edge.ref &&
+        current.previousRef !== edge.ref ? 12 : 0;
+      const cost = current.cost + edge.distanceMeters + turnPenalty +
+        refChangePenalty + sequencePenalty + (edge.ref ? 0 : 4);
+      const key = `${edge.to}|${edge.ref}|${current.node}|${nextProgress}`;
+      if (cost >= (best.get(key) ?? Number.POSITIVE_INFINITY)) {
+        continue;
+      }
+      best.set(key, cost);
+      previous.set(key, { state: current.key, edge });
+      queue.push({
+        node: edge.to,
+        previousNode: current.node,
+        previousRef: edge.ref,
+        progress: nextProgress,
+        cost,
+        distanceMeters: current.distanceMeters + edge.distanceMeters,
+        key
+      });
+    }
+  }
+
+  if (!finalState) {
+    return null;
+  }
+  const nodes = [finalState.node];
+  const edges: GraphEdge[] = [];
+  let key = finalState.key;
+  while (key !== initial.key) {
+    const link = previous.get(key);
+    if (!link) {
+      return null;
+    }
+    edges.push(link.edge);
+    nodes.push(Number(link.state.split("|")[0]));
+    key = link.state;
+  }
+  nodes.reverse();
+  edges.reverse();
+  return {
+    nodes,
+    edges,
+    cost: finalState.cost,
+    distanceMeters: finalState.distanceMeters
+  };
+}
+
 function makeRoute(
   graph: TaxiGraph,
   result: SearchResult,
@@ -600,6 +820,23 @@ function uniqueDestinations(destinations: TaxiDestination[]): TaxiDestination[] 
 function normalizeTaxiwayRef(value: string): string {
   const trimmed = value.trim().toUpperCase();
   return trimmed.length <= 12 ? trimmed : "";
+}
+
+function editDistance(left: string, right: string): number {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex++) {
+    const current = [leftIndex];
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex++) {
+      current[rightIndex] = Math.min(
+        current[rightIndex - 1]! + 1,
+        previous[rightIndex]! + 1,
+        previous[rightIndex - 1]! +
+          (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1)
+      );
+    }
+    previous.splice(0, previous.length, ...current);
+  }
+  return previous[right.length]!;
 }
 
 function compressRefs(refs: string[]): string[] {

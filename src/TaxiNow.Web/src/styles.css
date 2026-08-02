@@ -994,6 +994,50 @@ footer {
   box-shadow: 0 0 0 2px rgba(40, 169, 255, 0.16);
 }
 
+.taxi-custom-toggle {
+  margin-top: 4px;
+}
+
+.taxi-custom-route {
+  display: grid;
+  gap: 8px;
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(147, 181, 198, 0.18);
+}
+
+.taxi-custom-route[hidden],
+.taxi-custom-recovery[hidden] {
+  display: none;
+}
+
+.field-label-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-label-row label {
+  margin: 0 !important;
+}
+
+.custom-route-info .info-tooltip {
+  right: auto;
+  bottom: calc(100% + 7px);
+  left: -96px;
+  width: min(340px, calc(100vw - 32px));
+}
+
+.taxi-custom-recovery {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.taxi-custom-recovery .secondary-button {
+  flex: 1;
+}
+
 .taxi-route-section {
   margin-top: 14px;
 }
@@ -1278,6 +1322,20 @@ footer {
 .primary-button:hover {
   color: #051512;
   background: #7cf5df;
+}
+
+.secondary-button {
+  width: 100%;
+  border-color: rgba(76, 240, 209, 0.42);
+  color: #9ff3e3;
+  background: rgba(24, 66, 74, 0.44);
+  font-weight: 700;
+}
+
+.secondary-button:hover {
+  border-color: #4cf0d1;
+  color: #d8fff7;
+  background: rgba(36, 91, 96, 0.6);
 }
 
 .feedback {

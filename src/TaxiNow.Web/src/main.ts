@@ -60,8 +60,12 @@ import {
   buildTaxiGraph,
   listGateDestinations,
   listRunwayDestinations,
+  listTaxiwayRefs,
   nearestStandLabel,
+  planCustomTaxiRoute,
   planTaxiRoutes,
+  suggestReferences,
+  suggestTaxiwayRefs,
   updateTaxiRouteProgress,
   type Coordinate,
   type TaxiDestination,
@@ -98,6 +102,8 @@ let selectedTaxiRoute: TaxiRoute | null = null;
 let activeTaxiRoute: TaxiRoute | null = null;
 let activeTaxiSegmentIndex = 0;
 let lastTaxiCameraAt = 0;
+let pendingCustomTaxiCorrection: string | null = null;
+let pendingCustomTaxiDestination: TaxiDestination | null = null;
 const assetGroupOpenState = new Map<string, boolean>();
 const downloadProgressWatch = new Map<
   string,
@@ -232,6 +238,12 @@ function setupTaxiPlanner(): void {
   const kind = document.querySelector<HTMLSelectElement>(
     "#taxi-destination-kind"
   )!;
+  const customToggle = document.querySelector<HTMLButtonElement>(
+    "#toggle-custom-taxi-route"
+  )!;
+  const customSection = document.querySelector<HTMLElement>(
+    "#taxi-custom-route"
+  )!;
 
   const setOpen = (open: boolean): void => {
     panel.classList.toggle("open", open);
@@ -252,8 +264,35 @@ function setupTaxiPlanner(): void {
   closeButton.addEventListener("click", () => setOpen(false));
   backdrop.addEventListener("click", () => setOpen(false));
   kind.addEventListener("change", syncKind);
+  customToggle.addEventListener("click", () => {
+    const open = customSection.hidden;
+    customSection.hidden = !open;
+    customToggle.setAttribute("aria-expanded", String(open));
+    if (open) {
+      document.querySelector<HTMLInputElement>(
+        "#taxi-custom-route-input"
+      )?.focus();
+    }
+  });
   document.querySelector("#find-taxi-routes")!.addEventListener("click", () => {
     findTaxiRoutes();
+  });
+  document.querySelector("#preview-custom-taxi-route")!
+    .addEventListener("click", previewCustomTaxiRoute);
+  document.querySelector("#apply-custom-correction")!
+    .addEventListener("click", () => {
+      if (!pendingCustomTaxiCorrection) {
+        return;
+      }
+      document.querySelector<HTMLInputElement>(
+        "#taxi-custom-route-input"
+      )!.value = pendingCustomTaxiCorrection;
+      previewCustomTaxiRoute();
+    });
+  document.querySelector("#custom-auto-route")!.addEventListener("click", () => {
+    if (pendingCustomTaxiDestination) {
+      findTaxiRoutes(pendingCustomTaxiDestination);
+    }
   });
   document.querySelector("#start-taxi-guidance")!.addEventListener("click", () => {
     startTaxiGuidance();
@@ -301,33 +340,227 @@ function populateTaxiDestinations(): void {
   }
 }
 
-function findTaxiRoutes(): void {
+function previewCustomTaxiRoute(): void {
+  const feedback = document.querySelector<HTMLElement>(
+    "#taxi-custom-feedback"
+  )!;
+  const position = currentAircraftCoordinate();
+  if (!position || !currentAirportMap || !taxiGraph) {
+    showCustomTaxiFeedback(t("taxi.needPosition"), true);
+    return;
+  }
+  // Never leave an older blue route on screen while reporting that the newly
+  // entered custom route is invalid.
+  clearTaxiRoute();
+  const input = document.querySelector<HTMLInputElement>(
+    "#taxi-custom-route-input"
+  )!;
+  const tokens = input.value
+    .split(",")
+    .map((token) => token.trim().toUpperCase())
+    .filter(Boolean);
+  if (tokens.length < 2) {
+    showCustomTaxiFeedback(t("taxi.customNeedFormat"), true);
+    input.focus();
+    return;
+  }
+
+  const destinationToken = tokens.at(-1)!;
+  const destinationMatch = resolveCustomTaxiDestination(destinationToken);
+  if (!destinationMatch.destination) {
+    const correction = destinationMatch.suggestion
+      ? [...tokens.slice(0, -1), destinationMatch.suggestion].join(", ")
+      : null;
+    const suggestion = correction
+      ? t("taxi.customDidYouMean", { route: correction })
+      : "";
+    showCustomTaxiFeedback(
+      `${t("taxi.customBadDestination")}${suggestion}`,
+      true,
+      correction
+    );
+    return;
+  }
+
+  const requestedRefs = tokens.slice(0, -1);
+  const availableRefs = new Set(listTaxiwayRefs(taxiGraph));
+  const unknown = requestedRefs.filter((ref) => !availableRefs.has(ref));
+  if (unknown.length > 0) {
+    const suggestions = new Map<string, string | undefined>();
+    for (const ref of unknown) {
+      const index = requestedRefs.indexOf(ref);
+      const adjacent = new Set([
+        requestedRefs[index - 1],
+        requestedRefs[index + 1]
+      ].filter(Boolean));
+      const candidates = suggestTaxiwayRefs(taxiGraph, ref, 4);
+      suggestions.set(
+        ref,
+        candidates.find((candidate) => !adjacent.has(candidate)) ?? candidates[0]
+      );
+    }
+    const correctionTokens = requestedRefs.map((ref) =>
+      suggestions.get(ref) ?? ref
+    );
+    const canCorrect = unknown.every((ref) => Boolean(suggestions.get(ref)));
+    const correction = canCorrect
+      ? [...correctionTokens, destinationMatch.token].join(", ")
+      : null;
+    const unknownLabels = unknown.map((ref) => {
+      const suggestion = suggestions.get(ref);
+      return suggestion ? `${ref} → ${suggestion}` : ref;
+    }).join(", ");
+    showCustomTaxiFeedback(
+      `${t("taxi.customUnknown", { items: unknownLabels })}${
+        correction ? t("taxi.customDidYouMean", { route: correction }) : ""
+      }`,
+      true,
+      correction,
+      destinationMatch.destination
+    );
+    return;
+  }
+
+  const route = planCustomTaxiRoute(
+    taxiGraph,
+    position,
+    destinationMatch.destination,
+    requestedRefs,
+    nearestStandLabel(currentAirportMap.features, position)
+  );
+  if (!route) {
+    showCustomTaxiFeedback(
+      t("taxi.customNoPath"),
+      true,
+      null,
+      destinationMatch.destination
+    );
+    return;
+  }
+
+  taxiRouteOptions = [route];
+  selectTaxiRoute(route);
+  renderTaxiRouteOptions();
+  feedback.textContent = t("taxi.customReady");
+  feedback.className = "feedback success";
+  setCustomTaxiRecovery(null, null);
+}
+
+function resolveCustomTaxiDestination(
+  value: string
+): { destination: TaxiDestination | null; token: string; suggestion: string | null } {
+  const normalized = value.replace(/\s+/g, "").toUpperCase();
+  const candidates: Array<{ token: string; key: string; destination: TaxiDestination }> = [];
+  for (const runway of taxiRunways) {
+    candidates.push({
+      token: `RWY${runway.ref}`,
+      key: `RWY${runway.ref}`.replace(/\s+/g, "").toUpperCase(),
+      destination: runway
+    });
+  }
+  for (const gate of taxiGates) {
+    for (const ref of gate.ref.split(/[\/,]/).map((part) => part.trim()).filter(Boolean)) {
+      candidates.push({
+        token: `GATE ${ref}`,
+        key: `GATE${ref}`.replace(/\s+/g, "").toUpperCase(),
+        destination: gate
+      });
+    }
+  }
+  const exact = candidates.find((candidate) =>
+    candidate.key === normalized ||
+    (candidate.destination.kind === "gate" &&
+      candidate.destination.ref.toUpperCase() === value.trim().toUpperCase())
+  );
+  if (exact) {
+    return { destination: exact.destination, token: exact.token, suggestion: null };
+  }
+  const suggestedKey = suggestReferences(
+    normalized,
+    candidates.map((candidate) => candidate.key),
+    1
+  )[0];
+  const suggestion = candidates.find((candidate) => candidate.key === suggestedKey);
+  return {
+    destination: null,
+    token: value,
+    suggestion: suggestion?.token ?? null
+  };
+}
+
+function showCustomTaxiFeedback(
+  message: string,
+  error: boolean,
+  correction: string | null = null,
+  automaticDestination: TaxiDestination | null = null
+): void {
+  const feedback = document.querySelector<HTMLElement>(
+    "#taxi-custom-feedback"
+  )!;
+  feedback.textContent = message;
+  feedback.className = `feedback ${error ? "error" : "success"}`;
+  setCustomTaxiRecovery(correction, automaticDestination);
+}
+
+function setCustomTaxiRecovery(
+  correction: string | null,
+  automaticDestination: TaxiDestination | null
+): void {
+  pendingCustomTaxiCorrection = correction;
+  pendingCustomTaxiDestination = automaticDestination;
+  const recovery = document.querySelector<HTMLElement>(
+    "#taxi-custom-recovery"
+  )!;
+  const correctionButton = document.querySelector<HTMLButtonElement>(
+    "#apply-custom-correction"
+  )!;
+  const automaticButton = document.querySelector<HTMLButtonElement>(
+    "#custom-auto-route"
+  )!;
+  correctionButton.hidden = !correction;
+  automaticButton.hidden = !automaticDestination;
+  recovery.hidden = !correction && !automaticDestination;
+}
+
+function findTaxiRoutes(destinationOverride?: TaxiDestination): void {
   const feedback = document.querySelector<HTMLElement>("#taxi-plan-feedback")!;
+  if (destinationOverride) {
+    const customFeedback = document.querySelector<HTMLElement>(
+      "#taxi-custom-feedback"
+    );
+    if (customFeedback) {
+      customFeedback.textContent = "";
+      customFeedback.className = "feedback";
+    }
+    setCustomTaxiRecovery(null, null);
+  }
   const position = currentAircraftCoordinate();
   if (!position || !currentAirportMap || !taxiGraph) {
     feedback.textContent = t("taxi.needPosition");
     feedback.className = "feedback error";
     return;
   }
-  const kind = document.querySelector<HTMLSelectElement>(
-    "#taxi-destination-kind"
-  )!.value;
-  let destination: TaxiDestination | undefined;
-  if (kind === "runway") {
-    const ref = document.querySelector<HTMLSelectElement>("#taxi-runway")!.value;
-    destination = taxiRunways.find((item) => item.ref === ref);
-  } else {
-    const input = document.querySelector<HTMLInputElement>("#taxi-gate")!;
-    const ref = input.value.trim().toUpperCase();
-    destination = taxiGates.find((item) =>
-      item.ref.toUpperCase() === ref ||
-      item.ref.toUpperCase().split(/[\/,]/).includes(ref)
-    );
-    if (!destination) {
-      feedback.textContent = t("taxi.chooseGate");
-      feedback.className = "feedback error";
-      input.focus();
-      return;
+  let destination: TaxiDestination | undefined = destinationOverride;
+  if (!destination) {
+    const kind = document.querySelector<HTMLSelectElement>(
+      "#taxi-destination-kind"
+    )!.value;
+    if (kind === "runway") {
+      const ref = document.querySelector<HTMLSelectElement>("#taxi-runway")!.value;
+      destination = taxiRunways.find((item) => item.ref === ref);
+    } else {
+      const input = document.querySelector<HTMLInputElement>("#taxi-gate")!;
+      const ref = input.value.trim().toUpperCase();
+      destination = taxiGates.find((item) =>
+        item.ref.toUpperCase() === ref ||
+        item.ref.toUpperCase().split(/[\/,]/).includes(ref)
+      );
+      if (!destination) {
+        feedback.textContent = t("taxi.chooseGate");
+        feedback.className = "feedback error";
+        input.focus();
+        return;
+      }
     }
   }
   if (!destination) {
@@ -371,9 +604,15 @@ function renderTaxiRouteOptions(): void {
     const heading = document.createElement("span");
     heading.className = "taxi-route-option-heading";
     const title = document.createElement("strong");
-    title.textContent = t("taxi.option", { number: index + 1 });
+    title.textContent = route.custom
+      ? t("taxi.customOption")
+      : t("taxi.option", { number: index + 1 });
     heading.append(title);
-    if (index === 0) {
+    if (route.custom) {
+      const badge = document.createElement("small");
+      badge.textContent = t("taxi.customExperimental");
+      heading.append(badge);
+    } else if (index === 0) {
       const badge = document.createElement("small");
       badge.textContent = t("taxi.recommended");
       heading.append(badge);
@@ -445,6 +684,16 @@ function clearTaxiRoute(): void {
   if (feedback) {
     feedback.textContent = "";
     feedback.className = "feedback";
+  }
+  const customFeedback = document.querySelector<HTMLElement>(
+    "#taxi-custom-feedback"
+  );
+  if (customFeedback) {
+    customFeedback.textContent = "";
+    customFeedback.className = "feedback";
+  }
+  if (document.querySelector("#taxi-custom-recovery")) {
+    setCustomTaxiRecovery(null, null);
   }
   if (document.querySelector("#taxi-route-options")) {
     renderTaxiRouteOptions();

@@ -194,6 +194,64 @@
                   type="button"
                   data-i18n="taxi.find">Find taxi routes</button>
           <p id="taxi-plan-feedback" class="feedback" role="status"></p>
+          <button id="toggle-custom-taxi-route"
+                  class="secondary-button taxi-custom-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  data-i18n="taxi.customToggle">
+            Enter Customized Taxi Route (Experimental)
+          </button>
+          <section id="taxi-custom-route"
+                   class="taxi-custom-route"
+                   aria-labelledby="taxi-custom-route-label"
+                   hidden>
+            <div class="field-label-row">
+              <label id="taxi-custom-route-label"
+                     for="taxi-custom-route-input"
+                     data-i18n="taxi.customLabel">Customized taxi route</label>
+              <span class="info-bubble custom-route-info">
+                <button class="info-icon"
+                        type="button"
+                        aria-label="Customized taxi route format"
+                        data-i18n-aria-label="taxi.customHelpAria"
+                        aria-describedby="taxi-custom-route-help">i</button>
+                <span id="taxi-custom-route-help"
+                      class="info-tooltip"
+                      role="tooltip">
+                  <span data-i18n="taxi.customHelp">
+                    Enter comma-separated taxiways and finish with a runway or
+                    gate. Example: D, E, H, T1, RWY01L. Gate example: A, B,
+                    GATE B19. Names must match this airport map.
+                  </span>
+                </span>
+              </span>
+            </div>
+            <input id="taxi-custom-route-input"
+                   type="text"
+                   autocomplete="off"
+                   spellcheck="false"
+                   data-i18n-placeholder="taxi.customPlaceholder"
+                   placeholder="D, E, H, T1, RWY01L" />
+            <button id="preview-custom-taxi-route"
+                    class="primary-button"
+                    type="button"
+                    data-i18n="taxi.customPreview">Preview customized route</button>
+            <p id="taxi-custom-feedback" class="feedback" role="status"></p>
+            <div id="taxi-custom-recovery"
+                 class="taxi-custom-recovery"
+                 hidden>
+              <button id="apply-custom-correction"
+                      class="secondary-button"
+                      type="button"
+                      data-i18n="taxi.customApplyFix"
+                      hidden>Use suggested correction</button>
+              <button id="custom-auto-route"
+                      class="text-button"
+                      type="button"
+                      data-i18n="taxi.customAuto"
+                      hidden>Find route automatically</button>
+            </div>
+          </section>
         </div>
         <section class="taxi-route-section" aria-labelledby="taxi-routes-heading">
           <div class="section-heading">

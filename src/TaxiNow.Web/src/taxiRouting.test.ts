@@ -6,7 +6,10 @@ import {
   buildTaxiGraph,
   listGateDestinations,
   listRunwayDestinations,
+  listTaxiwayRefs,
+  planCustomTaxiRoute,
   planTaxiRoutes,
+  suggestTaxiwayRefs,
   updateTaxiRouteProgress
 } from "./taxiRouting";
 
@@ -58,6 +61,44 @@ describe("taxi routing", () => {
     expect(routes[0]!.summary).toMatch(/^Gate 105 → /);
     expect(routes[0]!.summary).toContain("RWY09");
     expect(routes.every((route) => route.distanceMeters > 0)).toBe(true);
+  });
+
+  it("follows a valid customized taxiway sequence in order", () => {
+    const graph = buildTaxiGraph(airport);
+    const destination = listRunwayDestinations(airport).find(
+      (item) => item.ref === "09"
+    )!;
+    const route = planCustomTaxiRoute(
+      graph,
+      [0, 0],
+      destination,
+      ["A", "H", "Q"],
+      "Gate 105"
+    );
+
+    expect(route?.custom).toBe(true);
+    expect(route?.summary).toBe("Gate 105 → A → H → Q → RWY09");
+    expect(route?.coordinates.length).toBeGreaterThan(3);
+  });
+
+  it("rejects unavailable custom taxiways and suggests close map labels", () => {
+    const graph = buildTaxiGraph(airport);
+    const destination = listRunwayDestinations(airport)[0]!;
+
+    expect(listTaxiwayRefs(graph)).toEqual(["A", "B", "H", "Q"]);
+    expect(suggestTaxiwayRefs(graph, "A1")).toContain("A");
+    expect(
+      planCustomTaxiRoute(graph, [0, 0], destination, ["A1", "H"])
+    ).toBeNull();
+  });
+
+  it("prefers a similarly prefixed taxiway when suggesting a typo fix", () => {
+    const graph = buildTaxiGraph([
+      feature("eight", "taxiway", [[0, 0], [0.001, 0]], "8"),
+      feature("eb", "taxiway", [[0, 0], [0, 0.001]], "EB")
+    ]);
+
+    expect(suggestTaxiwayRefs(graph, "E8", 1)).toEqual(["EB"]);
   });
 
   it("clears passed geometry and produces a turn instruction", () => {
@@ -120,5 +161,20 @@ describe("taxi routing", () => {
     expect(routes.length).toBeGreaterThanOrEqual(3);
     expect(routes.length).toBeLessThanOrEqual(5);
     expect(routes[0]!.summary).toMatch(/^Gate B19 → .*RWY23$/);
+  });
+
+  it("accepts a displayed CYYZ taxiway sequence as a custom route", () => {
+    const fixture = ciyyzFixture as unknown as AirportMap;
+    const destination = listRunwayDestinations(fixture.features).find(
+      (runway) => runway.ref === "23"
+    )!;
+    const route = planCustomTaxiRoute(
+      buildTaxiGraph(fixture.features),
+      [-79.62991, 43.67643],
+      destination,
+      ["EB", "E", "H", "Q"]
+    );
+
+    expect(route?.summary).toBe("Aircraft → EB → E → H → Q → RWY23");
   });
 });
