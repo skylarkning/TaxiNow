@@ -995,7 +995,11 @@ footer {
 }
 
 .taxi-custom-toggle {
-  margin-top: 4px;
+  margin-top: 0;
+}
+
+#taxi-plan-feedback:empty {
+  display: none;
 }
 
 .taxi-custom-route {
