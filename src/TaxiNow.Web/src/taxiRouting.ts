@@ -22,6 +22,7 @@ interface GraphEdge {
 export interface TaxiGraph {
   nodes: GraphNode[];
   referenceLatitude: number;
+  refImportance: ReadonlyMap<string, number>;
 }
 
 export interface TaxiDestination {
@@ -159,7 +160,38 @@ export function buildTaxiGraph(features: AirportFeature[]): TaxiGraph {
     }
   }
 
-  return { nodes, referenceLatitude };
+  return {
+    nodes,
+    referenceLatitude,
+    refImportance: calculateTaxiwayImportance(nodes)
+  };
+}
+
+function calculateTaxiwayImportance(
+  nodes: GraphNode[]
+): ReadonlyMap<string, number> {
+  const junctionsByRef = new Map<string, Set<number>>();
+  for (const node of nodes) {
+    const refs = new Set(node.edges.map((edge) => edge.ref).filter(Boolean));
+    if (node.edges.length < 3 && refs.size < 2) {
+      continue;
+    }
+    for (const ref of refs) {
+      const junctions = junctionsByRef.get(ref) ?? new Set<number>();
+      junctions.add(node.id);
+      junctionsByRef.set(ref, junctions);
+    }
+  }
+  const maximumJunctions = Math.max(
+    1,
+    ...[...junctionsByRef.values()].map((junctions) => junctions.size)
+  );
+  return new Map(
+    [...junctionsByRef].map(([ref, junctions]) => [
+      ref,
+      junctions.size / maximumJunctions
+    ])
+  );
 }
 
 export function listRunwayDestinations(
@@ -468,17 +500,22 @@ export function updateTaxiRouteProgress(
 
   let maneuver: TaxiRouteProgress["maneuver"] = "arrive";
   if (transitionIndex >= 0 && nextRef) {
-    const inboundStart = route.coordinates[Math.max(0, transitionIndex - 1)]!;
+    const inboundStart = representativeInboundCoordinate(
+      route,
+      transitionIndex,
+      currentRef
+    );
     const turn = route.coordinates[transitionIndex]!;
-    const outboundEnd = route.coordinates[Math.min(
-      route.coordinates.length - 1,
-      transitionIndex + 1
-    )]!;
+    const outboundEnd = representativeOutboundCoordinate(
+      route,
+      transitionIndex,
+      nextRef
+    );
     const delta = signedBearingDelta(
       coordinateBearing(inboundStart, turn),
       coordinateBearing(turn, outboundEnd)
     );
-    maneuver = Math.abs(delta) < 28
+    maneuver = Math.abs(delta) < 15
       ? "straight"
       : delta > 0 ? "right" : "left";
   }
@@ -508,6 +545,58 @@ export function updateTaxiRouteProgress(
     maneuver,
     distanceToManeuverMeters
   };
+}
+
+// Taxiway junctions are commonly represented by several short curved
+// segments. Looking only at the first segment after a ref change can make a
+// real turn look straight, so use enough geometry on each named taxiway to
+// determine the direction of the upcoming maneuver.
+function representativeInboundCoordinate(
+  route: TaxiRoute,
+  transitionIndex: number,
+  currentRef: string
+): Coordinate {
+  let index = Math.max(0, transitionIndex - 1);
+  let coordinate = route.coordinates[index]!;
+  let coveredMeters = geographicDistanceMeters(
+    coordinate,
+    route.coordinates[transitionIndex]!
+  );
+  while (
+    coveredMeters < 40 &&
+    index > 0 &&
+    (route.edgeRefs[index - 1] ?? "") === currentRef
+  ) {
+    index--;
+    const previous = route.coordinates[index]!;
+    coveredMeters += geographicDistanceMeters(previous, coordinate);
+    coordinate = previous;
+  }
+  return coordinate;
+}
+
+function representativeOutboundCoordinate(
+  route: TaxiRoute,
+  transitionIndex: number,
+  nextRef: string
+): Coordinate {
+  let index = Math.min(route.coordinates.length - 1, transitionIndex + 1);
+  let coordinate = route.coordinates[index]!;
+  let coveredMeters = geographicDistanceMeters(
+    route.coordinates[transitionIndex]!,
+    coordinate
+  );
+  while (
+    coveredMeters < 40 &&
+    index < route.coordinates.length - 1 &&
+    (route.edgeRefs[index] ?? "") === nextRef
+  ) {
+    const following = route.coordinates[index + 1]!;
+    coveredMeters += geographicDistanceMeters(coordinate, following);
+    coordinate = following;
+    index++;
+  }
+  return coordinate;
 }
 
 function searchRoute(
@@ -556,13 +645,17 @@ function searchRoute(
           nextNode
         );
       const refChangePenalty = current.previousRef && edge.ref &&
-        current.previousRef !== edge.ref ? 16 : 0;
-      const unnamedPenalty = edge.ref ? 0 : 5;
+        current.previousRef !== edge.ref
+        ? taxiwayChangePenalty(graph, current.previousRef, edge.ref)
+        : 0;
+      const unnamedPenalty = edge.ref ? 0 : 12;
+      const importance = graph.refImportance.get(edge.ref) ?? 0;
+      const traversalCost = edge.distanceMeters * (1 - importance * 0.24);
       const alternativePenalty = edgePenalties.get(edge.key) ?? 0;
       const deterministicJitter = attempt === 0
         ? 0
         : ((hashString(`${edge.key}:${attempt}`) % 17) / 17) * 3;
-      const cost = current.cost + edge.distanceMeters + turnPenalty +
+      const cost = current.cost + traversalCost + turnPenalty +
         refChangePenalty + unnamedPenalty + alternativePenalty +
         deterministicJitter;
       const key = `${edge.to}|${edge.ref}|${current.node}`;
@@ -606,6 +699,18 @@ function searchRoute(
     cost: finalState.cost,
     distanceMeters: finalState.distanceMeters
   };
+}
+
+function taxiwayChangePenalty(
+  graph: TaxiGraph,
+  currentRef: string,
+  nextRef: string
+): number {
+  const currentImportance = graph.refImportance.get(currentRef) ?? 0;
+  const nextImportance = graph.refImportance.get(nextRef) ?? 0;
+  const leavingMainTaxiway = Math.max(0, currentImportance - nextImportance);
+  const joiningMainTaxiway = Math.max(0, nextImportance - currentImportance);
+  return Math.max(6, 18 + leavingMainTaxiway * 30 - joiningMainTaxiway * 10);
 }
 
 function searchCustomRoute(

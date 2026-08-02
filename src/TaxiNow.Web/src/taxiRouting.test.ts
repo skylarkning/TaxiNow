@@ -63,6 +63,35 @@ describe("taxi routing", () => {
     expect(routes.every((route) => route.distanceMeters > 0)).toBe(true);
   });
 
+  it("prefers a highly connected main taxiway over a marginal shortcut", () => {
+    const features = [
+      feature("main", "taxiway", [
+        [0, 0],
+        [0.0005, 0.0001],
+        [0.001, 0.00012],
+        [0.0015, 0.0001],
+        [0.002, 0]
+      ], "A"),
+      feature("shortcut", "taxiway", [[0, 0], [0.002, 0]], "Z"),
+      feature("branch-b", "taxiway", [[0.0005, 0.0001], [0.0005, 0.0005]], "B"),
+      feature("branch-c", "taxiway", [[0.001, 0.00012], [0.001, 0.0005]], "C"),
+      feature("branch-d", "taxiway", [[0.0015, 0.0001], [0.0015, 0.0005]], "D"),
+      feature("destination", "runway", [[0.002, 0], [0.012, 0]], "09/27")
+    ];
+    const graph = buildTaxiGraph(features);
+    const destination = listRunwayDestinations(features).find(
+      (item) => item.ref === "09"
+    )!;
+
+    const route = planTaxiRoutes(graph, [0, 0], destination, "Aircraft", 1)[0]!;
+
+    expect(graph.refImportance.get("A")).toBeGreaterThan(
+      graph.refImportance.get("Z") ?? 0
+    );
+    expect(route.summary).toContain(" → A → ");
+    expect(route.summary).not.toContain(" → Z → ");
+  });
+
   it("follows a valid customized taxiway sequence in order", () => {
     const graph = buildTaxiGraph(airport);
     const destination = listRunwayDestinations(airport).find(
@@ -129,6 +158,37 @@ describe("taxi routing", () => {
     expect(noisyBackwardSample.remainingCoordinates[1]).not.toEqual(
       route.coordinates[1]
     );
+  });
+
+  it("recognizes a curved taxiway transition as an upcoming right turn", () => {
+    const route = {
+      id: "curved-transition",
+      coordinates: [
+        [0, 0],
+        [0, -0.001],
+        [0, -0.00112],
+        [-0.00025, -0.00135],
+        [-0.00055, -0.00135]
+      ] as [number, number][],
+      edgeRefs: ["E", "H1", "H1", "H1"],
+      distanceMeters: 200,
+      score: 200,
+      turnCount: 1,
+      summary: "Aircraft → E → H1 → RWY01L",
+      destination: {
+        kind: "runway" as const,
+        ref: "01L",
+        label: "RWY01L",
+        coordinate: [-0.00055, -0.00135] as [number, number]
+      }
+    };
+
+    const progress = updateTaxiRouteProgress(route, [0, -0.0005]);
+
+    expect(progress.currentRef).toBe("E");
+    expect(progress.nextRef).toBe("H1");
+    expect(progress.maneuver).toBe("right");
+    expect(progress.distanceToManeuverMeters).toBeGreaterThan(40);
   });
 
   it("does not route over a closed taxiway", () => {

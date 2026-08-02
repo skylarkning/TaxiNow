@@ -621,14 +621,10 @@ function renderTaxiRouteOptions(): void {
     summary.className = "taxi-route-summary";
     summary.textContent = route.summary;
     const details = document.createElement("small");
-    details.textContent = t(
-      route.turnCount === 1 ? "taxi.distanceOneTurn" : "taxi.distance",
-      {
+    details.textContent = t("taxi.distance", {
       distance: formatTaxiDistance(route.distanceMeters),
-      minutes: Math.max(1, Math.round(route.distanceMeters / 7.7 / 60)),
-      turns: route.turnCount
-      }
-    );
+      minutes: Math.max(1, Math.round(route.distanceMeters / 7.7 / 60))
+    });
     button.append(heading, summary, details);
     button.addEventListener("click", () => {
       selectTaxiRoute(route);
@@ -2302,14 +2298,21 @@ function updateActiveTaxiGuidance(
     });
     symbol.textContent = "!";
   } else if (progress.maneuver === "left" && progress.nextRef) {
-    instruction.textContent = t("taxi.turnLeft", { taxiway: progress.nextRef });
+    instruction.textContent = t("taxi.turnLeft", {
+      taxiway: progress.nextRef,
+      distance: formatTaxiDistance(progress.distanceToManeuverMeters)
+    });
     symbol.textContent = "↰";
   } else if (progress.maneuver === "right" && progress.nextRef) {
-    instruction.textContent = t("taxi.turnRight", { taxiway: progress.nextRef });
+    instruction.textContent = t("taxi.turnRight", {
+      taxiway: progress.nextRef,
+      distance: formatTaxiDistance(progress.distanceToManeuverMeters)
+    });
     symbol.textContent = "↱";
   } else if (progress.nextRef) {
     instruction.textContent = t("taxi.continueOn", {
-      taxiway: progress.nextRef
+      taxiway: progress.nextRef,
+      distance: formatTaxiDistance(progress.distanceToManeuverMeters)
     });
     symbol.textContent = "↑";
   } else if (progress.remainingMeters < 70) {
@@ -2323,12 +2326,9 @@ function updateActiveTaxiGuidance(
     });
     symbol.textContent = "↑";
   }
-  const maneuverDistance = progress.nextRef
-    ? `${formatTaxiDistance(progress.distanceToManeuverMeters)} · `
-    : "";
-  meta.textContent = `${maneuverDistance}${t("taxi.remaining", {
+  meta.textContent = t("taxi.remaining", {
     distance: formatTaxiDistance(progress.remainingMeters)
-  })}`;
+  });
 
   if (
     frameTime - lastTaxiCameraAt >= 900 &&

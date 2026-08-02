@@ -73,7 +73,10 @@ their surrounding white canvas and create the required output sizes.
 - V1.1 adds local taxi-route planning from the synchronized aircraft position
   to an individual runway end or gate/stand. The planner builds a connected
   graph from downloaded taxiway and taxilane centerlines, penalizes excessive
-  turns, reversals, unnamed links, and needless taxiway changes, and offers up
+  turns, reversals, unnamed links, and needless taxiway changes. It also ranks
+  taxiways by the number of junctions they serve so routes leave gate branches
+  for well-connected main taxiways and remain on them when practical, while
+  still bounding detours. The planner offers up
   to five reasonable alternatives instead of treating geometric distance as
   the only objective. Selecting an option highlights a route such as
   `Gate 105 → A → H → Q → RWY23` in blue. Guidance progressively removes

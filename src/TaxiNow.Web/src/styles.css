@@ -575,32 +575,31 @@ footer {
 .taxi-guidance {
   position: fixed;
   z-index: 18;
-  top: 76px;
-  left: 50%;
-  width: min(650px, calc(100vw - 32px));
-  min-height: 82px;
+  bottom: 38px;
+  left: 16px;
+  width: min(325px, calc(100vw - 32px));
+  min-height: 70px;
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  padding: 11px 13px;
+  gap: 9px;
+  padding: 9px 10px;
   border: 1px solid rgba(40, 169, 255, 0.62);
   border-radius: 14px;
   background: rgba(5, 20, 32, 0.95);
   box-shadow: 0 14px 42px rgba(0, 0, 0, 0.46);
   backdrop-filter: blur(12px);
-  transform: translateX(-50%);
 }
 
 .taxi-guidance-symbol {
   display: grid;
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
   place-items: center;
   border-radius: 12px;
   color: #fff;
   background: #168fdd;
-  font-size: 30px;
+  font-size: 26px;
   font-weight: 900;
 }
 
@@ -1704,8 +1703,9 @@ html[data-locale] .welcome-languages section[lang] {
   }
 
   .taxi-guidance {
-    top: 68px;
-    width: calc(100vw - 16px);
+    bottom: 36px;
+    left: 8px;
+    width: min(325px, calc(100vw - 16px));
     grid-template-columns: 44px minmax(0, 1fr) auto;
     gap: 8px;
     padding: 9px;
