@@ -64,12 +64,18 @@
               <span id="network-access-help"
                     class="info-tooltip"
                     role="tooltip">
-                <span lang="en">
+                <span class="localized-network-copy"
+                      data-i18n="access.help">
                   On another device connected to the same network, such as a
                   phone or iPad, enter this local IP address in its browser.
                   Firefox is the recommended browser for TaxiNow.
                 </span>
-                <span lang="zh-Hans">
+                <span class="network-copy-legacy" lang="en">
+                  On another device connected to the same network, such as a
+                  phone or iPad, enter this local IP address in its browser.
+                  Firefox is the recommended browser for TaxiNow.
+                </span>
+                <span class="network-copy-legacy" lang="zh-Hans">
                   在连接同一网络的手机或 iPad 等设备浏览器中输入此本地 IP
                   地址即可访问。推荐使用 Firefox 浏览器。
                 </span>
@@ -117,6 +123,20 @@
                       data-language-option="zh-Hans"
                       aria-checked="false">
                 <span>简体中文</span>
+                <span class="language-check" aria-hidden="true">✓</span>
+              </button>
+              <button type="button"
+                      role="menuitemradio"
+                      data-language-option="fr"
+                      aria-checked="false">
+                <span>Français</span>
+                <span class="language-check" aria-hidden="true">✓</span>
+              </button>
+              <button type="button"
+                      role="menuitemradio"
+                      data-language-option="de"
+                      aria-checked="false">
+                <span>Deutsch</span>
                 <span class="language-check" aria-hidden="true">✓</span>
               </button>
             </div>
@@ -312,7 +332,16 @@
                 <span id="download-speed-help"
                       class="info-tooltip"
                       role="tooltip">
-                  <span lang="en">
+                  <span class="localized-download-copy">
+                    <strong data-i18n="download.helpLabel">Why can map downloads be slow?</strong>
+                    <span data-i18n="download.typical">Typical: 5–30 seconds</span>
+                    <span data-i18n="download.busy">Busy or complex airport: 30–90 seconds</span>
+                    <span data-i18n="download.rate">OSM server processing normally takes longer than the actual data transfer.</span>
+                    <span data-i18n="download.osmLimit">TaxiNow stops waiting for OSM after 120 seconds and then tries fallback sources.</span>
+                    <span data-i18n="download.normal">An animated progress bar is normal while OSM calculates the map.</span>
+                    <span class="china-network-note" data-i18n="download.chinaNetwork"></span>
+                  </span>
+                  <span class="download-copy-legacy" lang="en">
                     <strong data-i18n="download.helpLabel">
                       Why can map downloads be slow?
                     </strong>
@@ -335,7 +364,7 @@
                       the map.
                     </span>
                   </span>
-                  <span lang="zh-Hans">
+                  <span class="download-copy-legacy" lang="zh-Hans">
                     <strong>为什么地图下载可能较慢？</strong>
                     <span>通常：5–30 秒</span>
                     <span>繁忙或复杂机场：30–90 秒</span>
@@ -383,7 +412,12 @@
           </div>
           <div id="country-fields" class="form-grid" hidden>
             <div class="country-download-notice full-row">
-              <div lang="en">
+              <div class="localized-download-copy">
+                <strong data-i18n="download.batchTitle">Large batch downloads take time.</strong>
+                <p data-i18n="download.batchBody">For the fastest setup, download only the airports you need by ICAO, or enter a province/state to narrow a country batch. Already installed airports are skipped automatically. When an official TaxiNow regional pack is available, it is verified and installed first; only missing airports use on-demand sources.</p>
+                <p data-i18n="download.batchEstimate">Typical planning range using public OSM: US 8–40 hours; CA/AU 1–8 hours; DE/FR 30 minutes–3 hours; CN/GB 20 minutes–2 hours; JP 15–75 minutes. Actual time varies with OSM load, airport complexity, and network conditions. One parallel task is normally fastest for OSM.</p>
+              </div>
+              <div class="download-copy-legacy" lang="en">
                 <strong>Large batch downloads take time.</strong>
                 <p>
                   For the fastest setup, download only the airports you need
@@ -401,7 +435,7 @@
                   One parallel task is normally fastest for OSM.
                 </p>
               </div>
-              <div lang="zh-Hans">
+              <div class="download-copy-legacy" lang="zh-Hans">
                 <strong>大批量下载需要一定时间。</strong>
                 <p>
                   建议优先按 ICAO 下载实际需要的机场，也可以填写省/州来缩小整国批量范围；
@@ -429,14 +463,21 @@
                   <span id="country-code-help"
                         class="info-tooltip"
                         role="tooltip">
-                    <span lang="en">
+                    <span class="localized-download-copy">
+                      <span data-i18n="download.countryCodeText">Use the ISO 3166-1 two-letter country/region code, such as CA, US, or GB.</span>
+                      <a href="https://www.iso.org/iso-3166-country-codes.html"
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         data-i18n="download.countryCodeLink">Find a code at ISO</a>.
+                    </span>
+                    <span class="download-copy-legacy" lang="en">
                       Use the ISO 3166-1 two-letter country/region code, such as
                       CA, US, or GB.
                       <a href="https://www.iso.org/iso-3166-country-codes.html"
                          target="_blank"
                          rel="noopener noreferrer">Find a code at ISO</a>.
                     </span>
-                    <span lang="zh-Hans">
+                    <span class="download-copy-legacy" lang="zh-Hans">
                       使用 ISO 3166-1 两位国家/地区代码，例如 CN、CA 或 JP。
                       <a href="https://www.iso.org/iso-3166-country-codes.html"
                          target="_blank"
@@ -474,7 +515,8 @@
                   <span id="parallel-download-help"
                         class="info-tooltip"
                         role="tooltip">
-                    <span lang="en">
+                    <span class="localized-download-copy" data-i18n="download.parallelHelp">Public OSM servers use per-user request slots and cooldowns, so several simultaneous OSM queries are often slower than one. TaxiNow serializes OSM requests to avoid self-throttling. Regional map-pack files can be downloaded safely in parallel. Higher values can overlap cached work, conversion, and fallback sources, but use more CPU and memory. Use 1 for on-demand OSM; higher values are useful when regional packs are listed.</span>
+                    <span class="download-copy-legacy" lang="en">
                       Public OSM servers use per-user request slots and
                       cooldowns, so several simultaneous OSM queries are often
                       slower than one. TaxiNow now serializes OSM requests to
@@ -484,7 +526,7 @@
                       but use more CPU and memory. Use 1 for on-demand OSM;
                       higher values are useful when regional packs are listed.
                     </span>
-                    <span lang="zh-Hans">
+                    <span class="download-copy-legacy" lang="zh-Hans">
                       公共 OSM 服务器按用户分配请求槽位并设置冷却时间，因此多个 OSM
                       请求同时运行往往比单个请求更慢。TaxiNow 现在会串行发送 OSM
                       请求以避免自我限流；地区地图包文件可以安全地并行下载。较高数值还可
@@ -698,7 +740,126 @@
                   aria-label="Close About TaxiNow"
                   data-i18n-aria-label="about.close">×</button>
         </div>
-        <div class="about-language" lang="en">
+        <div class="about-localized">
+          <p>
+            <span data-i18n="about.developedBy">TaxiNow developed by Sky Ning</span>
+            (GitHub:
+            <a href="https://github.com/skylarkning"
+               target="_blank"
+               rel="noopener noreferrer">skylarkning</a>).
+          </p>
+          <p>
+            <span data-i18n="about.officialPrefix">Official releases:</span>
+            <a href="https://flightsim.to/addon/112712/taxinow"
+               target="_blank"
+               rel="noopener noreferrer">flightsim.to</a>
+            <span data-i18n="about.and">and</span>
+            <a href="https://github.com/skylarkning/TaxiNow-Release"
+               target="_blank"
+               rel="noopener noreferrer">GitHub TaxiNow-Release</a>
+            <span data-i18n="about.only">only.</span>
+          </p>
+          <p>
+            <span data-i18n="about.introduction">Introduction:</span>
+            <a href="https://github.com/skylarkning/TaxiNow-Release#english"
+               target="_blank"
+               rel="noopener noreferrer">English</a>
+            /
+            <a href="https://github.com/skylarkning/TaxiNow-Release#中文"
+               target="_blank"
+               rel="noopener noreferrer">中文</a>
+          </p>
+          <p data-i18n="about.free">
+            TaxiNow is a 100% free application for personal flight simulator use only.
+          </p>
+          <div class="about-warning">
+            <strong data-i18n="about.warning">
+              Commercial use/real-world navigation using TaxiNow is strictly prohibited.
+            </strong>
+            <p data-i18n="about.scammed">You have been scammed if you paid for this app.</p>
+            <p data-i18n="about.asIs">TaxiNow is provided “AS IS”, without warranties of any kind.</p>
+          </div>
+          <p data-i18n="about.sourceReview">
+            Source code is not publicly available. Qualified independent security or privacy experts may request limited review access solely to verify TaxiNow's security and privacy. Review access does not grant modification, disclosure, or redistribution rights.
+          </p>
+          <section class="about-faq" aria-label="Frequently asked questions"
+                   data-i18n-aria-label="faq.aria">
+            <h2 data-i18n="faq.heading">Frequently asked questions and technical limitations</h2>
+            <details>
+              <summary data-i18n="faq.platform.q">Which simulator platforms are supported?</summary>
+              <p data-i18n="faq.platform.a">TaxiNow supports Microsoft Flight Simulator 2020 and Microsoft Flight Simulator 2024 on Windows.</p>
+            </details>
+            <details>
+              <summary data-i18n="faq.xplane.q">Why is X-Plane not supported?</summary>
+              <p data-i18n="faq.xplane.a">I do not fly with X-Plane regularly and I am not familiar enough with the X-Plane SDK to provide reliable support. I currently have no plans for X-Plane simulator integration, but I may consider it in the future if there is sufficient demand. This is separate from TaxiNow using selected X-Plane Scenery Gateway data as a fallback map-data source.</p>
+            </details>
+            <details>
+              <summary data-i18n="faq.feedback.q">How do I report an issue or submit feedback?</summary>
+              <p>
+                <span data-i18n="faq.feedback.before">Please leave a comment on TaxiNow's official</span>
+                <a href="https://flightsim.to/addon/112712/taxinow"
+                   target="_blank"
+                   rel="noopener noreferrer">flightsim.to</a>
+                <span data-i18n="faq.feedback.after">page. Include the airport ICAO, simulator version, TaxiNow version and internal build number, and a screenshot when useful.</span>
+              </p>
+            </details>
+            <details>
+              <summary data-i18n="faq.free.q">Will you charge me for TaxiNow in the future?</summary>
+              <p data-i18n="faq.free.a">No. TaxiNow is 100% free and I intend to keep it free. TaxiNow uses open-source data and technology, and charging for access could constitute commercial use. I created TaxiNow as a free tool and a gift to my fellow flight-simulation enthusiasts, and I will keep it free to the best of my ability.</p>
+            </details>
+            <details>
+              <summary data-i18n="faq.privacy.q">Do you collect any data? Is TaxiNow safe to use?</summary>
+              <p data-i18n="faq.privacy.a1">I do not collect or upload personal information, simulator telemetry, usage analytics, crash reports, or diagnostic data. Aircraft position remains on your computer and local network. TaxiNow does not need a continuous internet connection; internet access is required only when downloading map assets. During a download, TaxiNow sends the requested airport or region to the relevant third-party map-data provider or official TaxiNow map-pack host.</p>
+              <p data-i18n="faq.privacy.a2">I do not currently make the source code public in order to reduce unauthorized modification and redistribution. Qualified independent security or privacy experts may request limited source-review access solely to verify TaxiNow's security and privacy. This does not grant modification, disclosure, or redistribution rights.</p>
+            </details>
+            <details>
+              <summary data-i18n="faq.donate.q">Thank you for making TaxiNow. Can I donate to you?</summary>
+              <p data-i18n="faq.donate.a">Thank you for your kindness. I do not currently accept donations, so TaxiNow can remain a purely free project. A five-star review and constructive feedback are always greatly appreciated.</p>
+            </details>
+            <details id="faq-map-correctness-localized">
+              <summary data-i18n="faq.map.q">Can TaxiNow guarantee every airport map is correct?</summary>
+              <p data-i18n="faq.map.a">No. TaxiNow combines OpenStreetMap, official aviation GIS where available, open global building footprints, OurAirports, and selected X-Plane operational details. Source coverage, age, and precision vary by airport and country. TaxiNow cannot guarantee that every runway, taxiway, stand, terminal outline, or label is complete or correct. TaxiNow does not maintain manual per-airport drawing corrections.</p>
+            </details>
+            <details>
+              <summary data-i18n="faq.terminal.q">Why can a terminal shape or “Terminal X” label be missing?</summary>
+              <p data-i18n="faq.terminal.a">Some source datasets contain only an unnamed building footprint, only a terminal name point, or neither. TaxiNow attempts to match buildings to gates, aprons, terminal labels, and nearby accepted terminal geometry, but it will not invent a terminal number when no reliable name or number exists.</p>
+            </details>
+            <details>
+              <summary data-i18n="faq.broken.q">Why do I see missing or broken terminal buildings?</summary>
+              <p data-i18n="faq.broken.a1">First check the map source shown at the bottom of the map. If it shows X-Plane Scenery Gateway, TaxiNow used fallback data because it could not obtain usable OpenStreetMap data. Delete the airport from Downloaded Asset and download it again; a retry can sometimes obtain more complete OSM terminal geometry.</p>
+              <p>
+                <span data-i18n="faq.broken.a2">If several downloads still use X-Plane Scenery Gateway, usable OSM airport data is probably unavailable. X-Plane airport data may contain missing, unnamed, or fragmented terminal shapes. See also</span>
+                <a href="#faq-map-correctness-localized" data-i18n="faq.map.q">Can TaxiNow guarantee every airport map is correct?</a>
+              </p>
+            </details>
+            <details>
+              <summary data-i18n="faq.warp.q">Why is my aircraft position out of sync after using warp?</summary>
+              <p data-i18n="faq.warp.a">This can be normal because the simulator may not publish the updated aircraft position immediately after a warp or teleport. First click the position-refresh button above the zoom controls. If the position is still stale, begin moving the aircraft; the map should update when the simulator sends its next position change.</p>
+            </details>
+            <details>
+              <summary data-i18n="faq.packs.q">How do fast country downloads work?</summary>
+              <p data-i18n="faq.packs.a">Where an official TaxiNow regional pack exists, the app downloads a preprocessed, compressed, checksum-verified pack and then uses on-demand sources only for airports missing from that pack. Countries not yet preprocessed can still take considerably longer.</p>
+            </details>
+            <details>
+              <summary data-i18n="faq.routing.q">Can I treat a planned taxi route as an ATC clearance?</summary>
+              <p data-i18n="faq.routing.a">No. Automatic routes use a generic pathfinding algorithm and might not reflect the real taxi route. The planner cannot reliably account for taxiway direction, wingspan and aircraft-size limits, temporary closures, local procedures, or live ATC instructions. Always follow ATC and airport signage. If you do not like an automatic route, use Enter Customized Taxi Route to highlight the route you intend to follow.</p>
+            </details>
+            <details>
+              <summary data-i18n="faq.real.q">Is TaxiNow suitable for real-world navigation?</summary>
+              <p data-i18n="faq.real.a">No. Maps may be incomplete, outdated, inferred, or inaccurate. TaxiNow is exclusively for personal flight-simulator use.</p>
+            </details>
+          </section>
+          <p class="about-version">
+            <span data-i18n="about.versionLabel">Version:</span>
+            <strong id="about-version-localized">V1.1</strong>
+            (<span data-i18n="about.buildDateLabel">Build date:</span>
+            <span id="about-build-date-localized">August 2, 2026</span>).
+            <br />
+            <span data-i18n="about.internalBuildLabel">Internal build:</span>
+            <strong id="about-build-id-localized">102</strong>.
+          </p>
+        </div>
+        <div class="about-language about-legacy" lang="en">
         <p>
           TaxiNow Developed by Sky Ning
           (GitHub:
@@ -908,7 +1069,7 @@
           Internal build: <strong id="about-build-id">102</strong>.
         </p>
         </div>
-        <div class="about-chinese about-language" lang="zh-Hans">
+        <div class="about-chinese about-language about-legacy" lang="zh-Hans">
           <p>
             TaxiNow 由 Sky Ning 开发
             （GitHub：

@@ -711,6 +711,36 @@ function applyProductMetadata(status: AppStatus): void {
   document.title = `TaxiNow ${status.displayVersion}`;
   document.querySelector("#footer-version")!.textContent =
     status.displayVersion;
+  const localizedVersion = document.querySelector("#about-version-localized");
+  if (localizedVersion) {
+    localizedVersion.textContent = status.displayVersion;
+  }
+  const localizedBuildDate = document.querySelector(
+    "#about-build-date-localized"
+  );
+  if (localizedBuildDate) {
+    const parsedBuildDate = new Date(`${status.buildDate} 00:00:00 UTC`);
+    const dateLocales: Record<ReturnType<typeof getLocale>, string> = {
+      en: "en-US",
+      "zh-Hans": "zh-CN",
+      fr: "fr-FR",
+      de: "de-DE"
+    };
+    localizedBuildDate.textContent = Number.isNaN(parsedBuildDate.valueOf())
+      ? status.buildDate
+      : new Intl.DateTimeFormat(dateLocales[getLocale()], {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        timeZone: "UTC"
+      }).format(parsedBuildDate);
+  }
+  const localizedBuildId = document.querySelector(
+    "#about-build-id-localized"
+  );
+  if (localizedBuildId) {
+    localizedBuildId.textContent = String(status.internalBuildId);
+  }
   document.querySelector("#about-version")!.textContent =
     status.displayVersion;
   document.querySelector("#about-build-date")!.textContent =
@@ -1293,12 +1323,15 @@ function createAssetGroupSummary(
   name.textContent = label;
   const metadata = document.createElement("span");
   metadata.className = "asset-group-metadata";
-  metadata.textContent = t("storage.groupMeta", {
-    count: assets.length,
-    size: formatBytes(
-      assets.reduce((sum, asset) => sum + asset.sizeBytes, 0)
-    )
-  });
+  metadata.textContent = t(
+    assets.length === 1 ? "storage.groupMetaOne" : "storage.groupMeta",
+    {
+      count: assets.length,
+      size: formatBytes(
+        assets.reduce((sum, asset) => sum + asset.sizeBytes, 0)
+      )
+    }
+  );
   const actions = document.createElement("span");
   actions.className = "asset-group-actions";
   const remove = document.createElement("button");
@@ -1599,16 +1632,16 @@ function formatSeconds(value: number): string {
   const minutes = Math.floor((seconds % 3600) / 60);
   const remainder = seconds % 60;
   if (hours > 0) {
-    return getLocale() === "zh-Hans"
-      ? `${hours}小时 ${minutes}分`
-      : `${hours}h ${minutes}m`;
+    return `${formatDurationUnit(hours, "hour")} ${
+      formatDurationUnit(minutes, "minute")
+    }`;
   }
   if (minutes > 0) {
-    return getLocale() === "zh-Hans"
-      ? `${minutes}分 ${remainder}秒`
-      : `${minutes}m ${remainder}s`;
+    return `${formatDurationUnit(minutes, "minute")} ${
+      formatDurationUnit(remainder, "second")
+    }`;
   }
-  return getLocale() === "zh-Hans" ? `${seconds}秒` : `${seconds}s`;
+  return formatDurationUnit(seconds, "second");
 }
 
 function formatTimeSpan(value: string): string {
@@ -1623,18 +1656,33 @@ function formatTimeSpan(value: string): string {
   const minutes = Number(match[3] || 0);
   const seconds = Number(match[4] || 0);
   if (hours > 0) {
-    return getLocale() === "zh-Hans"
-      ? `${hours}小时 ${minutes}分`
-      : `${hours}h ${minutes}m`;
+    return `${formatDurationUnit(hours, "hour")} ${
+      formatDurationUnit(minutes, "minute")
+    }`;
   }
   if (minutes > 0) {
-    return getLocale() === "zh-Hans"
-      ? `${minutes}分 ${seconds}秒`
-      : `${minutes}m ${seconds}s`;
+    return `${formatDurationUnit(minutes, "minute")} ${
+      formatDurationUnit(seconds, "second")
+    }`;
   }
-  return getLocale() === "zh-Hans"
-    ? `${Math.max(1, seconds)}秒`
-    : `${Math.max(1, seconds)}s`;
+  return formatDurationUnit(Math.max(1, seconds), "second");
+}
+
+function formatDurationUnit(
+  value: number,
+  unit: "hour" | "minute" | "second"
+): string {
+  const locales: Record<ReturnType<typeof getLocale>, string> = {
+    en: "en-US",
+    "zh-Hans": "zh-CN",
+    fr: "fr-FR",
+    de: "de-DE"
+  };
+  return new Intl.NumberFormat(locales[getLocale()], {
+    style: "unit",
+    unit,
+    unitDisplay: "narrow"
+  }).format(value);
 }
 
 function createEmptyState(message: string): HTMLParagraphElement {

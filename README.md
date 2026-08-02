@@ -118,9 +118,10 @@ their surrounding white canvas and create the required output sizes.
   names are propagated to accepted unnamed footprints. X-Plane Gateway
   terminal facades remain excluded whenever a stronger footprint exists,
   preventing modular scenery pieces from replacing continuous terminals.
-- English and Simplified Chinese are selectable from the header. Download
-  guidance, statuses, controls, dialogs, and the downloaded-asset hierarchy
-  are localized.
+- English, Simplified Chinese, French, and German are selectable from the
+  header. Download guidance, statuses, controls, dialogs, About/FAQ content,
+  and the downloaded-asset hierarchy are localized. The first-run welcome
+  remains bilingual in English and Chinese.
 - Header airport search switches among installed maps. Entering a missing
   four-character ICAO code offers an immediate download beside the search.
 - Installed assets are grouped as country/region → province/state → airport,

@@ -1,6 +1,6 @@
-export type AppLocale = "en" | "zh-Hans";
+export type AppLocale = "en" | "zh-Hans" | "fr" | "de";
 
-type LocalizedRegionName = {
+type LocalizedRegionName = Partial<Record<AppLocale, string>> & {
   en: string;
   "zh-Hans": string;
 };
@@ -103,7 +103,12 @@ export function formatCountryName(
 ): string {
   try {
     return new Intl.DisplayNames(
-      [locale === "zh-Hans" ? "zh-CN" : "en"],
+      [{
+        "zh-Hans": "zh-CN",
+        fr: "fr-FR",
+        de: "de-DE",
+        en: "en"
+      }[locale]],
       { type: "region" }
     ).of(code.toUpperCase()) || code;
   } catch {

@@ -20,6 +20,22 @@ html[data-locale="zh-Hans"] [lang="en"] {
   display: none !important;
 }
 
+.about-legacy {
+  display: none !important;
+}
+
+.download-copy-legacy {
+  display: none !important;
+}
+
+.network-copy-legacy {
+  display: none !important;
+}
+
+html[data-locale]:not([data-locale="zh-Hans"]) .china-network-note {
+  display: none !important;
+}
+
 html,
 body,
 #app {

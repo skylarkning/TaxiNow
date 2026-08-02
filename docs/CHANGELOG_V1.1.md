@@ -27,7 +27,7 @@ adds local taxi-route planning and live ground guidance.
   maneuver distance, remaining distance, arrival status, and an off-route
   warning.
 - Removes passed route geometry progressively as the aircraft taxis.
-- Includes full English and Simplified Chinese localization.
+- Includes full English, Simplified Chinese, French, and German localization.
 - Adds an experimental customized-route editor using comma-separated clearance
   style input such as `D, E, H, T1, RWY01L` or `A, B, GATE B19`.
 - Validates taxiway and destination names against the active airport, suggests
@@ -67,7 +67,7 @@ TaxiNow V1.1 是首个结束 Beta 阶段的正式版本。在保留 Beta 6 稳�
 - 开始引导后提供航向朝上的地图跟随、前方左转/右转/继续直行提示、操作距离、
   剩余距离、到达状态和偏航提醒。
 - 飞机经过的路线会从地图上逐段清除。
-- 完整支持英文与简体中文界面。
+- 完整支持英文、简体中文、法语和德语界面。
 - 新增实验性自定义路线输入，支持 `D, E, H, T1, RWY01L` 或
   `A, B, GATE B19` 等使用逗号分隔的类似 ATC 滑行许可格式。
 - TaxiNow 会根据当前机场地图校验滑行道和目的地，对可能的拼写错误提供修正建议，

@@ -1,4 +1,9 @@
 import type { AppLocale } from "./regionNames";
+import {
+  frenchTranslations,
+  germanTranslations
+} from "./localization.fr-de";
+import { extendedTranslations } from "./localization.extended";
 
 const STORAGE_KEY = "taxinow.language";
 
@@ -374,15 +379,22 @@ const translations: Record<AppLocale, Record<string, string>> = {
     "feedback.queued": "正在将 {scope} 加入队列…",
     "feedback.downloadQueued": "下载任务已加入队列。",
     "feedback.cleared": "已清除完成的下载活动。"
-  }
+  },
+  fr: frenchTranslations,
+  de: germanTranslations
 };
+
+for (const locale of Object.keys(translations) as AppLocale[]) {
+  Object.assign(translations[locale], extendedTranslations[locale]);
+}
 
 let currentLocale: AppLocale = "en";
 
 function storedLocale(): AppLocale {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === "zh-Hans"
-      ? "zh-Hans"
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return stored === "zh-Hans" || stored === "fr" || stored === "de"
+      ? stored
       : "en";
   } catch {
     return "en";
@@ -391,6 +403,10 @@ function storedLocale(): AppLocale {
 
 export function getLocale(): AppLocale {
   return currentLocale;
+}
+
+export function getTranslationKeys(locale: AppLocale): string[] {
+  return Object.keys(translations[locale]).sort();
 }
 
 export function t(
@@ -435,6 +451,30 @@ export function applyDocumentTranslations(): void {
     )
   ) {
     element.title = t(element.dataset.i18nTitle!);
+  }
+  normalizeSimplifiedChineseSpacing(document);
+}
+
+const simplifiedChineseSpacing = new RegExp(
+  "(?<=[\\p{Script=Han}\\u3000-\\u303f\\uff00-\\uffef])\\s+" +
+  "(?=[\\p{Script=Han}\\u3000-\\u303f\\uff00-\\uffef])",
+  "gu"
+);
+
+export function normalizeSimplifiedChineseText(value: string): string {
+  return value.replace(simplifiedChineseSpacing, "");
+}
+
+function normalizeSimplifiedChineseSpacing(root: ParentNode): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if (node.parentElement?.closest("[lang='zh-Hans'], .about-localized")) {
+      node.textContent = normalizeSimplifiedChineseText(
+        node.textContent ?? ""
+      );
+    }
+    node = walker.nextNode();
   }
 }
 
