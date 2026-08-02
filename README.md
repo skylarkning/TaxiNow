@@ -23,8 +23,8 @@ the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release)
 The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
 third-party notices.
 
-Current release: **V1.0 Beta 6**, internal build **103**
-(build date: July 31, 2026). The About dialog
+Current release: **V1.1**, internal build **110**
+(build date: August 2, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is a free-of-charge application for personal
 flight-simulator use only.
@@ -70,6 +70,17 @@ their surrounding white canvas and create the required output sizes.
 - Performance-aware telemetry uses event-driven SimConnect callbacks, bounded
   buffers, change filtering, a low-frequency health watchdog, and a one-second
   parked publish heartbeat rather than a high-rate web polling loop.
+- V1.1 adds local taxi-route planning from the synchronized aircraft position
+  to an individual runway end or gate/stand. The planner builds a connected
+  graph from downloaded taxiway and taxilane centerlines, penalizes excessive
+  turns, reversals, unnamed links, and needless taxiway changes, and offers up
+  to five reasonable alternatives instead of treating geometric distance as
+  the only objective. Selecting an option highlights a route such as
+  `Gate 105 → A → H → Q → RWY23` in blue. Guidance progressively removes
+  passed route segments, presents upcoming left/right/continue cues, remaining
+  distance, and an off-route warning, while reusing the existing low-overhead
+  SimConnect position stream. Routing is advisory only and never overrides
+  ATC instructions, airport signs, closures, or pilot judgment.
 - Schema v2 validation and a schema v1 adapter.
 - Visible map downloader and asset manager for ICAO, country/region, and
   optional province/state downloads, with byte-level progress, transfer speed,

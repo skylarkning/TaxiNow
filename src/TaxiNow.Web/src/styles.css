@@ -520,6 +520,97 @@ footer {
   transform: translateX(0);
 }
 
+.taxi-plan-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 24;
+  border: 0;
+  border-radius: 0;
+  background: rgba(1, 7, 12, 0.48);
+  cursor: default;
+}
+
+.taxi-plan-backdrop:hover {
+  border: 0;
+  background: rgba(1, 7, 12, 0.48);
+}
+
+.taxi-plan-panel {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 25;
+  width: min(400px, 100vw);
+  padding: 18px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: #eaf2f5;
+  background:
+    linear-gradient(180deg, rgba(13, 29, 42, 0.99), rgba(7, 17, 29, 0.99));
+  border-right: 1px solid rgba(147, 181, 198, 0.32);
+  box-shadow: 18px 0 50px rgba(0, 0, 0, 0.38);
+  transform: translateX(-102%);
+  transition: transform 180ms ease;
+}
+
+.taxi-plan-panel.open {
+  transform: translateX(0);
+}
+
+.taxi-guidance {
+  position: fixed;
+  z-index: 18;
+  top: 76px;
+  left: 50%;
+  width: min(650px, calc(100vw - 32px));
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid rgba(40, 169, 255, 0.62);
+  border-radius: 14px;
+  background: rgba(5, 20, 32, 0.95);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.46);
+  backdrop-filter: blur(12px);
+  transform: translateX(-50%);
+}
+
+.taxi-guidance-symbol {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 12px;
+  color: #fff;
+  background: #168fdd;
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.taxi-guidance-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.taxi-guidance-copy strong {
+  font-size: 16px;
+}
+
+.taxi-guidance-copy span {
+  color: #9ed8f6;
+  font-size: 11px;
+}
+
+.taxi-guidance-copy small {
+  overflow: hidden;
+  color: #aabdc7;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .about-backdrop {
   position: fixed;
   inset: 0;
@@ -843,6 +934,125 @@ footer {
   border: 1px solid rgba(147, 181, 198, 0.2);
   border-radius: 12px;
   background: rgba(18, 38, 53, 0.72);
+}
+
+.taxi-search-card,
+.taxi-route-section {
+  padding: 14px;
+  border: 1px solid rgba(147, 181, 198, 0.2);
+  border-radius: 12px;
+  background: rgba(18, 38, 53, 0.72);
+}
+
+.taxi-search-card {
+  display: grid;
+  gap: 8px;
+}
+
+.taxi-search-card > label,
+.taxi-search-card div > label {
+  display: block;
+  margin-bottom: 5px;
+  color: #b9cbd3;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.taxi-search-card input,
+.taxi-search-card select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid rgba(147, 181, 198, 0.34);
+  border-radius: 8px;
+  outline: none;
+  color: #edf5f7;
+  background: rgba(7, 17, 29, 0.9);
+  font: inherit;
+  font-size: 13px;
+}
+
+.taxi-search-card input:focus,
+.taxi-search-card select:focus {
+  border-color: #28a9ff;
+  box-shadow: 0 0 0 2px rgba(40, 169, 255, 0.16);
+}
+
+.taxi-route-section {
+  margin-top: 14px;
+}
+
+.taxi-route-section h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.taxi-route-options {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.taxi-route-option {
+  width: 100%;
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border-color: rgba(147, 181, 198, 0.25);
+  background: rgba(7, 20, 31, 0.72);
+  text-align: left;
+}
+
+.taxi-route-option:hover,
+.taxi-route-option.selected {
+  border-color: #28a9ff;
+  background: rgba(20, 72, 105, 0.58);
+}
+
+.taxi-route-option-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.taxi-route-option-heading small {
+  padding: 2px 6px;
+  border-radius: 12px;
+  color: #7de4ff;
+  background: rgba(40, 169, 255, 0.16);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.taxi-route-summary {
+  color: #e6f4fa;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.taxi-route-option > small {
+  color: #91aab6;
+  font-size: 10px;
+}
+
+.taxi-plan-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.taxi-plan-actions .primary-button {
+  flex: 1;
+}
+
+.taxi-advisory {
+  margin: 12px 2px 0;
+  color: #d5b973;
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .country-download-notice {
@@ -1377,6 +1587,12 @@ html[data-locale] .welcome-languages section[lang] {
   display: block !important;
 }
 
+@media (max-width: 1080px) {
+  .network-access {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   #airport-name,
   .server-url,
@@ -1403,6 +1619,23 @@ html[data-locale] .welcome-languages section[lang] {
 
   .asset-panel {
     width: 100vw;
+  }
+
+  .taxi-plan-panel {
+    width: 100vw;
+  }
+
+  .taxi-guidance {
+    top: 68px;
+    width: calc(100vw - 16px);
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 9px;
+  }
+
+  .taxi-guidance-symbol {
+    width: 42px;
+    height: 42px;
   }
 
   .welcome-languages {

@@ -1,0 +1,124 @@
+import { describe, expect, it } from "vitest";
+import type { AirportFeature } from "./contracts";
+import ciyyzFixture from "../../../tests/fixtures/airport-maps/CYYZ.v2.json";
+import type { AirportMap } from "./contracts";
+import {
+  buildTaxiGraph,
+  listGateDestinations,
+  listRunwayDestinations,
+  planTaxiRoutes,
+  updateTaxiRouteProgress
+} from "./taxiRouting";
+
+function feature(
+  id: string,
+  kind: AirportFeature["kind"],
+  points: [number, number][],
+  ref: string | null
+): AirportFeature {
+  return {
+    id,
+    kind,
+    points,
+    ref,
+    name: null,
+    widthMeters: kind === "runway" ? 45 : null,
+    headingDegrees: null,
+    closed: false,
+    source: "test"
+  };
+}
+
+const airport: AirportFeature[] = [
+  feature("a", "taxiway", [[0, 0], [0.001, 0], [0.002, 0]], "A"),
+  feature("h", "taxiway", [[0.001, 0], [0.001, 0.001]], "H"),
+  feature("q", "taxiway", [[0.001, 0.001], [0.002, 0.001]], "Q"),
+  feature("b", "taxiway", [[0, 0], [0, 0.001], [0.002, 0.001]], "B"),
+  feature("gate", "gate", [[0, 0]], "105"),
+  feature("runway", "runway", [[0.002, 0.001], [0.012, 0.001]], "09/27")
+];
+
+describe("taxi routing", () => {
+  it("lists gate and correctly oriented runway destinations", () => {
+    expect(listGateDestinations(airport).map((item) => item.ref)).toEqual(["105"]);
+    expect(listRunwayDestinations(airport).map((item) => item.ref)).toEqual([
+      "09",
+      "27"
+    ]);
+  });
+
+  it("finds sensible alternative routes and describes their taxiways", () => {
+    const graph = buildTaxiGraph(airport);
+    const destination = listRunwayDestinations(airport).find(
+      (item) => item.ref === "09"
+    )!;
+    const routes = planTaxiRoutes(graph, [0, 0], destination, "Gate 105", 5);
+
+    expect(routes.length).toBeGreaterThanOrEqual(2);
+    expect(routes[0]!.summary).toMatch(/^Gate 105 → /);
+    expect(routes[0]!.summary).toContain("RWY09");
+    expect(routes.every((route) => route.distanceMeters > 0)).toBe(true);
+  });
+
+  it("clears passed geometry and produces a turn instruction", () => {
+    const graph = buildTaxiGraph(airport);
+    const destination = listRunwayDestinations(airport).find(
+      (item) => item.ref === "09"
+    )!;
+    const route = planTaxiRoutes(graph, [0, 0], destination, "Gate 105", 1)[0]!;
+    const progress = updateTaxiRouteProgress(route, [0.0008, 0]);
+
+    expect(progress.remainingCoordinates.length).toBeLessThanOrEqual(
+      route.coordinates.length
+    );
+    expect(progress.remainingMeters).toBeLessThan(route.distanceMeters);
+    expect(["left", "right", "straight", "arrive"]).toContain(
+      progress.maneuver
+    );
+
+    const later = updateTaxiRouteProgress(route, [0.001, 0.0007]);
+    const noisyBackwardSample = updateTaxiRouteProgress(
+      route,
+      [0.0002, 0],
+      later.segmentIndex
+    );
+    expect(noisyBackwardSample.segmentIndex).toBeGreaterThanOrEqual(
+      later.segmentIndex
+    );
+    expect(noisyBackwardSample.remainingCoordinates[1]).not.toEqual(
+      route.coordinates[1]
+    );
+  });
+
+  it("does not route over a closed taxiway", () => {
+    const closed = { ...airport[0]!, closed: true };
+    const graph = buildTaxiGraph([closed, ...airport.slice(1)]);
+    const destination = listRunwayDestinations(airport)[0]!;
+    const routes = planTaxiRoutes(graph, [0, 0], destination, "Gate 105", 5);
+
+    expect(routes.every((route) => !route.summary.includes(" A "))).toBe(true);
+  });
+
+  it("routes across the bundled CYYZ map from gate B19 to runway 23", () => {
+    const fixture = ciyyzFixture as unknown as AirportMap;
+    const gates = listGateDestinations(fixture.features);
+    const start = gates.find((gate) =>
+      gate.ref.toUpperCase().split(/[\/,]/).includes("B19")
+    )!;
+    const destination = listRunwayDestinations(fixture.features).find(
+      (runway) => runway.ref === "23"
+    )!;
+
+    const routes = planTaxiRoutes(
+      buildTaxiGraph(fixture.features),
+      start.coordinate,
+      destination,
+      "Gate B19",
+      5
+    );
+
+    expect(routes.length).toBeGreaterThanOrEqual(3);
+    expect(routes.length).toBeLessThanOrEqual(5);
+    expect(routes[0]!.summary).toMatch(/^Gate B19 → .*RWY23$/);
+  });
+});

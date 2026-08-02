@@ -15,10 +15,10 @@ namespace TaxiNow.Server;
 public static class TaxiNowHost
 {
     public const int DefaultPort = 8780;
-    public const string ProductVersion = "1.0.0-beta.6";
-    public const string DisplayVersion = "V1.0 Beta 6";
-    public const int InternalBuildId = 103;
-    public const string BuildDate = "July 31, 2026";
+    public const string ProductVersion = "1.1.0";
+    public const string DisplayVersion = "V1.1";
+    public const int InternalBuildId = 110;
+    public const string BuildDate = "August 2, 2026";
 
     public static string MapShellUrl =>
         $"http://127.0.0.1:{DefaultPort}/?build={InternalBuildId}";

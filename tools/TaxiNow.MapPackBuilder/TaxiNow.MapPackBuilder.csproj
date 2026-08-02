@@ -11,7 +11,7 @@
     <AssemblyName>TaxiNow.MapPackBuilder</AssemblyName>
     <RootNamespace>TaxiNow.MapPackBuilder</RootNamespace>
     <FileVersion>1.0.0.105</FileVersion>
-    <InformationalVersion>1.0.0-beta.6-map-pack-builder+build.105</InformationalVersion>
+    <InformationalVersion>1.1.0-map-pack-builder+build.105</InformationalVersion>
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="..\..\src\TaxiNow.App\Assets\TaxiNow.ico"

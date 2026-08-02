@@ -12,6 +12,7 @@ import type {
   Feature,
   FeatureCollection,
   Geometry,
+  LineString,
   Point
 } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -55,6 +56,18 @@ import {
   formatCountryName,
   formatRegionName
 } from "./regionNames";
+import {
+  buildTaxiGraph,
+  listGateDestinations,
+  listRunwayDestinations,
+  nearestStandLabel,
+  planTaxiRoutes,
+  updateTaxiRouteProgress,
+  type Coordinate,
+  type TaxiDestination,
+  type TaxiGraph,
+  type TaxiRoute
+} from "./taxiRouting";
 
 const telemetrySamples: TelemetrySnapshot[] = [];
 let lastOwnshipFrameAt = 0;
@@ -73,6 +86,15 @@ let pendingAirportIcao: string | null = null;
 let mapInitialized = false;
 let assetRefreshInFlight = false;
 let activeDownloads = false;
+let currentAirportMap: AirportMap | null = null;
+let taxiGraph: TaxiGraph | null = null;
+let taxiRunways: TaxiDestination[] = [];
+let taxiGates: TaxiDestination[] = [];
+let taxiRouteOptions: TaxiRoute[] = [];
+let selectedTaxiRoute: TaxiRoute | null = null;
+let activeTaxiRoute: TaxiRoute | null = null;
+let activeTaxiSegmentIndex = 0;
+let lastTaxiCameraAt = 0;
 const assetGroupOpenState = new Map<string, boolean>();
 const downloadProgressWatch = new Map<
   string,
@@ -95,6 +117,7 @@ interface DesktopStorageMessage {
 
 async function start(): Promise<void> {
   setupLanguageSelector();
+  setupTaxiPlanner();
   setupAssetManager();
   setupAirportPicker();
   setupAboutDialog();
@@ -192,6 +215,250 @@ function setupWelcomeDialog(): void {
   });
 }
 
+function setupTaxiPlanner(): void {
+  const panel = document.querySelector<HTMLElement>("#taxi-plan-panel")!;
+  const backdrop = document.querySelector<HTMLButtonElement>(
+    "#taxi-plan-backdrop"
+  )!;
+  const openButton = document.querySelector<HTMLButtonElement>(
+    "#open-taxi-plan"
+  )!;
+  const closeButton = document.querySelector<HTMLButtonElement>(
+    "#close-taxi-plan"
+  )!;
+  const kind = document.querySelector<HTMLSelectElement>(
+    "#taxi-destination-kind"
+  )!;
+
+  const setOpen = (open: boolean): void => {
+    panel.classList.toggle("open", open);
+    panel.setAttribute("aria-hidden", String(!open));
+    backdrop.hidden = !open;
+    if (open) {
+      populateTaxiDestinations();
+      document.querySelector<HTMLElement>("#taxi-runway")?.focus();
+    }
+  };
+  const syncKind = (): void => {
+    const runway = kind.value === "runway";
+    document.querySelector<HTMLElement>("#taxi-runway-field")!.hidden = !runway;
+    document.querySelector<HTMLElement>("#taxi-gate-field")!.hidden = runway;
+  };
+
+  openButton.addEventListener("click", () => setOpen(true));
+  closeButton.addEventListener("click", () => setOpen(false));
+  backdrop.addEventListener("click", () => setOpen(false));
+  kind.addEventListener("change", syncKind);
+  document.querySelector("#find-taxi-routes")!.addEventListener("click", () => {
+    findTaxiRoutes();
+  });
+  document.querySelector("#start-taxi-guidance")!.addEventListener("click", () => {
+    startTaxiGuidance();
+    setOpen(false);
+  });
+  document.querySelector("#clear-taxi-route")!.addEventListener("click", () => {
+    clearTaxiRoute();
+  });
+  document.querySelector("#stop-taxi-guidance")!.addEventListener("click", () => {
+    clearTaxiRoute();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && panel.classList.contains("open")) {
+      setOpen(false);
+    }
+  });
+  syncKind();
+}
+
+function populateTaxiDestinations(): void {
+  const runwaySelect = document.querySelector<HTMLSelectElement>("#taxi-runway");
+  const gateOptions = document.querySelector<HTMLDataListElement>(
+    "#taxi-gate-options"
+  );
+  if (!runwaySelect || !gateOptions) {
+    return;
+  }
+  const selectedRunway = runwaySelect.value;
+  runwaySelect.replaceChildren();
+  for (const runway of taxiRunways) {
+    const option = document.createElement("option");
+    option.value = runway.ref;
+    option.textContent = runway.label;
+    runwaySelect.append(option);
+  }
+  if (taxiRunways.some((runway) => runway.ref === selectedRunway)) {
+    runwaySelect.value = selectedRunway;
+  }
+  gateOptions.replaceChildren();
+  for (const gate of taxiGates) {
+    const option = document.createElement("option");
+    option.value = gate.ref;
+    option.label = gate.label;
+    gateOptions.append(option);
+  }
+}
+
+function findTaxiRoutes(): void {
+  const feedback = document.querySelector<HTMLElement>("#taxi-plan-feedback")!;
+  const position = currentAircraftCoordinate();
+  if (!position || !currentAirportMap || !taxiGraph) {
+    feedback.textContent = t("taxi.needPosition");
+    feedback.className = "feedback error";
+    return;
+  }
+  const kind = document.querySelector<HTMLSelectElement>(
+    "#taxi-destination-kind"
+  )!.value;
+  let destination: TaxiDestination | undefined;
+  if (kind === "runway") {
+    const ref = document.querySelector<HTMLSelectElement>("#taxi-runway")!.value;
+    destination = taxiRunways.find((item) => item.ref === ref);
+  } else {
+    const input = document.querySelector<HTMLInputElement>("#taxi-gate")!;
+    const ref = input.value.trim().toUpperCase();
+    destination = taxiGates.find((item) =>
+      item.ref.toUpperCase() === ref ||
+      item.ref.toUpperCase().split(/[\/,]/).includes(ref)
+    );
+    if (!destination) {
+      feedback.textContent = t("taxi.chooseGate");
+      feedback.className = "feedback error";
+      input.focus();
+      return;
+    }
+  }
+  if (!destination) {
+    feedback.textContent = t("taxi.noNetwork");
+    feedback.className = "feedback error";
+    return;
+  }
+
+  taxiRouteOptions = planTaxiRoutes(
+    taxiGraph,
+    position,
+    destination,
+    nearestStandLabel(currentAirportMap.features, position),
+    5
+  );
+  if (taxiRouteOptions.length === 0) {
+    feedback.textContent = t("taxi.noNetwork");
+    feedback.className = "feedback error";
+    renderTaxiRouteOptions();
+    return;
+  }
+  feedback.textContent = t("taxi.found", { count: taxiRouteOptions.length });
+  feedback.className = "feedback success";
+  selectTaxiRoute(taxiRouteOptions[0]!);
+  renderTaxiRouteOptions();
+}
+
+function renderTaxiRouteOptions(): void {
+  const container = document.querySelector<HTMLElement>("#taxi-route-options")!;
+  container.replaceChildren();
+  if (taxiRouteOptions.length === 0) {
+    container.append(createEmptyState(t("taxi.empty")));
+    return;
+  }
+  taxiRouteOptions.forEach((route, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `taxi-route-option${
+      selectedTaxiRoute?.id === route.id ? " selected" : ""
+    }`;
+    const heading = document.createElement("span");
+    heading.className = "taxi-route-option-heading";
+    const title = document.createElement("strong");
+    title.textContent = t("taxi.option", { number: index + 1 });
+    heading.append(title);
+    if (index === 0) {
+      const badge = document.createElement("small");
+      badge.textContent = t("taxi.recommended");
+      heading.append(badge);
+    }
+    const summary = document.createElement("span");
+    summary.className = "taxi-route-summary";
+    summary.textContent = route.summary;
+    const details = document.createElement("small");
+    details.textContent = t(
+      route.turnCount === 1 ? "taxi.distanceOneTurn" : "taxi.distance",
+      {
+      distance: formatTaxiDistance(route.distanceMeters),
+      minutes: Math.max(1, Math.round(route.distanceMeters / 7.7 / 60)),
+      turns: route.turnCount
+      }
+    );
+    button.append(heading, summary, details);
+    button.addEventListener("click", () => {
+      selectTaxiRoute(route);
+      renderTaxiRouteOptions();
+    });
+    container.append(button);
+  });
+}
+
+function selectTaxiRoute(route: TaxiRoute): void {
+  activeTaxiRoute = null;
+  activeTaxiSegmentIndex = 0;
+  selectedTaxiRoute = route;
+  document.querySelector<HTMLButtonElement>("#start-taxi-guidance")!.disabled = false;
+  document.querySelector<HTMLElement>("#taxi-guidance")!.hidden = true;
+  setTaxiRouteGeometry(route.coordinates);
+  fitTaxiRoute(route.coordinates);
+}
+
+function startTaxiGuidance(): void {
+  if (!selectedTaxiRoute) {
+    return;
+  }
+  activeTaxiRoute = selectedTaxiRoute;
+  activeTaxiSegmentIndex = 0;
+  lastTaxiCameraAt = 0;
+  const guidance = document.querySelector<HTMLElement>("#taxi-guidance")!;
+  guidance.hidden = false;
+  document.querySelector<HTMLElement>("#taxi-guidance-route")!.textContent =
+    selectedTaxiRoute.summary;
+  const feedback = document.querySelector<HTMLElement>("#taxi-plan-feedback")!;
+  feedback.textContent = t("taxi.guidanceStarted");
+  feedback.className = "feedback success";
+  const position = currentAircraftCoordinate();
+  if (position) {
+    updateActiveTaxiGuidance(position, lastRenderedOwnship?.heading ?? 0);
+  }
+}
+
+function clearTaxiRoute(): void {
+  taxiRouteOptions = [];
+  selectedTaxiRoute = null;
+  activeTaxiRoute = null;
+  activeTaxiSegmentIndex = 0;
+  document.querySelector<HTMLElement>("#taxi-guidance")?.setAttribute("hidden", "");
+  const startButton = document.querySelector<HTMLButtonElement>(
+    "#start-taxi-guidance"
+  );
+  if (startButton) {
+    startButton.disabled = true;
+  }
+  const feedback = document.querySelector<HTMLElement>("#taxi-plan-feedback");
+  if (feedback) {
+    feedback.textContent = "";
+    feedback.className = "feedback";
+  }
+  if (document.querySelector("#taxi-route-options")) {
+    renderTaxiRouteOptions();
+  }
+  setTaxiRouteGeometry([]);
+}
+
+function currentAircraftCoordinate(): Coordinate | null {
+  if (lastRenderedOwnship?.visible) {
+    return [lastRenderedOwnship.longitude, lastRenderedOwnship.latitude];
+  }
+  const sample = telemetrySamples.at(-1);
+  return sample?.hasPosition && sample.onGround
+    ? [sample.longitude, sample.latitude]
+    : null;
+}
+
 function applyProductMetadata(status: AppStatus): void {
   document.title = `TaxiNow ${status.displayVersion}`;
   document.querySelector("#footer-version")!.textContent =
@@ -225,6 +492,7 @@ function applyProductMetadata(status: AppStatus): void {
 }
 
 async function loadAirport(icao: string): Promise<void> {
+  clearTaxiRoute();
   const downloadedAirport = await getJson<AirportMap>(
     `/api/v1/airports/${encodeURIComponent(icao)}/map`
   );
@@ -244,6 +512,11 @@ async function loadAirport(icao: string): Promise<void> {
     features: visibleFeatures,
     counts: featureCounts(visibleFeatures)
   };
+  currentAirportMap = airport;
+  taxiGraph = buildTaxiGraph(airport.features);
+  taxiRunways = listRunwayDestinations(airport.features);
+  taxiGates = listGateDestinations(airport.features);
+  populateTaxiDestinations();
   selectedAirportIcao = airport.airport.icao;
   airportBounds = [
     [airport.airport.bounds.minLon, airport.airport.bounds.minLat],
@@ -1191,6 +1464,10 @@ function createMap(airport: AirportMap): MapLibreMap {
         type: "geojson",
         data: terminalLabelCollection(airport.features)
       });
+      created.addSource("taxi-route", {
+        type: "geojson",
+        data: taxiRouteCollection([])
+      });
       created.addSource("ownship", {
         type: "geojson",
         data: ownshipFeature(
@@ -1202,6 +1479,7 @@ function createMap(airport: AirportMap): MapLibreMap {
         )
       });
       addAirportLayers(created);
+      addTaxiRouteLayers(created);
       created.addImage("ownship-plane", createOwnshipImage(), { pixelRatio: 2 });
       addOwnshipLayer(created);
       created.moveLayer("taxiway-labels");
@@ -1574,6 +1852,31 @@ function addOwnshipLayer(target: MapLibreMap): void {
   });
 }
 
+function addTaxiRouteLayers(target: MapLibreMap): void {
+  target.addLayer({
+    id: "taxi-route-casing",
+    type: "line",
+    source: "taxi-route",
+    paint: {
+      "line-color": "#07131e",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 11, 9, 17, 18],
+      "line-opacity": 0.94
+    },
+    layout: { "line-cap": "round", "line-join": "round" }
+  });
+  target.addLayer({
+    id: "taxi-route-highlight",
+    type: "line",
+    source: "taxi-route",
+    paint: {
+      "line-color": "#16b5ff",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 11, 6, 17, 12],
+      "line-opacity": 1
+    },
+    layout: { "line-cap": "round", "line-join": "round" }
+  });
+}
+
 async function connectTelemetry(): Promise<void> {
   try {
     const initial = await getJson<TelemetrySnapshot>("/api/v1/telemetry");
@@ -1676,6 +1979,13 @@ function renderOwnship(frameTime = performance.now()): void {
       fallbackOwnship.style.opacity = renderedOwnship.stale ? "0.45" : "1";
     }
     ownshipVisible = renderedOwnship.visible;
+    if (renderedOwnship.visible && activeTaxiRoute) {
+      updateActiveTaxiGuidance(
+        [renderedOwnship.longitude, renderedOwnship.latitude],
+        renderedOwnship.heading,
+        frameTime
+      );
+    }
   } else if (ownshipVisible) {
     if (map?.isStyleLoaded() && map.getLayer("ownship")) {
       map.setLayoutProperty("ownship", "visibility", "none");
@@ -1701,6 +2011,133 @@ function fitAirport(): void {
     duration: 600,
     maxZoom: 14
   });
+}
+
+function updateActiveTaxiGuidance(
+  position: Coordinate,
+  heading: number,
+  frameTime = performance.now()
+): void {
+  if (!activeTaxiRoute) {
+    return;
+  }
+  const progress = updateTaxiRouteProgress(
+    activeTaxiRoute,
+    position,
+    activeTaxiSegmentIndex
+  );
+  activeTaxiSegmentIndex = progress.segmentIndex;
+  setTaxiRouteGeometry(progress.remainingCoordinates);
+
+  const instruction = document.querySelector<HTMLElement>(
+    "#taxi-guidance-instruction"
+  )!;
+  const meta = document.querySelector<HTMLElement>("#taxi-guidance-meta")!;
+  const symbol = document.querySelector<HTMLElement>("#taxi-guidance-symbol")!;
+  if (progress.remainingMeters <= 22 && progress.offRouteMeters <= 35) {
+    instruction.textContent = t("taxi.completed");
+    meta.textContent = "";
+    symbol.textContent = "✓";
+    setTaxiRouteGeometry([]);
+    activeTaxiRoute = null;
+    return;
+  }
+  if (progress.offRouteMeters > 75) {
+    instruction.textContent = t("taxi.offRoute", {
+      distance: formatTaxiDistance(progress.offRouteMeters)
+    });
+    symbol.textContent = "!";
+  } else if (progress.maneuver === "left" && progress.nextRef) {
+    instruction.textContent = t("taxi.turnLeft", { taxiway: progress.nextRef });
+    symbol.textContent = "↰";
+  } else if (progress.maneuver === "right" && progress.nextRef) {
+    instruction.textContent = t("taxi.turnRight", { taxiway: progress.nextRef });
+    symbol.textContent = "↱";
+  } else if (progress.nextRef) {
+    instruction.textContent = t("taxi.continueOn", {
+      taxiway: progress.nextRef
+    });
+    symbol.textContent = "↑";
+  } else if (progress.remainingMeters < 70) {
+    instruction.textContent = t("taxi.arrive", {
+      destination: activeTaxiRoute.destination.label
+    });
+    symbol.textContent = "●";
+  } else {
+    instruction.textContent = t("taxi.continueTo", {
+      destination: activeTaxiRoute.destination.label
+    });
+    symbol.textContent = "↑";
+  }
+  const maneuverDistance = progress.nextRef
+    ? `${formatTaxiDistance(progress.distanceToManeuverMeters)} · `
+    : "";
+  meta.textContent = `${maneuverDistance}${t("taxi.remaining", {
+    distance: formatTaxiDistance(progress.remainingMeters)
+  })}`;
+
+  if (
+    frameTime - lastTaxiCameraAt >= 900 &&
+    map?.isStyleLoaded() &&
+    !map.isMoving()
+  ) {
+    lastTaxiCameraAt = frameTime;
+    map.easeTo({
+      center: position,
+      bearing: heading,
+      zoom: Math.max(map.getZoom(), 16),
+      duration: 550,
+      essential: true
+    });
+  }
+}
+
+function setTaxiRouteGeometry(coordinates: Coordinate[]): void {
+  if (!map?.isStyleLoaded() || !map.getSource("taxi-route")) {
+    return;
+  }
+  const source = map.getSource("taxi-route") as GeoJSONSource;
+  source.setData(taxiRouteCollection(coordinates));
+}
+
+function taxiRouteCollection(
+  coordinates: Coordinate[]
+): FeatureCollection<LineString> {
+  return {
+    type: "FeatureCollection",
+    features: coordinates.length >= 2
+      ? [{
+        type: "Feature",
+        properties: {},
+        geometry: { type: "LineString", coordinates }
+      }]
+      : []
+  };
+}
+
+function fitTaxiRoute(coordinates: Coordinate[]): void {
+  if (!map || coordinates.length < 2) {
+    return;
+  }
+  const bounds = new maplibregl.LngLatBounds(
+    coordinates[0],
+    coordinates[0]
+  );
+  for (const coordinate of coordinates.slice(1)) {
+    bounds.extend(coordinate);
+  }
+  map.fitBounds(bounds, {
+    padding: { top: 135, right: 55, bottom: 75, left: 420 },
+    duration: 600,
+    maxZoom: 16.5
+  });
+}
+
+function formatTaxiDistance(distanceMeters: number): string {
+  if (distanceMeters >= 1000) {
+    return `${(distanceMeters / 1000).toFixed(distanceMeters >= 10_000 ? 0 : 1)} km`;
+  }
+  return `${Math.max(0, Math.round(distanceMeters / 10) * 10)} m`;
 }
 
 function toFeatureCollection(

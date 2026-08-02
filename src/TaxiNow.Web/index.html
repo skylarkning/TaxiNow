@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#08111d" />
-    <title>TaxiNow V1.0 Beta 6</title>
+    <title>TaxiNow V1.1</title>
   </head>
   <body>
     <main id="app">
@@ -79,6 +79,9 @@
           <span id="status"
                 class="status"
                 data-i18n="status.connecting">Connecting</span>
+          <button id="open-taxi-plan"
+                  type="button"
+                  data-i18n="taxi.open">Plan Taxi</button>
           <button id="open-assets"
                   type="button"
                   data-i18n="actions.assets">Maps &amp; storage</button>
@@ -123,10 +126,100 @@
                   data-i18n="actions.about">About</button>
         </div>
       </header>
+      <section id="taxi-guidance"
+               class="taxi-guidance"
+               role="status"
+               aria-live="polite"
+               hidden>
+        <div class="taxi-guidance-symbol" id="taxi-guidance-symbol"
+             aria-hidden="true">↑</div>
+        <div class="taxi-guidance-copy">
+          <strong id="taxi-guidance-instruction">Continue straight</strong>
+          <span id="taxi-guidance-meta"></span>
+          <small id="taxi-guidance-route"></small>
+        </div>
+        <button id="stop-taxi-guidance"
+                class="text-button"
+                type="button"
+                data-i18n="taxi.end">End</button>
+      </section>
       <div id="map"
            role="application"
-           aria-label="TaxiNow airport map"
-           data-i18n-aria-label="map.aria"></div>
+            aria-label="TaxiNow airport map"
+            data-i18n-aria-label="map.aria"></div>
+      <button id="taxi-plan-backdrop"
+              class="taxi-plan-backdrop"
+              type="button"
+              aria-label="Close taxi planner"
+              data-i18n-aria-label="taxi.close"
+              hidden></button>
+      <aside id="taxi-plan-panel"
+             class="taxi-plan-panel"
+             aria-label="Taxi route planner"
+             data-i18n-aria-label="taxi.panelAria"
+             aria-hidden="true">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow" data-i18n="taxi.eyebrow">Ground navigation</span>
+            <h1 data-i18n="taxi.title">Plan Taxi</h1>
+          </div>
+          <button id="close-taxi-plan"
+                  class="icon-button"
+                  type="button"
+                  aria-label="Close taxi planner"
+                  data-i18n-aria-label="taxi.close">×</button>
+        </div>
+        <div class="taxi-search-card">
+          <label for="taxi-destination-kind"
+                 data-i18n="taxi.where">Where are you taxiing?</label>
+          <select id="taxi-destination-kind">
+            <option value="runway" data-i18n="taxi.toRunway">To a runway</option>
+            <option value="gate" data-i18n="taxi.toGate">To a gate or stand</option>
+          </select>
+          <div id="taxi-runway-field">
+            <label for="taxi-runway" data-i18n="taxi.runway">Choose runway</label>
+            <select id="taxi-runway"></select>
+          </div>
+          <div id="taxi-gate-field" hidden>
+            <label for="taxi-gate" data-i18n="taxi.gate">Enter gate or stand</label>
+            <input id="taxi-gate"
+                   autocomplete="off"
+                   list="taxi-gate-options"
+                   data-i18n-placeholder="taxi.gatePlaceholder"
+                   placeholder="e.g. 105 or B19" />
+            <datalist id="taxi-gate-options"></datalist>
+          </div>
+          <button id="find-taxi-routes"
+                  class="primary-button"
+                  type="button"
+                  data-i18n="taxi.find">Find taxi routes</button>
+          <p id="taxi-plan-feedback" class="feedback" role="status"></p>
+        </div>
+        <section class="taxi-route-section" aria-labelledby="taxi-routes-heading">
+          <div class="section-heading">
+            <h2 id="taxi-routes-heading" data-i18n="taxi.routes">Route options</h2>
+          </div>
+          <div id="taxi-route-options" class="taxi-route-options">
+            <p class="empty-state" data-i18n="taxi.empty">
+              Choose a destination to calculate taxi routes.
+            </p>
+          </div>
+        </section>
+        <div class="taxi-plan-actions">
+          <button id="start-taxi-guidance"
+                  class="primary-button"
+                  type="button"
+                  data-i18n="taxi.start"
+                  disabled>Start guidance</button>
+          <button id="clear-taxi-route"
+                  class="text-button"
+                  type="button"
+                  data-i18n="taxi.clear">Clear route</button>
+        </div>
+        <p class="taxi-advisory" data-i18n="taxi.advisory">
+          Advisory only. Follow ATC instructions and airport signage.
+        </p>
+      </aside>
       <button id="asset-backdrop"
               class="asset-backdrop"
               type="button"
@@ -441,7 +534,7 @@
             <h1 id="welcome-heading">Welcome to TaxiNow</h1>
             <p class="welcome-subtitle">欢迎使用 TaxiNow</p>
           </div>
-          <span class="welcome-version">V1.0 Beta 6</span>
+          <span class="welcome-version">V1.1</span>
         </div>
         <div class="welcome-languages">
           <section lang="en">
@@ -730,6 +823,17 @@
             </p>
           </details>
           <details>
+            <summary>Can I treat a planned taxi route as an ATC clearance?</summary>
+            <p>
+              No. Plan Taxi uses the centerlines present in the downloaded map
+              and optimizes for a practical route with fewer unnecessary turns.
+              It cannot know every temporary closure, one-way or aircraft-size
+              restriction, local procedure, or live ATC instruction. Always
+              follow ATC and airport signage; recalculate if the planned route
+              is disconnected or unsuitable.
+            </p>
+          </details>
+          <details>
             <summary>Is TaxiNow suitable for real-world navigation?</summary>
             <p>
               No. Maps may be incomplete, outdated, inferred, or inaccurate.
@@ -738,8 +842,8 @@
           </details>
         </section>
         <p class="about-version">
-          Version: <strong id="about-version">V1.0 Beta 6</strong>
-          (Build date: <span id="about-build-date">July 31, 2026</span>).
+          Version: <strong id="about-version">V1.1</strong>
+          (Build date: <span id="about-build-date">August 2, 2026</span>).
           <br />
           Internal build: <strong id="about-build-id">102</strong>.
         </p>
@@ -900,6 +1004,15 @@
               </p>
             </details>
             <details>
+              <summary>规划出的滑行路线可以视为 ATC 许可吗？</summary>
+              <p>
+                不可以。“规划滑行”依据已下载地图中的中心线，在距离和减少不必要转弯之间
+                选择较合理的路线，但无法掌握所有临时关闭、单行或机型尺寸限制、机场本地
+                程序和实时 ATC 指令。请始终遵守 ATC 与机场标志；路线断开或不适用时请
+                重新规划。
+              </p>
+            </details>
+            <details>
               <summary>TaxiNow 可以用于真实飞行导航吗？</summary>
               <p>
                 不可以。地图可能不完整、过时、包含推断或存在误差；TaxiNow 仅限个人模拟飞行。
@@ -907,8 +1020,8 @@
             </details>
           </section>
           <p class="about-version">
-            版本：<strong id="about-version-zh">V1.0 Beta 6</strong>
-            （构建日期：<span id="about-build-date-zh">2026年7月31日</span>）。
+            版本：<strong id="about-version-zh">V1.1</strong>
+            （构建日期：<span id="about-build-date-zh">2026年8月2日</span>）。
             <br />
             内部构建号：<strong id="about-build-id-zh">102</strong>。
           </p>
@@ -920,7 +1033,7 @@
         </span>
         <span id="map-summary"></span>
         <span class="footer-right">
-          <span id="footer-version">V1.0 Beta 6</span>
+          <span id="footer-version">V1.1</span>
           <span id="attribution"
                 data-i18n="footer.fixture">Bundled TaxiNow fixture</span>
         </span>
