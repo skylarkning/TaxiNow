@@ -240,8 +240,9 @@ path without an explicit telemetry mode also selects replay for compatibility.
 ## Repository layout
 
 The implementation follows the boundaries and milestones in
-[`docs/IMPLEMENTATION_HANDOFF.md`](docs/IMPLEMENTATION_HANDOFF.md). No
-taxi-route/pathfinding code is included.
+[`docs/IMPLEMENTATION_HANDOFF.md`](docs/IMPLEMENTATION_HANDOFF.md). TaxiNow
+V1.1 includes local taxi-route planning and live ground guidance; planned
+routes remain advisory and must not be treated as ATC clearance.
 
 ## Map data
 

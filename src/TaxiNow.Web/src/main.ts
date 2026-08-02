@@ -78,6 +78,9 @@ let airportBounds: LngLatBoundsLike;
 let airportPerimeter: GeographicBounds | null = null;
 let ownshipAnimationStarted = false;
 let fallbackOwnship: SVGGElement | null = null;
+let fallbackTaxiRouteCasing: SVGPolylineElement | null = null;
+let fallbackTaxiRouteHighlight: SVGPolylineElement | null = null;
+let renderedTaxiRouteCoordinates: Coordinate[] = [];
 let assetRefreshTimer: number | null = null;
 let assetPanelOpen = false;
 let installedAssets: StoredMapAsset[] = [];
@@ -543,6 +546,8 @@ async function loadAirport(icao: string): Promise<void> {
     map.remove();
     document.querySelector("#airport-fallback")?.remove();
     fallbackOwnship = null;
+    fallbackTaxiRouteCasing = null;
+    fallbackTaxiRouteHighlight = null;
   }
   map = createMap(airport);
   mapInitialized = true;
@@ -2093,11 +2098,38 @@ function updateActiveTaxiGuidance(
 }
 
 function setTaxiRouteGeometry(coordinates: Coordinate[]): void {
-  if (!map?.isStyleLoaded() || !map.getSource("taxi-route")) {
+  renderedTaxiRouteCoordinates = coordinates.map(
+    (coordinate) => [...coordinate] as Coordinate
+  );
+  if (!map) {
     return;
   }
-  const source = map.getSource("taxi-route") as GeoJSONSource;
-  source.setData(taxiRouteCollection(coordinates));
+  const source = map.getSource("taxi-route") as GeoJSONSource | undefined;
+  source?.setData(taxiRouteCollection(renderedTaxiRouteCoordinates));
+  updateFallbackTaxiRoute(map);
+}
+
+function updateFallbackTaxiRoute(target: MapLibreMap): void {
+  if (!fallbackTaxiRouteCasing || !fallbackTaxiRouteHighlight) {
+    return;
+  }
+  if (renderedTaxiRouteCoordinates.length < 2) {
+    fallbackTaxiRouteCasing.style.display = "none";
+    fallbackTaxiRouteHighlight.style.display = "none";
+    return;
+  }
+  const points = renderedTaxiRouteCoordinates
+    .map((coordinate) => target.project(coordinate))
+    .map((point) => `${point.x},${point.y}`)
+    .join(" ");
+  const zoom = target.getZoom();
+  const routeWidth = Math.max(6, Math.min(12, 6 + (zoom - 11)));
+  fallbackTaxiRouteCasing.setAttribute("points", points);
+  fallbackTaxiRouteCasing.setAttribute("stroke-width", String(routeWidth + 6));
+  fallbackTaxiRouteCasing.style.display = "";
+  fallbackTaxiRouteHighlight.setAttribute("points", points);
+  fallbackTaxiRouteHighlight.setAttribute("stroke-width", String(routeWidth));
+  fallbackTaxiRouteHighlight.style.display = "";
 }
 
 function taxiRouteCollection(
@@ -2457,6 +2489,17 @@ function activateFallbackOverlay(
     taxiCenterlineGroup,
     foregroundGroup
   );
+  fallbackTaxiRouteCasing = createFallbackPolyline(
+    [],
+    "fallback-taxi-route-casing"
+  );
+  fallbackTaxiRouteHighlight = createFallbackPolyline(
+    [],
+    "fallback-taxi-route-highlight"
+  );
+  fallbackTaxiRouteCasing.style.display = "none";
+  fallbackTaxiRouteHighlight.style.display = "none";
+  svg.append(fallbackTaxiRouteCasing, fallbackTaxiRouteHighlight);
   fallbackOwnship = createFallbackOwnship();
   fallbackOwnship.style.display = "none";
   svg.append(fallbackOwnship);
@@ -2598,6 +2641,7 @@ function activateFallbackOverlay(
         }
       }
     }
+    updateFallbackTaxiRoute(target);
   };
   target.on("move", redraw);
   target.on("resize", redraw);

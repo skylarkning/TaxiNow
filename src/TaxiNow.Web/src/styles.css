@@ -398,6 +398,22 @@ button:disabled {
   stroke-linejoin: round;
 }
 
+.fallback-taxi-route-casing,
+.fallback-taxi-route-highlight {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.fallback-taxi-route-casing {
+  stroke: #07131e;
+  opacity: 0.94;
+}
+
+.fallback-taxi-route-highlight {
+  stroke: #16b5ff;
+}
+
 .fallback-gate,
 .fallback-parking_position {
   fill: none;
