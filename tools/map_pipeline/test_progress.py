@@ -474,6 +474,54 @@ class OpenStreetMapPriorityTests(unittest.TestCase):
 
         self.assertTrue(skycharts.needs_terminal_supplement(result))
 
+    def test_large_hub_with_explicit_terminal_skips_all_building_query(self):
+        result = {
+            "center": [-0.45, 51.47],
+            "features": [{
+                "kind": "terminal",
+                "name": "Terminal 5",
+                "points": [
+                    [-0.46, 51.47],
+                    [-0.45, 51.47],
+                    [-0.45, 51.48],
+                    [-0.46, 51.48],
+                    [-0.46, 51.47],
+                ],
+            }],
+        }
+        result["features"].extend({
+            "kind": "gate",
+            "points": [[-0.42 + index * 0.001, 51.47]],
+        } for index in range(20))
+
+        self.assertTrue(skycharts.needs_terminal_supplement(result))
+        self.assertFalse(skycharts.needs_focused_terminal_detail(result))
+
+    def test_uncovered_named_terminal_still_requests_focused_detail(self):
+        result = {
+            "center": [-0.45, 51.47],
+            "features": [
+                {
+                    "kind": "terminal",
+                    "name": "Terminal 5",
+                    "points": [
+                        [-0.46, 51.47],
+                        [-0.45, 51.47],
+                        [-0.45, 51.48],
+                        [-0.46, 51.48],
+                        [-0.46, 51.47],
+                    ],
+                },
+                {
+                    "kind": "terminal",
+                    "name": "Terminal 4",
+                    "points": [[-0.40, 51.46]],
+                },
+            ],
+        }
+
+        self.assertTrue(skycharts.needs_focused_terminal_detail(result))
+
     def test_public_overpass_queries_are_serialized(self):
         active = 0
         maximum_active = 0

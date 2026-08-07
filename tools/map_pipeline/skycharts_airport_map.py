@@ -1655,6 +1655,28 @@ def uncovered_terminal_label_points(result, maximum_distance=180):
     return uncovered
 
 
+def needs_focused_terminal_detail(result):
+    """Avoid an all-building query when explicit OSM terminals are usable.
+
+    At hub airports such as EGLL, remote stands and gate-like parking anchors
+    can sit far outside passenger buildings. Gate coverage alone therefore
+    produces a false missing-terminal signal and used to trigger an enormous
+    query covering every building around the complete runway envelope.
+    Explicit terminal polygons remain sufficient unless a named terminal
+    anchor is still uncovered.
+    """
+    if result is None:
+        return False
+    if uncovered_terminal_label_points(result):
+        return True
+    authoritative_terminals = [
+        feature for feature in result.get("features", [])
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) >= 3
+    ]
+    return not authoritative_terminals and needs_terminal_supplement(result)
+
+
 def terminal_completeness_metrics(result):
     """Return auditable terminal label and gate-footprint coverage metrics."""
     features = list((result or {}).get("features") or [])
@@ -2381,13 +2403,7 @@ def build_airport_map(
                 result["osmRevision"] = OSM_SOURCE_REVISION
             except AirportMapError:
                 result = None
-    terminal_detail_needed = (
-        result is not None
-        and (
-            uncovered_terminal_label_points(result)
-            or needs_terminal_supplement(result)
-        )
-    )
+    terminal_detail_needed = needs_focused_terminal_detail(result)
     terminal_detail_failed = False
     if terminal_detail_needed:
         # Broad airport queries can be expensive on a busy Overpass instance.
