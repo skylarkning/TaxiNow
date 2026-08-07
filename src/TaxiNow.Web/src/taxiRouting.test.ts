@@ -92,6 +92,64 @@ describe("taxi routing", () => {
     expect(route.summary).not.toContain(" → Z → ");
   });
 
+  it("uses an exit ahead of the aircraft instead of a closer reverse exit", () => {
+    const features = [
+      feature("reverse-exit", "taxiway", [
+        [0, -0.00008],
+        [0.0018, 0.001]
+      ], "R"),
+      feature("forward-exit", "taxiway", [
+        [0, 0.00022],
+        [0.00035, 0.00055],
+        [0.0018, 0.001]
+      ], "K7"),
+      feature("gate", "gate", [[0.0018, 0.001]], "C32")
+    ];
+    const destination = listGateDestinations(features)[0]!;
+
+    const route = planTaxiRoutes(
+      buildTaxiGraph(features),
+      [0, 0],
+      destination,
+      "Aircraft",
+      1,
+      { startHeadingDegrees: 0 }
+    )[0]!;
+
+    expect(route.summary).toContain(" → K7 → ");
+    expect(route.summary).not.toContain(" → R → ");
+    expect(route.coordinates[1]![1]).toBeGreaterThan(0);
+  });
+
+  it("rejects an immediate near-180-degree reversal when taxiing to a gate", () => {
+    const features = [
+      feature("runway-exit", "taxiway", [[0, 0], [0, 0.0004]], "K7"),
+      feature("main", "taxiway", [
+        [0, 0.0004],
+        [0.0005, 0.0008],
+        [0.0012, 0.0008]
+      ], "K"),
+      feature("turnaround", "taxiway", [
+        [0, 0],
+        [0, -0.00015],
+        [0.0012, 0.0008]
+      ], "K6"),
+      feature("gate", "gate", [[0.0012, 0.0008]], "C")
+    ];
+    const route = planTaxiRoutes(
+      buildTaxiGraph(features),
+      [0, 0],
+      listGateDestinations(features)[0]!,
+      "Aircraft",
+      1,
+      { startHeadingDegrees: 0 }
+    )[0]!;
+
+    expect(route.summary).toContain(" → K → Gate C");
+    expect(route.summary).not.toContain("K6");
+    expect(route.coordinates[1]![1]).toBeGreaterThan(0);
+  });
+
   it("follows a valid customized taxiway sequence in order", () => {
     const graph = buildTaxiGraph(airport);
     const destination = listRunwayDestinations(airport).find(

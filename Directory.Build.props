@@ -7,10 +7,10 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.1.0.110</FileVersion>
-    <InformationalVersion>1.1.0+build.110</InformationalVersion>
+    <FileVersion>1.2.0.111</FileVersion>
+    <InformationalVersion>1.2.0+build.111</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>TaxiNow</Product>
     <Authors>Sky Ning</Authors>

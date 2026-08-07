@@ -1,4 +1,8 @@
 import type { AppLocale } from "./regionNames";
+import {
+  japaneseExtendedTranslations,
+  toTraditionalTranslations
+} from "./localization.zh-hant-ja";
 
 export const extendedTranslations: Record<AppLocale, Record<string, string>> = {
   en: {
@@ -111,6 +115,8 @@ export const extendedTranslations: Record<AppLocale, Record<string, string>> = {
     "faq.real.a": "不可以。地图可能不完整、过时、包含推断或存在误差；TaxiNow仅限个人模拟飞行使用。",
     "storage.groupMetaOne": "1 个机场 · {size}"
   },
+  "zh-Hant": {},
+  ja: japaneseExtendedTranslations,
   fr: {
     "access.help": "Sur un autre appareil connecté au même réseau, comme un téléphone ou un iPad, saisissez cette adresse IP locale dans le navigateur. Firefox est le navigateur recommandé pour TaxiNow.",
     "download.chinaNetwork": "",
@@ -222,3 +228,7 @@ export const extendedTranslations: Record<AppLocale, Record<string, string>> = {
     "storage.groupMetaOne": "1 Flughafen · {size}"
   }
 };
+
+extendedTranslations["zh-Hant"] = toTraditionalTranslations(
+  extendedTranslations["zh-Hans"]
+);

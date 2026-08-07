@@ -74,6 +74,8 @@ import {
 } from "./taxiRouting";
 
 const telemetrySamples: TelemetrySnapshot[] = [];
+const lastAirportStorageKey = "taxinow.lastAirport";
+const headingFollowStorageKey = "taxinow.map.headingFollow";
 let lastOwnshipFrameAt = 0;
 let lastRenderedOwnship: InterpolatedOwnship | null = null;
 let ownshipVisible = false;
@@ -102,6 +104,7 @@ let selectedTaxiRoute: TaxiRoute | null = null;
 let activeTaxiRoute: TaxiRoute | null = null;
 let activeTaxiSegmentIndex = 0;
 let lastTaxiCameraAt = 0;
+let headingFollowEnabled = readBooleanPreference(headingFollowStorageKey);
 let pendingCustomTaxiCorrection: string | null = null;
 let pendingCustomTaxiDestination: TaxiDestination | null = null;
 const assetGroupOpenState = new Map<string, boolean>();
@@ -124,6 +127,40 @@ interface DesktopStorageMessage {
   restartRequired: boolean;
 }
 
+function readLastAirport(): string | null {
+  try {
+    const value = window.localStorage.getItem(lastAirportStorageKey)
+      ?.trim().toUpperCase();
+    return value && /^[A-Z0-9]{3,5}$/.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberLastAirport(icao: string): void {
+  try {
+    window.localStorage.setItem(lastAirportStorageKey, icao);
+  } catch {
+    // The current map remains usable when browser storage is unavailable.
+  }
+}
+
+function readBooleanPreference(key: string): boolean {
+  try {
+    return window.localStorage.getItem(key) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeBooleanPreference(key: string, value: boolean): void {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    // Keep the setting for this session when storage is unavailable.
+  }
+}
+
 async function start(): Promise<void> {
   setupLanguageSelector();
   setupTaxiPlanner();
@@ -143,8 +180,11 @@ async function start(): Promise<void> {
     addresses: appStatus.localUrls.join(", ")
   });
   await refreshAssetManager();
+  const lastAirport = readLastAirport();
   const initialIcao =
-    installedAssets.some((asset) => asset.icao === appStatus.selectedAirport)
+    lastAirport && installedAssets.some((asset) => asset.icao === lastAirport)
+      ? lastAirport
+      : installedAssets.some((asset) => asset.icao === appStatus.selectedAirport)
       ? appStatus.selectedAirport
       : installedAssets[0]?.icao;
   if (!initialIcao) {
@@ -574,7 +614,8 @@ function findTaxiRoutes(destinationOverride?: TaxiDestination): void {
     position,
     destination,
     nearestStandLabel(currentAirportMap.features, position),
-    5
+    5,
+    { startHeadingDegrees: currentAircraftHeading() ?? undefined }
   );
   if (taxiRouteOptions.length === 0) {
     feedback.textContent = t("taxi.noNetwork");
@@ -707,6 +748,16 @@ function currentAircraftCoordinate(): Coordinate | null {
     : null;
 }
 
+function currentAircraftHeading(): number | null {
+  if (lastRenderedOwnship?.visible) {
+    return lastRenderedOwnship.heading;
+  }
+  const sample = telemetrySamples.at(-1);
+  return sample?.hasPosition && sample.onGround
+    ? sample.trueHeadingDegrees
+    : null;
+}
+
 function applyProductMetadata(status: AppStatus): void {
   document.title = `TaxiNow ${status.displayVersion}`;
   document.querySelector("#footer-version")!.textContent =
@@ -723,6 +774,8 @@ function applyProductMetadata(status: AppStatus): void {
     const dateLocales: Record<ReturnType<typeof getLocale>, string> = {
       en: "en-US",
       "zh-Hans": "zh-CN",
+      "zh-Hant": "zh-TW",
+      ja: "ja-JP",
       fr: "fr-FR",
       de: "de-DE"
     };
@@ -796,6 +849,7 @@ async function loadAirport(icao: string): Promise<void> {
   taxiGates = listGateDestinations(airport.features);
   populateTaxiDestinations();
   selectedAirportIcao = airport.airport.icao;
+  rememberLastAirport(selectedAirportIcao);
   airportBounds = [
     [airport.airport.bounds.minLon, airport.airport.bounds.minLat],
     [airport.airport.bounds.maxLon, airport.airport.bounds.maxLat]
@@ -1675,6 +1729,8 @@ function formatDurationUnit(
   const locales: Record<ReturnType<typeof getLocale>, string> = {
     en: "en-US",
     "zh-Hans": "zh-CN",
+    "zh-Hant": "zh-TW",
+    ja: "ja-JP",
     fr: "fr-FR",
     de: "de-DE"
   };
@@ -1736,7 +1792,7 @@ function createMap(airport: AirportMap): MapLibreMap {
     console.error(event.error);
   });
 
-  created.addControl(new maplibregl.NavigationControl(), "bottom-right");
+  created.addControl(new TaxiNowNavigationControl(), "bottom-right");
   created.addControl(new TelemetryRefreshControl(), "bottom-right");
   created.addControl(new FitAirportControl(), "bottom-right");
   labelNavigationControls(created);
@@ -1832,6 +1888,59 @@ class TelemetryRefreshControl implements maplibregl.IControl {
   onRemove(): void {
     this.container?.remove();
     this.container = undefined;
+  }
+}
+
+class TaxiNowNavigationControl implements maplibregl.IControl {
+  private readonly navigation = new maplibregl.NavigationControl();
+  private headingButton?: HTMLButtonElement;
+
+  onAdd(target: MapLibreMap): HTMLElement {
+    const container = this.navigation.onAdd(target);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "maplibregl-ctrl-heading-follow";
+    button.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path fill="currentColor" d="M12 2l3.2 7.1 5.8 2.2v2.2l-5.8-.8-1.1 6.1 2.3 1.6V22L12 20.8 7.6 22v-1.6l2.3-1.6-1.1-6.1-5.8.8v-2.2l5.8-2.2L12 2z" />' +
+      '<path fill="none" stroke="currentColor" stroke-width="1.7" d="M17.5 4.5h4v4" />' +
+      '<path fill="none" stroke="currentColor" stroke-width="1.7" d="M21.5 8.5a7 7 0 0 0-4-6" /></svg>';
+    button.addEventListener("click", () => {
+      headingFollowEnabled = !headingFollowEnabled;
+      writeBooleanPreference(headingFollowStorageKey, headingFollowEnabled);
+      this.updateButton();
+      if (headingFollowEnabled && lastRenderedOwnship?.visible) {
+        lastTaxiCameraAt = 0;
+        updateHeadingFollowCamera(
+          [lastRenderedOwnship.longitude, lastRenderedOwnship.latitude],
+          lastRenderedOwnship.heading,
+          performance.now(),
+          true
+        );
+      }
+    });
+    container.append(button);
+    this.headingButton = button;
+    this.updateButton();
+    return container;
+  }
+
+  onRemove(): void {
+    this.navigation.onRemove();
+    this.headingButton = undefined;
+  }
+
+  private updateButton(): void {
+    if (!this.headingButton) {
+      return;
+    }
+    const label = headingFollowEnabled
+      ? t("map.headingFollowDisable")
+      : t("map.headingFollowEnable");
+    this.headingButton.title = label;
+    this.headingButton.setAttribute("aria-label", label);
+    this.headingButton.setAttribute("aria-pressed", String(headingFollowEnabled));
+    this.headingButton.classList.toggle("is-active", headingFollowEnabled);
   }
 }
 
@@ -2243,6 +2352,13 @@ function renderOwnship(frameTime = performance.now()): void {
       lastRenderedOwnship.visible === renderedOwnship.visible &&
       lastRenderedOwnship.stale === renderedOwnship.stale
     ) {
+      if (headingFollowEnabled && renderedOwnship.visible) {
+        updateHeadingFollowCamera(
+          [renderedOwnship.longitude, renderedOwnship.latitude],
+          renderedOwnship.heading,
+          frameTime
+        );
+      }
       requestAnimationFrame(renderOwnship);
       return;
     }
@@ -2279,6 +2395,13 @@ function renderOwnship(frameTime = performance.now()): void {
     ownshipVisible = renderedOwnship.visible;
     if (renderedOwnship.visible && activeTaxiRoute) {
       updateActiveTaxiGuidance(
+        [renderedOwnship.longitude, renderedOwnship.latitude],
+        renderedOwnship.heading,
+        frameTime
+      );
+    }
+    if (renderedOwnship.visible && headingFollowEnabled) {
+      updateHeadingFollowCamera(
         [renderedOwnship.longitude, renderedOwnship.latitude],
         renderedOwnship.heading,
         frameTime
@@ -2379,6 +2502,7 @@ function updateActiveTaxiGuidance(
   });
 
   if (
+    !headingFollowEnabled &&
     frameTime - lastTaxiCameraAt >= 900 &&
     map?.isStyleLoaded() &&
     !map.isMoving()
@@ -2392,6 +2516,31 @@ function updateActiveTaxiGuidance(
       essential: true
     });
   }
+}
+
+function updateHeadingFollowCamera(
+  position: Coordinate,
+  heading: number,
+  frameTime: number,
+  force = false
+): void {
+  if (
+    !map?.isStyleLoaded() ||
+    (!force && frameTime - lastTaxiCameraAt < 700) ||
+    (!force && map.isMoving())
+  ) {
+    return;
+  }
+  lastTaxiCameraAt = frameTime;
+  const canvasHeight = map.getCanvas().clientHeight;
+  map.easeTo({
+    center: position,
+    bearing: heading,
+    zoom: Math.max(map.getZoom(), 16),
+    offset: [0, Math.min(220, canvasHeight * 0.23)],
+    duration: force ? 350 : 500,
+    essential: true
+  });
 }
 
 function setTaxiRouteGeometry(coordinates: Coordinate[]): void {

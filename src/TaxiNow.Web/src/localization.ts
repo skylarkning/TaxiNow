@@ -4,6 +4,10 @@ import {
   germanTranslations
 } from "./localization.fr-de";
 import { extendedTranslations } from "./localization.extended";
+import {
+  japaneseTranslations,
+  toTraditionalTranslations
+} from "./localization.zh-hant-ja";
 
 const STORAGE_KEY = "taxinow.language";
 
@@ -185,6 +189,8 @@ const translations: Record<AppLocale, Record<string, string>> = {
     "map.zoomIn": "Zoom in",
     "map.zoomOut": "Zoom out",
     "map.compass": "Map rotation: drag to rotate; click to reset north",
+    "map.headingFollowEnable": "Lock aircraft heading up and follow from lower center",
+    "map.headingFollowDisable": "Unlock aircraft heading-up follow mode",
     "error.noMaps": "No airport maps are downloaded.",
     "error.mapLoad": "Map failed to load.",
     "error.request": "Request failed ({status}).",
@@ -371,6 +377,8 @@ const translations: Record<AppLocale, Record<string, string>> = {
     "map.zoomIn": "放大",
     "map.zoomOut": "缩小",
     "map.compass": "地图旋转：拖动以旋转；单击恢复朝北",
+    "map.headingFollowEnable": "锁定机头朝上并将飞机跟随在画面下方中央",
+    "map.headingFollowDisable": "关闭机头朝上跟随模式",
     "error.noMaps": "尚未下载机场地图。",
     "error.mapLoad": "地图加载失败。",
     "error.request": "请求失败（{status}）。",
@@ -380,9 +388,15 @@ const translations: Record<AppLocale, Record<string, string>> = {
     "feedback.downloadQueued": "下载任务已加入队列。",
     "feedback.cleared": "已清除完成的下载活动。"
   },
+  "zh-Hant": {},
+  ja: japaneseTranslations,
   fr: frenchTranslations,
   de: germanTranslations
 };
+
+translations["zh-Hant"] = toTraditionalTranslations(
+  translations["zh-Hans"]
+);
 
 for (const locale of Object.keys(translations) as AppLocale[]) {
   Object.assign(translations[locale], extendedTranslations[locale]);
@@ -393,7 +407,8 @@ let currentLocale: AppLocale = "en";
 function storedLocale(): AppLocale {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored === "zh-Hans" || stored === "fr" || stored === "de"
+    return stored === "zh-Hans" || stored === "zh-Hant" ||
+      stored === "ja" || stored === "fr" || stored === "de"
       ? stored
       : "en";
   } catch {
@@ -469,7 +484,9 @@ function normalizeSimplifiedChineseSpacing(root: ParentNode): void {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let node = walker.nextNode();
   while (node) {
-    if (node.parentElement?.closest("[lang='zh-Hans'], .about-localized")) {
+    if (node.parentElement?.closest(
+      "[lang='zh-Hans'], [lang='zh-Hant'], .about-localized"
+    )) {
       node.textContent = normalizeSimplifiedChineseText(
         node.textContent ?? ""
       );

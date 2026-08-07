@@ -56,6 +56,16 @@ export interface TaxiRouteProgress {
   distanceToManeuverMeters: number;
 }
 
+export interface TaxiRoutePlanningOptions {
+  startHeadingDegrees?: number;
+}
+
+interface StartNodeCandidate {
+  node: number;
+  connectorDistanceMeters: number;
+  headingPenalty: number;
+}
+
 interface SearchState {
   node: number;
   previousNode: number | null;
@@ -272,14 +282,25 @@ export function planTaxiRoutes(
   start: Coordinate,
   destination: TaxiDestination,
   startLabel = "Aircraft",
-  maximumRoutes = 5
+  maximumRoutes = 5,
+  options: TaxiRoutePlanningOptions = {}
 ): TaxiRoute[] {
   if (graph.nodes.length === 0) {
     return [];
   }
-  const startNode = nearestNode(graph, start);
   const destinationNode = nearestNode(graph, destination.coordinate);
-  if (startNode === null || destinationNode === null) {
+  if (destinationNode === null) {
+    return [];
+  }
+  const enforceDepartureHeading = destination.kind === "gate" &&
+    Number.isFinite(options.startHeadingDegrees);
+  const startCandidates = nearestStartNodes(
+    graph,
+    start,
+    options.startHeadingDegrees,
+    enforceDepartureHeading
+  );
+  if (startCandidates.length === 0) {
     return [];
   }
 
@@ -290,14 +311,49 @@ export function planTaxiRoutes(
   let primaryDistance = 0;
   let primaryScore = 0;
 
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    const result = searchRoute(
+  let selectedStart = startCandidates[0]!;
+  let initialResult: SearchResult | null = null;
+  let initialCost = Number.POSITIVE_INFINITY;
+  for (const candidate of startCandidates) {
+    const candidateResult = searchRoute(
       graph,
-      startNode,
+      candidate.node,
       destinationNode,
       edgePenalties,
-      attempt
+      0,
+      options.startHeadingDegrees,
+      enforceDepartureHeading
     );
+    if (!candidateResult) {
+      continue;
+    }
+    const candidateCost = candidateResult.cost +
+      candidate.connectorDistanceMeters + candidate.headingPenalty;
+    if (candidateCost < initialCost) {
+      initialCost = candidateCost;
+      selectedStart = candidate;
+      initialResult = {
+        ...candidateResult,
+        cost: candidateResult.cost + candidate.headingPenalty
+      };
+    }
+  }
+  if (!initialResult) {
+    return [];
+  }
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const result = attempt === 0
+      ? initialResult
+      : searchRoute(
+        graph,
+        selectedStart.node,
+        destinationNode,
+        edgePenalties,
+        attempt,
+        options.startHeadingDegrees,
+        enforceDepartureHeading
+      );
     if (!result) {
       break;
     }
@@ -604,7 +660,9 @@ function searchRoute(
   startNode: number,
   destinationNode: number,
   edgePenalties: Map<string, number>,
-  attempt: number
+  attempt: number,
+  startHeadingDegrees?: number,
+  enforceStartHeading = false
 ): SearchResult | null {
   const queue: SearchState[] = [];
   const best = new Map<string, number>();
@@ -637,13 +695,37 @@ function searchRoute(
         continue;
       }
       const nextNode = graph.nodes[edge.to]!;
-      const turnPenalty = current.previousNode === null
-        ? 0
-        : calculateTurnPenalty(
+      const turnAngle = current.previousNode === null
+        ? null
+        : calculateTurnAngleDegrees(
           graph.nodes[current.previousNode]!,
           node,
           nextNode
         );
+      // A connected centerline graph can contain tiny loops and overlapping
+      // lines. Traversing one of those to reverse direction is not a usable
+      // aircraft manoeuvre, even when its geometric distance is short.
+      if (turnAngle !== null && turnAngle >= 165) {
+        continue;
+      }
+      let turnPenalty = turnAngle === null ? 0 : turnPenaltyForAngle(turnAngle);
+      if (
+        current.previousNode === null &&
+        Number.isFinite(startHeadingDegrees)
+      ) {
+        const firstEdgeBearing = coordinateBearing(
+          node.coordinate,
+          nextNode.coordinate
+        );
+        const departureDelta = Math.abs(signedBearingDelta(
+          startHeadingDegrees!,
+          firstEdgeBearing
+        ));
+        if (enforceStartHeading && departureDelta > 105) {
+          continue;
+        }
+        turnPenalty += headingDeparturePenalty(departureDelta);
+      }
       const refChangePenalty = current.previousRef && edge.ref &&
         current.previousRef !== edge.ref
         ? taxiwayChangePenalty(graph, current.previousRef, edge.ref)
@@ -960,9 +1042,22 @@ function calculateTurnPenalty(
   current: GraphNode,
   next: GraphNode
 ): number {
+  return turnPenaltyForAngle(
+    calculateTurnAngleDegrees(previous, current, next)
+  );
+}
+
+function calculateTurnAngleDegrees(
+  previous: GraphNode,
+  current: GraphNode,
+  next: GraphNode
+): number {
   const inbound = Math.atan2(current.y - previous.y, current.x - previous.x);
   const outbound = Math.atan2(next.y - current.y, next.x - current.x);
-  const delta = Math.abs(normalizeRadians(outbound - inbound)) * 180 / Math.PI;
+  return Math.abs(normalizeRadians(outbound - inbound)) * 180 / Math.PI;
+}
+
+function turnPenaltyForAngle(delta: number): number {
   if (delta < 25) {
     return 0;
   }
@@ -973,9 +1068,87 @@ function calculateTurnPenalty(
     return 24;
   }
   if (delta < 145) {
-    return 62;
+    return 82;
   }
-  return 220;
+  return 700;
+}
+
+function headingDeparturePenalty(delta: number): number {
+  if (delta <= 25) {
+    return 0;
+  }
+  if (delta <= 65) {
+    return 12;
+  }
+  if (delta <= 100) {
+    return 42;
+  }
+  if (delta <= 135) {
+    return 320;
+  }
+  return 1_200;
+}
+
+function nearestStartNodes(
+  graph: TaxiGraph,
+  coordinate: Coordinate,
+  headingDegrees: number | undefined,
+  enforceHeading: boolean
+): StartNodeCandidate[] {
+  if (graph.nodes.length === 0) {
+    return [];
+  }
+  const projected = projectMeters(coordinate, graph.referenceLatitude);
+  const measured = graph.nodes
+    .map((node) => ({
+      node,
+      distance: Math.hypot(node.x - projected[0], node.y - projected[1])
+    }))
+    .sort((left, right) => left.distance - right.distance);
+  const nearestDistance = measured[0]!.distance;
+  const maximumDistance = Math.min(220, Math.max(55, nearestDistance + 125));
+  const candidates = measured
+    .filter((candidate) => candidate.distance <= maximumDistance)
+    .slice(0, 10)
+    .map(({ node, distance }) => {
+      let delta = 0;
+      if (Number.isFinite(headingDegrees)) {
+        if (distance >= 6) {
+          delta = Math.abs(signedBearingDelta(
+            headingDegrees!,
+            coordinateBearing(coordinate, node.coordinate)
+          ));
+        } else if (node.edges.length > 0) {
+          delta = Math.min(...node.edges.map((edge) =>
+            Math.abs(signedBearingDelta(
+              headingDegrees!,
+              coordinateBearing(
+                node.coordinate,
+                graph.nodes[edge.to]!.coordinate
+              )
+            ))
+          ));
+        }
+      }
+      return {
+        node: node.id,
+        connectorDistanceMeters: distance,
+        headingPenalty: Number.isFinite(headingDegrees)
+          ? headingDeparturePenalty(delta)
+          : 0,
+        delta
+      };
+    });
+  const forward = enforceHeading
+    ? candidates.filter((candidate) => candidate.delta <= 105)
+    : candidates;
+  return (forward.length > 0 ? forward : candidates)
+    .sort((left, right) =>
+      left.connectorDistanceMeters + left.headingPenalty -
+      (right.connectorDistanceMeters + right.headingPenalty)
+    )
+    .slice(0, 6)
+    .map(({ delta: _delta, ...candidate }) => candidate);
 }
 
 function countTurns(coordinates: Coordinate[]): number {

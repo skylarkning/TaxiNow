@@ -1676,6 +1676,26 @@ footer {
   pointer-events: none;
 }
 
+.maplibregl-ctrl-heading-follow {
+  position: relative;
+  color: #38515e;
+}
+
+.maplibregl-ctrl-heading-follow svg {
+  width: 19px;
+  height: 19px;
+}
+
+.maplibregl-ctrl-heading-follow.is-active {
+  color: #056f66;
+  background: #bff5e9;
+  box-shadow: inset 3px 0 0 #0aa58e;
+}
+
+.maplibregl-ctrl-heading-follow.is-active:hover {
+  background: #d8fff6;
+}
+
 html[data-locale] .welcome-languages section[lang] {
   display: block !important;
 }

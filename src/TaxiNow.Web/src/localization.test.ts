@@ -5,11 +5,13 @@ import {
 } from "./localization";
 
 describe("application localization", () => {
-  it("keeps French and German translation catalogs complete", () => {
+  it("keeps every translation catalog complete", () => {
     const englishKeys = getTranslationKeys("en");
     expect(getTranslationKeys("fr")).toEqual(englishKeys);
     expect(getTranslationKeys("de")).toEqual(englishKeys);
     expect(getTranslationKeys("zh-Hans")).toEqual(englishKeys);
+    expect(getTranslationKeys("zh-Hant")).toEqual(englishKeys);
+    expect(getTranslationKeys("ja")).toEqual(englishKeys);
   });
 
   it("removes layout whitespace between Simplified Chinese characters", () => {
