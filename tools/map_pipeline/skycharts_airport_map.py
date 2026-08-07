@@ -37,6 +37,8 @@ OVERPASS_ENDPOINTS = (
 )
 OVERPASS_REQUEST_TIMEOUT = 35
 OVERPASS_TOTAL_TIMEOUT = 120
+OVERPASS_TERMINAL_TOTAL_TIMEOUT = 45
+OVERPASS_TERMINAL_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 OVERPASS_FAILURE_COOLDOWN = 60
 OVERPASS_MAX_FAILURE_COOLDOWN = 15 * 60
 OVERPASS_BUSY_WAIT = 120
@@ -122,7 +124,16 @@ def report_progress(callback, phase, percentage, source, **metrics):
         )
 
 
-def read_response(response, progress, phase, start_percentage, end_percentage, source):
+def read_response(
+    response,
+    progress,
+    phase,
+    start_percentage,
+    end_percentage,
+    source,
+    deadline=None,
+    maximum_bytes=None,
+):
     total_header = response.headers.get("Content-Length")
     try:
         total = int(total_header) if total_header else None
@@ -132,11 +143,39 @@ def read_response(response, progress, phase, start_percentage, end_percentage, s
     downloaded = 0
     started = time.monotonic()
     while True:
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("response exceeded its total time limit")
+            # urllib's timeout normally applies to each socket operation rather
+            # than the complete response. Tighten the underlying socket before
+            # every read so a server cannot keep a request alive indefinitely
+            # by occasionally sending a small chunk.
+            socket = getattr(
+                getattr(getattr(response, "fp", None), "raw", None),
+                "_sock",
+                None,
+            )
+            if socket is not None:
+                try:
+                    socket.settimeout(max(0.1, remaining))
+                except (OSError, ValueError):
+                    # Some HTTP wrappers expose a socket that has already
+                    # transitioned state. The deadline checks still provide a
+                    # bounded response at the next completed read.
+                    pass
         chunk = response.read(64 * 1024)
         if not chunk:
             break
         chunks.append(chunk)
         downloaded += len(chunk)
+        if maximum_bytes is not None and downloaded > maximum_bytes:
+            raise AirportMapError(
+                "response exceeded the %d MiB safety limit"
+                % (maximum_bytes // (1024 * 1024))
+            )
+        if deadline is not None and time.monotonic() >= deadline:
+            raise TimeoutError("response exceeded its total time limit")
         elapsed = max(time.monotonic() - started, 0.001)
         speed = downloaded / elapsed
         fraction = min(1.0, downloaded / total) if total else 0.0
@@ -296,7 +335,14 @@ def short_network_error(error):
     return text if len(text) <= 72 else text[:69] + "..."
 
 
-def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT, progress=None):
+def request_overpass(
+    query,
+    endpoints,
+    timeout=OVERPASS_REQUEST_TIMEOUT,
+    progress=None,
+    total_timeout=OVERPASS_TOTAL_TIMEOUT,
+    maximum_response_bytes=None,
+):
     """Serialize public Overpass work across airport download workers.
 
     Public instances apply per-user slots and cooldowns. Sending several
@@ -309,6 +355,8 @@ def request_overpass(query, endpoints, timeout=OVERPASS_REQUEST_TIMEOUT, progres
             endpoints,
             timeout=timeout,
             progress=progress,
+            total_timeout=total_timeout,
+            maximum_response_bytes=maximum_response_bytes,
         )
 
 
@@ -317,12 +365,14 @@ def _request_overpass_unlocked(
     endpoints,
     timeout=OVERPASS_REQUEST_TIMEOUT,
     progress=None,
+    total_timeout=OVERPASS_TOTAL_TIMEOUT,
+    maximum_response_bytes=None,
 ):
     body = urllib.parse.urlencode({"data": query}).encode("utf-8")
     errors = []
     attempted = set()
     started = time.monotonic()
-    request_deadline = started + OVERPASS_TOTAL_TIMEOUT
+    request_deadline = started + total_timeout
     busy_deadline = min(
         request_deadline,
         started + OVERPASS_BUSY_WAIT,
@@ -397,6 +447,8 @@ def _request_overpass_unlocked(
                     12,
                     76,
                     "OpenStreetMap",
+                    deadline=request_deadline,
+                    maximum_bytes=maximum_response_bytes,
                 )
                 result = json.loads(payload.decode("utf-8"))
             with _ENDPOINT_CONDITION:
@@ -431,7 +483,7 @@ def _request_overpass_unlocked(
         raise OverpassUnavailableError("all available Overpass services failed (%s)" % "; ".join(errors))
     raise OverpassUnavailableError(
         "OpenStreetMap did not respond within %d seconds"
-        % OVERPASS_TOTAL_TIMEOUT
+        % total_timeout
     )
 
 
@@ -442,12 +494,14 @@ def fetch_overpass(
     endpoint=None,
     progress=None,
     bounds=None,
+    total_timeout=OVERPASS_TOTAL_TIMEOUT,
 ):
     endpoints = (endpoint,) if endpoint else OVERPASS_ENDPOINTS
     return request_overpass(
         overpass_query(latitude, longitude, radius, bounds),
         endpoints,
         progress=progress,
+        total_timeout=total_timeout,
     )
 
 
@@ -641,13 +695,20 @@ def airport_query_bounds(
     )
 
 
-def fetch_overpass_terminals(bounds, endpoint=None, progress=None):
+def fetch_overpass_terminals(
+    bounds,
+    endpoint=None,
+    progress=None,
+    total_timeout=OVERPASS_TERMINAL_TOTAL_TIMEOUT,
+):
     endpoints = (endpoint,) if endpoint else OVERPASS_ENDPOINTS
     return request_overpass(
         overpass_terminal_query(bounds),
         endpoints,
         timeout=min(OVERPASS_REQUEST_TIMEOUT, 25),
         progress=progress,
+        total_timeout=min(OVERPASS_TERMINAL_TOTAL_TIMEOUT, total_timeout),
+        maximum_response_bytes=OVERPASS_TERMINAL_MAX_RESPONSE_BYTES,
     )
 
 
@@ -2093,6 +2154,24 @@ def gateway_terminal_supplements(
     return supplements
 
 
+def should_try_gateway_terminal_supplement(result, terminal_detail_failed=False):
+    """Use Gateway only when it can fill an unresolved terminal gap.
+
+    A focused OSM building query may time out or exceed its response budget at
+    very large airports. In that case existing OSM terminal polygons remain
+    authoritative, while the overlap filter can safely accept only Gateway
+    terminal pieces located in still-uncovered areas.
+    """
+    if result is None or not needs_terminal_supplement(result):
+        return False
+    authoritative_terminals = [
+        feature for feature in result.get("features", [])
+        if feature.get("kind") == "terminal"
+        and len(feature.get("points") or []) >= 3
+    ]
+    return terminal_detail_failed or not authoritative_terminals
+
+
 def normalize(raw, airport, source="OpenStreetMap contributors", source_url="https://www.openstreetmap.org/copyright"):
     features = []
     all_points = []
@@ -2273,6 +2352,10 @@ def build_airport_map(
         runway_raw,
         maximum_radius=radius,
     )
+    # Treat all public Overpass work for one airport as a single budget. A
+    # successful broad query must not reset the clock before an optional,
+    # expensive terminal-building query (EGLL is a representative case).
+    osm_deadline = time.monotonic() + OVERPASS_TOTAL_TIMEOUT
     try:
         raw = fetch_overpass(
             airport["latitude"],
@@ -2280,6 +2363,7 @@ def build_airport_map(
             radius,
             progress=progress,
             bounds=query_bounds,
+            total_timeout=max(1, osm_deadline - time.monotonic()),
         )
     except OverpassUnavailableError as error:
         overpass_error = error
@@ -2304,6 +2388,7 @@ def build_airport_map(
             or needs_terminal_supplement(result)
         )
     )
+    terminal_detail_failed = False
     if terminal_detail_needed:
         # Broad airport queries can be expensive on a busy Overpass instance.
         # Retry terminal anchors plus all building footprints in the compact
@@ -2311,6 +2396,11 @@ def build_airport_map(
         # buildings. This reconstructs terminals made from building parts
         # without importing unrelated urban buildings.
         try:
+            remaining_osm_time = osm_deadline - time.monotonic()
+            if remaining_osm_time <= 1:
+                raise OverpassUnavailableError(
+                    "airport OpenStreetMap time budget was exhausted"
+                )
             report_progress(
                 progress,
                 "waiting_for_map_source",
@@ -2320,6 +2410,7 @@ def build_airport_map(
             terminal_raw = fetch_overpass_terminals(
                 query_bounds,
                 progress=None,
+                total_timeout=remaining_osm_time,
             )
             terminal_elements = list(terminal_raw.get("elements", []))
             if terminal_elements:
@@ -2351,7 +2442,7 @@ def build_airport_map(
         except (OverpassUnavailableError, AirportMapError):
             # The original map is still usable; the Gateway supplement below
             # remains available if the focused OSM request also fails.
-            pass
+            terminal_detail_failed = True
 
     faa_elements = []
     result_counts = (result or {}).get("counts") or {}
@@ -2406,15 +2497,9 @@ def build_airport_map(
         except AirportMapError:
             pass
 
-    authoritative_terminals = [
-        feature for feature in (result or {}).get("features", [])
-        if feature.get("kind") == "terminal"
-        and len(feature.get("points") or []) >= 3
-    ]
-    if (
-        result is not None
-        and needs_terminal_supplement(result)
-        and not authoritative_terminals
+    if should_try_gateway_terminal_supplement(
+        result,
+        terminal_detail_failed,
     ):
         try:
             report_progress(

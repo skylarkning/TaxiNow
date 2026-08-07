@@ -508,6 +508,65 @@ class OpenStreetMapPriorityTests(unittest.TestCase):
 
         self.assertEqual(1, maximum_active)
 
+    def test_terminal_overpass_request_has_bounded_time_and_size(self):
+        with mock.patch.object(
+            skycharts,
+            "request_overpass",
+            return_value={"elements": []},
+        ) as request:
+            skycharts.fetch_overpass_terminals((1.0, 2.0, 3.0, 4.0))
+
+        self.assertEqual(
+            skycharts.OVERPASS_TERMINAL_TOTAL_TIMEOUT,
+            request.call_args.kwargs["total_timeout"],
+        )
+        self.assertEqual(
+            skycharts.OVERPASS_TERMINAL_MAX_RESPONSE_BYTES,
+            request.call_args.kwargs["maximum_response_bytes"],
+        )
+
+    def test_terminal_overpass_request_respects_smaller_airport_budget(self):
+        with mock.patch.object(
+            skycharts,
+            "request_overpass",
+            return_value={"elements": []},
+        ) as request:
+            skycharts.fetch_overpass_terminals(
+                (1.0, 2.0, 3.0, 4.0),
+                total_timeout=7,
+            )
+
+        self.assertEqual(7, request.call_args.kwargs["total_timeout"])
+
+    def test_failed_osm_terminal_detail_allows_gateway_gap_fill(self):
+        result = {
+            "center": [-0.45, 51.47],
+            "features": [{
+                "kind": "terminal",
+                "points": [
+                    [-0.46, 51.47],
+                    [-0.45, 51.47],
+                    [-0.45, 51.48],
+                    [-0.46, 51.48],
+                    [-0.46, 51.47],
+                ],
+            }],
+        }
+        result["features"].extend({
+            "kind": "gate",
+            "points": [[-0.44 + index * 0.001, 51.47]],
+        } for index in range(10))
+
+        self.assertFalse(
+            skycharts.should_try_gateway_terminal_supplement(result)
+        )
+        self.assertTrue(
+            skycharts.should_try_gateway_terminal_supplement(
+                result,
+                terminal_detail_failed=True,
+            )
+        )
+
     def test_gateway_terminal_supplement_skips_osm_overlap(self):
         def terminal(element_id, west):
             return {
