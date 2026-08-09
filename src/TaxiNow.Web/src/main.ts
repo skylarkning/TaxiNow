@@ -168,6 +168,7 @@ function writeBooleanPreference(key: string, value: boolean): void {
 
 async function start(): Promise<void> {
   setupLanguageSelector();
+  setupResponsiveHeader();
   setupDesktopWindowSettings();
   setupTaxiPlanner();
   setupAssetManager();
@@ -198,6 +199,69 @@ async function start(): Promise<void> {
   }
   await loadAirport(initialIcao);
   await connectTelemetry();
+}
+
+const headerCollapseClasses = [
+  "header-collapse-airport-name",
+  "header-collapse-network",
+  "header-collapse-status",
+  "header-collapse-about"
+] as const;
+
+function setupResponsiveHeader(): void {
+  const header = document.querySelector<HTMLElement>("header");
+  const primary = header?.querySelector<HTMLElement>(".header-primary");
+  const airportToggle = header?.querySelector<HTMLElement>(
+    ".airport-picker-toggle"
+  );
+  const actions = header?.querySelector<HTMLElement>(".actions");
+  if (!header || !primary || !airportToggle || !actions) {
+    return;
+  }
+
+  let frame: number | null = null;
+  const overlaps = (): boolean => {
+    const headerRect = header.getBoundingClientRect();
+    const primaryRect = primary.getBoundingClientRect();
+    const airportRect = airportToggle.getBoundingClientRect();
+    const actionsRect = actions.getBoundingClientRect();
+    const gap = Number.parseFloat(getComputedStyle(header).columnGap) || 0;
+    return airportRect.right + gap > actionsRect.left + 1 ||
+      primaryRect.left < headerRect.left - 1 ||
+      actionsRect.right > headerRect.right + 1;
+  };
+
+  const fit = (): void => {
+    frame = null;
+    header.classList.remove(...headerCollapseClasses);
+    for (const className of headerCollapseClasses) {
+      if (!overlaps()) {
+        break;
+      }
+      header.classList.add(className);
+    }
+  };
+
+  const schedule = (): void => {
+    if (frame !== null) {
+      cancelAnimationFrame(frame);
+    }
+    frame = requestAnimationFrame(fit);
+  };
+
+  const resizeObserver = new ResizeObserver(schedule);
+  resizeObserver.observe(header);
+  resizeObserver.observe(primary);
+  resizeObserver.observe(actions);
+  const textObserver = new MutationObserver(schedule);
+  textObserver.observe(header, {
+    characterData: true,
+    childList: true,
+    subtree: true
+  });
+  document.fonts.ready.then(schedule).catch(schedule);
+  window.addEventListener("resize", schedule, { passive: true });
+  schedule();
 }
 
 function setupAboutDialog(): void {

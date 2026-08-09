@@ -87,6 +87,7 @@ header > div {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   max-width: min(510px, 46vw);
   padding: 7px 9px;
   border-color: transparent;
@@ -188,6 +189,7 @@ header > div {
 }
 
 #airport-name {
+  min-width: 0;
   color: #b8c9d3;
   font-size: 13px;
   overflow: hidden;
@@ -198,6 +200,13 @@ header > div {
 .actions {
   flex-shrink: 0;
   align-items: center;
+}
+
+header.header-collapse-airport-name #airport-name,
+header.header-collapse-network .network-access,
+header.header-collapse-status .status,
+header.header-collapse-about #open-about {
+  display: none;
 }
 
 .actions > button,
@@ -1734,31 +1743,7 @@ html[data-locale] .welcome-languages section[lang] {
   display: block !important;
 }
 
-@media (max-width: 1080px) {
-  .network-access {
-    display: none;
-  }
-}
-
-@media (max-width: 1180px) {
-  #airport-name {
-    display: none;
-  }
-
-  .airport-picker-toggle {
-    max-width: 110px;
-  }
-}
-
-@media (max-width: 900px) {
-  .actions .status {
-    display: none;
-  }
-}
-
 @media (max-width: 640px) {
-  #airport-name,
-  .server-url,
   footer span:first-child {
     display: none;
   }
@@ -1770,14 +1755,6 @@ html[data-locale] .welcome-languages section[lang] {
 
   header > div {
     gap: 7px;
-  }
-
-  .actions .status {
-    display: none;
-  }
-
-  #open-about {
-    display: none;
   }
 
   .asset-panel {
