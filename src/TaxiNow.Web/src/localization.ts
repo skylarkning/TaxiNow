@@ -416,6 +416,8 @@ for (const locale of Object.keys(translations) as AppLocale[]) {
 translations["zh-Hant"]["faq.warp.a"] =
   translations["zh-Hant"]["faq.warp.a"]
     ?.replaceAll("飛停機", "停機") ?? "";
+translations["zh-Hant"]["faq.warp.q"] =
+  "使用瞬移後，為什麼航機位置沒有同步？";
 
 let currentLocale: AppLocale = "en";
 
