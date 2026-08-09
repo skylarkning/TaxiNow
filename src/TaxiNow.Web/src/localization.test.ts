@@ -12,6 +12,7 @@ describe("application localization", () => {
     expect(getTranslationKeys("zh-Hans")).toEqual(englishKeys);
     expect(getTranslationKeys("zh-Hant")).toEqual(englishKeys);
     expect(getTranslationKeys("ja")).toEqual(englishKeys);
+    expect(getTranslationKeys("ko")).toEqual(englishKeys);
   });
 
   it("removes layout whitespace between Simplified Chinese characters", () => {

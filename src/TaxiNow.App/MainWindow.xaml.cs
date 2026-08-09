@@ -10,16 +10,23 @@ namespace TaxiNow.App;
 public partial class MainWindow : Window
 {
     private readonly Func<string, Task<bool>> _changeStorageRootAsync;
+    private readonly Func<bool, bool> _changeKeepWindowVisible;
     private string _storageRoot;
+    private bool _keepWindowVisible;
 
     public MainWindow(
         string storageRoot,
-        Func<string, Task<bool>> changeStorageRootAsync)
+        bool keepWindowVisible,
+        Func<string, Task<bool>> changeStorageRootAsync,
+        Func<bool, bool> changeKeepWindowVisible)
     {
         _storageRoot = storageRoot;
+        _keepWindowVisible = keepWindowVisible;
         _changeStorageRootAsync = changeStorageRootAsync;
+        _changeKeepWindowVisible = changeKeepWindowVisible;
         InitializeComponent();
         Title = $"TaxiNow {TaxiNowHost.DisplayVersion}";
+        Topmost = keepWindowVisible;
     }
 
     public async Task LoadMapAsync()
@@ -80,6 +87,35 @@ public partial class MainWindow : Window
             PostStorageLocation(restartRequired: false);
             return;
         }
+        if (type == "window-settings:get")
+        {
+            PostWindowSettings();
+            return;
+        }
+        if (type == "window-settings:set")
+        {
+            bool enabled;
+            try
+            {
+                using var document = JsonDocument.Parse(e.WebMessageAsJson);
+                enabled = document.RootElement.GetProperty("keepVisible")
+                    .GetBoolean();
+            }
+            catch (Exception exception)
+                when (exception is JsonException or KeyNotFoundException or
+                    InvalidOperationException)
+            {
+                return;
+            }
+
+            if (_changeKeepWindowVisible(enabled))
+            {
+                _keepWindowVisible = enabled;
+                Topmost = enabled;
+            }
+            PostWindowSettings();
+            return;
+        }
         if (type != "storage-location:choose")
         {
             return;
@@ -106,6 +142,15 @@ public partial class MainWindow : Window
 
         _storageRoot = Path.GetFullPath(picker.SelectedPath);
         PostStorageLocation(restartRequired: true);
+    }
+
+    private void PostWindowSettings()
+    {
+        MapView.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(new
+        {
+            type = "window-settings",
+            keepVisible = _keepWindowVisible
+        }));
     }
 
     private void PostStorageLocation(bool restartRequired)

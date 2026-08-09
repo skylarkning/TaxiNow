@@ -127,6 +127,11 @@ interface DesktopStorageMessage {
   restartRequired: boolean;
 }
 
+interface DesktopWindowSettingsMessage {
+  type: "window-settings";
+  keepVisible: boolean;
+}
+
 function readLastAirport(): string | null {
   try {
     const value = window.localStorage.getItem(lastAirportStorageKey)
@@ -163,6 +168,7 @@ function writeBooleanPreference(key: string, value: boolean): void {
 
 async function start(): Promise<void> {
   setupLanguageSelector();
+  setupDesktopWindowSettings();
   setupTaxiPlanner();
   setupAssetManager();
   setupAirportPicker();
@@ -777,7 +783,8 @@ function applyProductMetadata(status: AppStatus): void {
       "zh-Hant": "zh-TW",
       ja: "ja-JP",
       fr: "fr-FR",
-      de: "de-DE"
+      de: "de-DE",
+      ko: "ko-KR"
     };
     localizedBuildDate.textContent = Number.isNaN(parsedBuildDate.valueOf())
       ? status.buildDate
@@ -1143,6 +1150,38 @@ function setupDesktopStorageLocation(): void {
       : t("storage.newLocation");
   });
   bridge.postMessage({ type: "storage-location:get" });
+}
+
+function setupDesktopWindowSettings(): void {
+  const bridge = (
+    window as typeof window & {
+      chrome?: { webview?: DesktopWebViewBridge };
+    }
+  ).chrome?.webview;
+  const toggle = document.querySelector<HTMLButtonElement>(
+    "#keep-window-visible"
+  );
+  if (!bridge || !toggle) {
+    return;
+  }
+
+  toggle.hidden = false;
+  toggle.addEventListener("click", () => {
+    const enabled = toggle.getAttribute("aria-checked") !== "true";
+    bridge.postMessage({
+      type: "window-settings:set",
+      keepVisible: enabled
+    });
+  });
+  bridge.addEventListener("message", (event) => {
+    const message = event.data as Partial<DesktopWindowSettingsMessage> | null;
+    if (message?.type !== "window-settings" ||
+        typeof message.keepVisible !== "boolean") {
+      return;
+    }
+    toggle.setAttribute("aria-checked", String(message.keepVisible));
+  });
+  bridge.postMessage({ type: "window-settings:get" });
 }
 
 function ensureAssetPolling(): void {
@@ -1732,7 +1771,8 @@ function formatDurationUnit(
     "zh-Hant": "zh-TW",
     ja: "ja-JP",
     fr: "fr-FR",
-    de: "de-DE"
+    de: "de-DE",
+    ko: "ko-KR"
   };
   return new Intl.NumberFormat(locales[getLocale()], {
     style: "unit",

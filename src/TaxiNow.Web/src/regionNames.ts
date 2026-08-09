@@ -1,4 +1,4 @@
-export type AppLocale = "en" | "zh-Hans" | "zh-Hant" | "ja" | "fr" | "de";
+export type AppLocale = "en" | "zh-Hans" | "zh-Hant" | "ja" | "fr" | "de" | "ko";
 
 type LocalizedRegionName = Partial<Record<AppLocale, string>> & {
   en: string;
@@ -154,6 +154,7 @@ export function formatCountryName(
         ja: "ja-JP",
         fr: "fr-FR",
         de: "de-DE",
+        ko: "ko-KR",
         en: "en"
       }[locale]],
       { type: "region" }

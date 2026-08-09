@@ -1,6 +1,6 @@
 # Windows distribution
 
-TaxiNow V1.2 (internal build 111) ships in two forms:
+TaxiNow V1.3 (internal build 112) ships in two forms:
 
 1. A Windows installer is the primary release for most users.
 2. A portable ZIP is a secondary release for advanced users and troubleshooting.

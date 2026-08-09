@@ -3,6 +3,7 @@ import {
   japaneseExtendedTranslations,
   toTraditionalTranslations
 } from "./localization.zh-hant-ja";
+import { koreanExtendedTranslations } from "./localization.ko";
 
 export const extendedTranslations: Record<AppLocale, Record<string, string>> = {
   en: {
@@ -226,7 +227,8 @@ export const extendedTranslations: Record<AppLocale, Record<string, string>> = {
     "faq.real.q": "Eignet sich TaxiNow für reale Navigation?",
     "faq.real.a": "Nein. Karten können unvollständig, veraltet, abgeleitet oder ungenau sein. TaxiNow ist ausschließlich für private Flugsimulation bestimmt.",
     "storage.groupMetaOne": "1 Flughafen · {size}"
-  }
+  },
+  ko: koreanExtendedTranslations
 };
 
 extendedTranslations["zh-Hant"] = toTraditionalTranslations(

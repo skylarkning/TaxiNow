@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#08111d" />
-    <title>TaxiNow V1.2</title>
+    <title>TaxiNow V1.3</title>
   </head>
   <body>
     <main id="app">
@@ -91,26 +91,52 @@
           <button id="open-assets"
                   type="button"
                   data-i18n="actions.assets">Maps &amp; storage</button>
-          <div class="language-picker">
-            <button id="language-selector"
-                    class="language-selector"
+          <div class="settings-picker">
+            <button id="settings-selector"
+                    class="settings-selector"
                     type="button"
                     aria-haspopup="menu"
                     aria-expanded="false"
-                    aria-controls="language-menu"
-                    aria-label="Choose language"
-                    data-i18n-aria-label="actions.languageAria">
+                    aria-controls="settings-menu"
+                    aria-label="Settings"
+                    data-i18n-aria-label="settings.aria">
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="9"></circle>
-                <path d="M3 12h18M12 3c2.7 2.5 4.1 5.5 4.1 9S14.7 18.5 12 21M12 3C9.3 5.5 7.9 8.5 7.9 12S9.3 18.5 12 21"></path>
+                <path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"></path>
+                <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.86 2.86-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H9.55v-.1A1.7 1.7 0 0 0 8.4 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.86-2.86.06-.06A1.7 1.7 0 0 0 4 15a1.7 1.7 0 0 0-1.5-1H2.4V10h.1A1.7 1.7 0 0 0 4 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06L6.46 4.2l.06.06A1.7 1.7 0 0 0 8.4 4a1.7 1.7 0 0 0 1-1.5V2.4h4.05v.1A1.7 1.7 0 0 0 15 4a1.7 1.7 0 0 0 1.88.26l.06-.06 2.86 2.86-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.5 1h.1v4h-.1a1.7 1.7 0 0 0-1.5 1Z"></path>
               </svg>
             </button>
-            <div id="language-menu"
-                 class="language-menu"
+            <div id="settings-menu"
+                 class="settings-menu"
                  role="menu"
-                 aria-label="Language"
-                 data-i18n-aria-label="actions.languageMenu"
+                 aria-label="Settings"
+                 data-i18n-aria-label="settings.menu"
                  hidden>
+              <div class="settings-title" data-i18n="settings.title">Settings</div>
+              <button id="keep-window-visible"
+                      class="settings-check-row"
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked="false"
+                      hidden>
+                <span data-i18n="settings.keepVisible">Keep window visible</span>
+                <span class="settings-check" aria-hidden="true">✓</span>
+              </button>
+              <button id="language-selector"
+                      class="settings-submenu-toggle"
+                      type="button"
+                      role="menuitem"
+                      aria-haspopup="menu"
+                      aria-expanded="false"
+                      aria-controls="language-menu">
+                <span data-i18n="actions.languageMenu">Language</span>
+                <span aria-hidden="true">›</span>
+              </button>
+              <div id="language-menu"
+                   class="language-menu"
+                   role="menu"
+                   aria-label="Language"
+                   data-i18n-aria-label="actions.languageMenu"
+                   hidden>
               <button type="button"
                       role="menuitemradio"
                       data-language-option="en"
@@ -153,6 +179,14 @@
                 <span>Deutsch</span>
                 <span class="language-check" aria-hidden="true">✓</span>
               </button>
+              <button type="button"
+                      role="menuitemradio"
+                      data-language-option="ko"
+                      aria-checked="false">
+                <span>한국어</span>
+                <span class="language-check" aria-hidden="true">✓</span>
+              </button>
+              </div>
             </div>
           </div>
           <button id="open-about"
@@ -648,7 +682,7 @@
             <h1 id="welcome-heading">Welcome to TaxiNow</h1>
             <p class="welcome-subtitle">欢迎使用 TaxiNow</p>
           </div>
-          <span class="welcome-version">V1.2</span>
+          <span class="welcome-version">V1.3</span>
         </div>
         <div class="welcome-languages">
           <section lang="en">
@@ -865,12 +899,12 @@
           </section>
           <p class="about-version">
             <span data-i18n="about.versionLabel">Version:</span>
-            <strong id="about-version-localized">V1.2</strong>
+            <strong id="about-version-localized">V1.3</strong>
             (<span data-i18n="about.buildDateLabel">Build date:</span>
-            <span id="about-build-date-localized">August 6, 2026</span>).
+            <span id="about-build-date-localized">August 9, 2026</span>).
             <br />
             <span data-i18n="about.internalBuildLabel">Internal build:</span>
-            <strong id="about-build-id-localized">111</strong>.
+            <strong id="about-build-id-localized">112</strong>.
           </p>
         </div>
         <div class="about-language about-legacy" lang="en">
@@ -1077,10 +1111,10 @@
           </details>
         </section>
         <p class="about-version">
-          Version: <strong id="about-version">V1.2</strong>
-          (Build date: <span id="about-build-date">August 6, 2026</span>).
+          Version: <strong id="about-version">V1.3</strong>
+          (Build date: <span id="about-build-date">August 9, 2026</span>).
           <br />
-          Internal build: <strong id="about-build-id">111</strong>.
+          Internal build: <strong id="about-build-id">112</strong>.
         </p>
         </div>
         <div class="about-chinese about-language about-legacy" lang="zh-Hans">
@@ -1255,10 +1289,10 @@
             </details>
           </section>
           <p class="about-version">
-            版本：<strong id="about-version-zh">V1.2</strong>
+            版本：<strong id="about-version-zh">V1.3</strong>
             （构建日期：<span id="about-build-date-zh">2026年8月2日</span>）。
             <br />
-            内部构建号：<strong id="about-build-id-zh">111</strong>。
+            内部构建号：<strong id="about-build-id-zh">112</strong>。
           </p>
         </div>
       </section>
@@ -1268,7 +1302,7 @@
         </span>
         <span id="map-summary"></span>
         <span class="footer-right">
-          <span id="footer-version">V1.2</span>
+          <span id="footer-version">V1.3</span>
           <span id="attribution"
                 data-i18n="footer.fixture">Bundled TaxiNow fixture</span>
         </span>

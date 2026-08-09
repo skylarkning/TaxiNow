@@ -3,7 +3,9 @@ using System.Text.Json;
 
 namespace TaxiNow.App;
 
-internal sealed record DesktopSettings(string? StorageRoot = null);
+internal sealed record DesktopSettings(
+    string? StorageRoot = null,
+    bool KeepWindowVisible = false);
 
 internal static class DesktopSettingsStore
 {
@@ -25,22 +27,20 @@ internal static class DesktopSettingsStore
     {
         try
         {
+            var settings = File.Exists(SettingsPath)
+                ? JsonSerializer.Deserialize<DesktopSettings>(
+                    File.ReadAllText(SettingsPath),
+                    JsonOptions) ?? new DesktopSettings()
+                : new DesktopSettings();
             if (File.Exists(StorageRootPointerPath))
             {
                 var storedRoot = File.ReadAllText(StorageRootPointerPath).Trim();
                 if (!string.IsNullOrWhiteSpace(storedRoot))
                 {
-                    return new DesktopSettings(storedRoot);
+                    settings = settings with { StorageRoot = storedRoot };
                 }
             }
-            if (!File.Exists(SettingsPath))
-            {
-                return new DesktopSettings();
-            }
-
-            return JsonSerializer.Deserialize<DesktopSettings>(
-                File.ReadAllText(SettingsPath),
-                JsonOptions) ?? new DesktopSettings();
+            return settings;
         }
         catch
         {

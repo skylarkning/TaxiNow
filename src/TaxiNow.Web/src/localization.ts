@@ -8,6 +8,7 @@ import {
   japaneseTranslations,
   toTraditionalTranslations
 } from "./localization.zh-hant-ja";
+import { koreanTranslations } from "./localization.ko";
 
 const STORAGE_KEY = "taxinow.language";
 
@@ -391,16 +392,30 @@ const translations: Record<AppLocale, Record<string, string>> = {
   "zh-Hant": {},
   ja: japaneseTranslations,
   fr: frenchTranslations,
-  de: germanTranslations
+  de: germanTranslations,
+  ko: koreanTranslations
 };
 
 translations["zh-Hant"] = toTraditionalTranslations(
   translations["zh-Hans"]
 );
+const settingsTranslations: Record<AppLocale, Record<string, string>> = {
+  en: { "settings.title": "Settings", "settings.aria": "Open settings", "settings.menu": "Settings", "settings.keepVisible": "Keep window visible" },
+  "zh-Hans": { "settings.title": "设置", "settings.aria": "打开设置", "settings.menu": "设置", "settings.keepVisible": "保持窗口始终可见" },
+  "zh-Hant": { "settings.title": "設定", "settings.aria": "開啟設定", "settings.menu": "設定", "settings.keepVisible": "保持視窗永遠顯示在最上層" },
+  ja: { "settings.title": "設定", "settings.aria": "設定を開く", "settings.menu": "設定", "settings.keepVisible": "ウィンドウを常に手前に表示" },
+  fr: { "settings.title": "Paramètres", "settings.aria": "Ouvrir les paramètres", "settings.menu": "Paramètres", "settings.keepVisible": "Garder la fenêtre visible" },
+  de: { "settings.title": "Einstellungen", "settings.aria": "Einstellungen öffnen", "settings.menu": "Einstellungen", "settings.keepVisible": "Fenster immer im Vordergrund" },
+  ko: { "settings.title": "설정", "settings.aria": "설정 열기", "settings.menu": "설정", "settings.keepVisible": "창을 항상 위에 표시" }
+};
 
 for (const locale of Object.keys(translations) as AppLocale[]) {
   Object.assign(translations[locale], extendedTranslations[locale]);
+  Object.assign(translations[locale], settingsTranslations[locale]);
 }
+translations["zh-Hant"]["faq.warp.a"] =
+  translations["zh-Hant"]["faq.warp.a"]
+    ?.replaceAll("飛停機", "停機") ?? "";
 
 let currentLocale: AppLocale = "en";
 
@@ -408,7 +423,7 @@ function storedLocale(): AppLocale {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     return stored === "zh-Hans" || stored === "zh-Hant" ||
-      stored === "ja" || stored === "fr" || stored === "de"
+      stored === "ja" || stored === "fr" || stored === "de" || stored === "ko"
       ? stored
       : "en";
   } catch {
@@ -501,29 +516,40 @@ export function initializeLocalization(): void {
 }
 
 export function setupLanguageSelector(): void {
-  const button = document.querySelector<HTMLButtonElement>(
+  const settingsButton = document.querySelector<HTMLButtonElement>(
+    "#settings-selector"
+  );
+  const settingsMenu = document.querySelector<HTMLElement>("#settings-menu");
+  const languageButton = document.querySelector<HTMLButtonElement>(
     "#language-selector"
   );
   const menu = document.querySelector<HTMLElement>("#language-menu");
-  const picker = document.querySelector<HTMLElement>(".language-picker");
-  if (!button || !menu || !picker) {
+  const picker = document.querySelector<HTMLElement>(".settings-picker");
+  if (!settingsButton || !settingsMenu || !languageButton || !menu || !picker) {
     return;
   }
 
   const options = Array.from(
     menu.querySelectorAll<HTMLButtonElement>("[data-language-option]")
   );
-  const setOpen = (open: boolean): void => {
+  const setLanguageOpen = (open: boolean): void => {
     menu.hidden = !open;
-    button.setAttribute("aria-expanded", String(open));
+    languageButton.setAttribute("aria-expanded", String(open));
+  };
+  const setSettingsOpen = (open: boolean): void => {
+    settingsMenu.hidden = !open;
+    settingsButton.setAttribute("aria-expanded", String(open));
+    if (!open) {
+      setLanguageOpen(false);
+    }
   };
   for (const option of options) {
     const locale = option.dataset.languageOption as AppLocale;
     option.setAttribute("aria-checked", String(locale === currentLocale));
     option.addEventListener("click", () => {
-      setOpen(false);
+      setSettingsOpen(false);
       if (locale === currentLocale) {
-        button.focus();
+        settingsButton.focus();
         return;
       }
       try {
@@ -536,9 +562,17 @@ export function setupLanguageSelector(): void {
     });
   }
 
-  button.addEventListener("click", () => {
+  settingsButton.addEventListener("click", () => {
+    const open = settingsMenu.hidden;
+    setSettingsOpen(open);
+    if (open) {
+      languageButton.focus();
+    }
+  });
+  languageButton.addEventListener("click", (event) => {
+    event.stopPropagation();
     const open = menu.hidden;
-    setOpen(open);
+    setLanguageOpen(open);
     if (open) {
       options.find(
         (option) => option.dataset.languageOption === currentLocale
@@ -547,14 +581,19 @@ export function setupLanguageSelector(): void {
   });
   document.addEventListener("click", (event) => {
     if (!picker.contains(event.target as Node)) {
-      setOpen(false);
+      setSettingsOpen(false);
     }
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape" || menu.hidden) {
+    if (event.key !== "Escape" || settingsMenu.hidden) {
       return;
     }
-    setOpen(false);
-    button.focus();
+    if (!menu.hidden) {
+      setLanguageOpen(false);
+      languageButton.focus();
+      return;
+    }
+    setSettingsOpen(false);
+    settingsButton.focus();
   });
 }

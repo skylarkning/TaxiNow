@@ -200,11 +200,16 @@ header > div {
   align-items: center;
 }
 
-.language-picker {
+.actions > button,
+.status {
+  white-space: nowrap;
+}
+
+.settings-picker {
   position: relative;
 }
 
-.language-selector {
+.settings-selector {
   display: grid;
   width: 38px;
   min-width: 38px;
@@ -213,7 +218,7 @@ header > div {
   place-items: center;
 }
 
-.language-selector svg {
+.settings-selector svg {
   width: 19px;
   height: 19px;
   fill: none;
@@ -223,12 +228,12 @@ header > div {
   stroke-linejoin: round;
 }
 
-.language-menu {
+.settings-menu {
   position: absolute;
   z-index: 24;
   top: calc(100% + 8px);
   right: 0;
-  width: 152px;
+  width: 230px;
   padding: 6px;
   border: 1px solid rgba(147, 181, 198, 0.34);
   border-radius: 10px;
@@ -236,6 +241,16 @@ header > div {
   box-shadow: 0 16px 42px rgba(0, 0, 0, 0.48);
 }
 
+.settings-title {
+  padding: 7px 9px 5px;
+  color: #78919e;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-menu button,
 .language-menu button {
   display: flex;
   align-items: center;
@@ -247,20 +262,39 @@ header > div {
   text-align: left;
 }
 
+.settings-menu button:hover,
+.settings-menu button[aria-checked="true"],
 .language-menu button:hover,
 .language-menu button[aria-checked="true"] {
   border-color: rgba(76, 240, 209, 0.28);
   background: rgba(33, 79, 82, 0.56);
 }
 
+.settings-check,
 .language-check {
   color: #4cf0d1;
   font-weight: 900;
   opacity: 0;
 }
 
+.settings-menu button[aria-checked="true"] .settings-check,
 .language-menu button[aria-checked="true"] .language-check {
   opacity: 1;
+}
+
+.settings-submenu-toggle {
+  margin-top: 2px;
+  border-top: 1px solid rgba(147, 181, 198, 0.14) !important;
+  border-radius: 0 0 7px 7px;
+}
+
+.language-menu {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  margin-top: 3px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(147, 181, 198, 0.14);
 }
 
 .server-url {
@@ -1702,6 +1736,22 @@ html[data-locale] .welcome-languages section[lang] {
 
 @media (max-width: 1080px) {
   .network-access {
+    display: none;
+  }
+}
+
+@media (max-width: 1180px) {
+  #airport-name {
+    display: none;
+  }
+
+  .airport-picker-toggle {
+    max-width: 110px;
+  }
+}
+
+@media (max-width: 900px) {
+  .actions .status {
     display: none;
   }
 }

@@ -24,6 +24,7 @@ public partial class App : System.Windows.Application
     private bool _allowWindowClose;
     private bool _quitStarted;
     private string _storageRoot = StoragePaths.Default.Root;
+    private bool _keepWindowVisible;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -46,8 +47,14 @@ public partial class App : System.Windows.Application
         }
 
         CreateTrayIcon();
-        _storageRoot = ResolveStorageRoot();
-        _window = new MainWindow(_storageRoot, ChangeStorageRootAsync);
+        var desktopSettings = DesktopSettingsStore.Load();
+        _keepWindowVisible = desktopSettings.KeepWindowVisible;
+        _storageRoot = ResolveStorageRoot(desktopSettings);
+        _window = new MainWindow(
+            _storageRoot,
+            _keepWindowVisible,
+            ChangeStorageRootAsync,
+            ChangeKeepWindowVisible);
         MainWindow = _window;
         _window.Closing += OnWindowClosing;
         _window.StateChanged += OnWindowStateChanged;
@@ -78,9 +85,9 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private static string ResolveStorageRoot()
+    private static string ResolveStorageRoot(DesktopSettings desktopSettings)
     {
-        var configured = DesktopSettingsStore.Load().StorageRoot;
+        var configured = desktopSettings.StorageRoot;
         var selected = string.IsNullOrWhiteSpace(configured)
             ? StoragePaths.Default.Root
             : configured;
@@ -90,7 +97,8 @@ public partial class App : System.Windows.Application
             var paths = PrepareStorageRoot(selected);
             try
             {
-                DesktopSettingsStore.Save(new DesktopSettings(selected));
+                DesktopSettingsStore.Save(
+                    desktopSettings with { StorageRoot = selected });
             }
             catch
             {
@@ -139,7 +147,9 @@ public partial class App : System.Windows.Application
 
         try
         {
-            DesktopSettingsStore.Save(new DesktopSettings(selected));
+            DesktopSettingsStore.Save(new DesktopSettings(
+                selected,
+                _keepWindowVisible));
         }
         catch (Exception exception)
         {
@@ -172,6 +182,33 @@ public partial class App : System.Windows.Application
         Dispatcher.BeginInvoke(
             () => _ = QuitAsync(restartApplication: true));
         return Task.FromResult(true);
+    }
+
+    private bool ChangeKeepWindowVisible(bool enabled)
+    {
+        try
+        {
+            DesktopSettingsStore.Save(new DesktopSettings(
+                _storageRoot,
+                enabled));
+        }
+        catch (Exception exception)
+        {
+            System.Windows.MessageBox.Show(
+                $"TaxiNow could not save the window visibility setting.\n\n" +
+                exception.Message,
+                "Window setting could not be saved",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return false;
+        }
+
+        _keepWindowVisible = enabled;
+        if (_window is not null)
+        {
+            _window.Topmost = enabled;
+        }
+        return true;
     }
 
     private static StoragePaths PrepareStorageRoot(string root)

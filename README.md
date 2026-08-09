@@ -23,8 +23,8 @@ the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release)
 The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
 third-party notices.
 
-Current release: **V1.2**, internal build **111**
-(build date: August 6, 2026). The About dialog
+Current release: **V1.3**, internal build **112**
+(build date: August 9, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is a free-of-charge application for personal
 flight-simulator use only.
@@ -89,12 +89,15 @@ their surrounding white canvas and create the required output sizes.
   `D, E, H, T1, RWY01L`. TaxiNow validates identifiers against the active map,
   highlights valid custom routes, suggests likely typo corrections, and offers
   automatic route finding when the requested sequence cannot be connected.
-- V1.2 adds Traditional Chinese and Japanese alongside English, Simplified
-  Chinese, French, and German; remembers the last displayed airport; and adds
+- V1.3 adds Korean alongside English, Simplified Chinese, Traditional Chinese,
+  Japanese, French, and German; remembers the last displayed airport; and adds
   an optional heading-up map lock that follows the aircraft at the lower center
   of the screen. Arrival routing now uses the live aircraft heading to reject
   reverse runway exits and strongly avoids near-180-degree ground turns while
   retaining the preference for well-connected main taxiways.
+- The language selector now lives inside a gear-shaped Settings menu. The
+  Windows app can persistently keep its window above the simulator, and narrow
+  headers collapse the airport name before controls can overlap.
 - Schema v2 validation and a schema v1 adapter.
 - Visible map downloader and asset manager for ICAO, country/region, and
   optional province/state downloads, with byte-level progress, transfer speed,
