@@ -15,6 +15,7 @@
 .selected-taxiway-pill button { display:grid; width:18px; height:18px; padding:0; place-items:center; border:0; border-radius:50%; color:#dff5ff; background:rgba(255,255,255,.12); line-height:1; }
 .available-taxiway-pill { min-width:31px; padding:5px 8px; border-color:rgba(147,181,198,.28); border-radius:6px; color:#d6e5eb; background:rgba(11,27,40,.8); font-size:10px; font-weight:800; }
 .taxiway-builder-feedback { margin:0; }
+.taxi-map-hint { margin:0; color:#91a8b4; font-size:10px; line-height:1.45; }
 
 .update-dialog { position:fixed; z-index:41; top:50%; left:50%; width:min(600px,calc(100vw - 32px)); max-height:calc(100vh - 48px); padding:22px; overflow-y:auto; border:1px solid rgba(76,240,209,.34); border-radius:14px; outline:none; color:#d9e6ea; background:linear-gradient(180deg,rgba(15,34,48,.99),rgba(7,17,29,.99)); box-shadow:0 24px 70px rgba(0,0,0,.58); transform:translate(-50%,-50%); }
 .update-version { color:#4cf0d1; font-weight:800; }
@@ -42,6 +43,7 @@ html[data-theme="light"] .download-form,html[data-theme="light"] .manager-sectio
 html[data-theme="light"] .taxi-search-card input,html[data-theme="light"] .taxi-search-card select,html[data-theme="light"] .airport-picker-panel input { color:#243743; border-color:rgba(67,95,108,.3); background:#fff; }
 html[data-theme="light"] .taxi-route-option,html[data-theme="light"] .available-taxiway-pill { color:#29414c; background:rgba(242,247,249,.95); }
 html[data-theme="light"] .taxi-guidance { color:#233b48; background:rgba(245,250,252,.97); box-shadow:0 14px 36px rgba(35,58,70,.24); }
+html[data-theme="light"] .taxi-map-hint { color:#506b78; }
 html[data-theme="light"] .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color:rgba(248,251,252,.99); }
 
 @media (max-width:620px) { .update-actions { grid-template-columns:1fr; } }

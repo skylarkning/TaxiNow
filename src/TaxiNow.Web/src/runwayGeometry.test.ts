@@ -39,6 +39,9 @@ describe("buildRunwayDecorations", () => {
       (feature) => feature.properties?.kind === "centerline"
     )).toBe(true);
     expect(result.markings.features.filter(
+      (feature) => feature.properties?.kind === "pavement"
+    )).toHaveLength(1);
+    expect(result.markings.features.filter(
       (feature) => feature.properties?.kind === "threshold"
     )).toHaveLength(2);
     expect(result.markings.features.some(
@@ -64,6 +67,27 @@ describe("buildRunwayDecorations", () => {
       const [first, second, third] = touchdown.geometry.coordinates[0]!;
       expect(distanceMeters(first!, second!)).toBeCloseTo(22.5, 1);
       expect(distanceMeters(second!, third!)).toBeCloseTo(1.8, 1);
+    }
+  });
+
+  it("keeps aiming and touchdown geometry inside the physical runway edges", () => {
+    const result = buildRunwayDecorations([runway]);
+    const paintedBlocks = result.markings.features.filter((feature) =>
+      ["aiming", "touchdown"].includes(String(feature.properties?.kind))
+    );
+
+    for (const feature of paintedBlocks) {
+      expect(feature.geometry.type).toBe("Polygon");
+      if (feature.geometry.type !== "Polygon") {
+        continue;
+      }
+      for (const point of feature.geometry.coordinates[0]!) {
+        expect(lateralDistanceMeters(
+          runway.points[0]!,
+          runway.points.at(-1)!,
+          point as [number, number]
+        )).toBeLessThanOrEqual((runway.widthMeters ?? 45) / 2 + 0.1);
+      }
     }
   });
 
@@ -118,4 +142,20 @@ function distanceMeters(left: number[], right: number[]): number {
     (right[0]! - left[0]!) * 111_320 * Math.cos(latitude * Math.PI / 180),
     (right[1]! - left[1]!) * 110_540
   );
+}
+
+function lateralDistanceMeters(
+  start: [number, number],
+  end: [number, number],
+  point: [number, number]
+): number {
+  const latitude = (start[1] + end[1]) / 2;
+  const scaleX = 111_320 * Math.cos(latitude * Math.PI / 180);
+  const scaleY = 110_540;
+  const runwayX = (end[0] - start[0]) * scaleX;
+  const runwayY = (end[1] - start[1]) * scaleY;
+  const pointX = (point[0] - start[0]) * scaleX;
+  const pointY = (point[1] - start[1]) * scaleY;
+  return Math.abs(runwayX * pointY - runwayY * pointX) /
+    Math.hypot(runwayX, runwayY);
 }

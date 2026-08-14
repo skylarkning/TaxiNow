@@ -646,7 +646,10 @@ function setupTaxiPlanner(): void {
   const setOpen = (open: boolean): void => {
     panel.classList.toggle("open", open);
     panel.setAttribute("aria-hidden", String(!open));
-    backdrop.hidden = !open;
+    // Taxi planning is a map tool, not a blocking modal. Keep the former
+    // backdrop hidden so users can pan, zoom and right-click the map while the
+    // planner is open (including manual start/destination placement).
+    backdrop.hidden = true;
     if (open) {
       populateTaxiDestinations();
       renderTaxiwayBuilder();
@@ -2389,9 +2392,9 @@ function createMap(airport: AirportMap): MapLibreMap {
         createTaxiwayBadgeImage("#080b0e", "#56636d"),
         {
           pixelRatio: 2,
-          stretchX: [[13, 35]],
-          stretchY: [[10, 22]],
-          content: [7, 5, 41, 27]
+          stretchX: [[11, 33]],
+          stretchY: [[9, 19]],
+          content: [6, 4, 38, 24]
         }
       );
       created.addImage(
@@ -2399,9 +2402,9 @@ function createMap(airport: AirportMap): MapLibreMap {
         createTaxiwayBadgeImage("#34454f", "#718792"),
         {
           pixelRatio: 2,
-          stretchX: [[13, 35]],
-          stretchY: [[10, 22]],
-          content: [7, 5, 41, 27]
+          stretchX: [[11, 33]],
+          stretchY: [[9, 19]],
+          content: [6, 4, 38, 24]
         }
       );
       created.addSource("runway-pavement-labels", {
@@ -2444,8 +2447,12 @@ function createMap(airport: AirportMap): MapLibreMap {
       );
       created.addImage("ownship-plane", createOwnshipImage(), { pixelRatio: 2 });
       addOwnshipLayer(created);
+      // Keep AMM runway badges above every runway and route layer. Labels and
+      // the aircraft remain above the badges for legibility and navigation.
+      created.moveLayer("runway-labels");
       created.moveLayer("taxiway-labels");
       created.moveLayer("building-labels");
+      created.moveLayer("ownship");
       fitAirport();
       created.on("sourcedata", (event) => {
         if (event.sourceId === "airport" && event.isSourceLoaded) {
@@ -2475,7 +2482,64 @@ function createMap(airport: AirportMap): MapLibreMap {
     event.originalEvent.preventDefault();
     openManualTaxiContextMenu(created, [event.lngLat.lng, event.lngLat.lat]);
   });
-  created.on("click", closeManualTaxiContextMenu);
+
+  // iPadOS and other touch-only browsers have no right mouse button. Treat a
+  // stationary 600 ms press as the touch equivalent while preserving normal
+  // single-tap, pinch-zoom, and drag-to-pan map interaction.
+  const mapCanvas = created.getCanvas();
+  let touchHoldTimer: number | null = null;
+  let touchHoldStart: { x: number; y: number } | null = null;
+  let suppressClickAfterTouchHold = false;
+  const cancelTouchHold = (): void => {
+    if (touchHoldTimer !== null) {
+      window.clearTimeout(touchHoldTimer);
+    }
+    touchHoldTimer = null;
+    touchHoldStart = null;
+  };
+  const pointInCanvas = (event: PointerEvent): { x: number; y: number } => {
+    const bounds = mapCanvas.getBoundingClientRect();
+    return {
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    };
+  };
+  mapCanvas.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "touch") {
+      return;
+    }
+    cancelTouchHold();
+    touchHoldStart = pointInCanvas(event);
+    touchHoldTimer = window.setTimeout(() => {
+      touchHoldTimer = null;
+      if (!touchHoldStart) {
+        return;
+      }
+      const lngLat = created.unproject([touchHoldStart.x, touchHoldStart.y]);
+      suppressClickAfterTouchHold = true;
+      openManualTaxiContextMenu(created, [lngLat.lng, lngLat.lat]);
+      touchHoldStart = null;
+    }, 600);
+  });
+  mapCanvas.addEventListener("pointermove", (event) => {
+    if (event.pointerType !== "touch" || !touchHoldStart) {
+      return;
+    }
+    const current = pointInCanvas(event);
+    if (Math.hypot(current.x - touchHoldStart.x, current.y - touchHoldStart.y) > 12) {
+      cancelTouchHold();
+    }
+  });
+  mapCanvas.addEventListener("pointerup", cancelTouchHold);
+  mapCanvas.addEventListener("pointercancel", cancelTouchHold);
+  mapCanvas.addEventListener("pointerleave", cancelTouchHold);
+  created.on("click", () => {
+    if (suppressClickAfterTouchHold) {
+      suppressClickAfterTouchHold = false;
+      return;
+    }
+    closeManualTaxiContextMenu();
+  });
   return created;
 }
 
@@ -2495,7 +2559,7 @@ function applyMapTheme(
   set("terminals", "fill-color", light ? "#f6f8fa" : "#8795a4");
   set("terminals", "fill-outline-color", light ? "#8699a8" : "#d8e1e8");
   set("runway-outline", "line-color", light ? "#ffffff" : "#dce3e8");
-  set("runways", "line-color", light ? "#26343d" : "#15191f");
+  set("runways", "fill-color", light ? "#26343d" : "#15191f");
   set("taxiway-outline", "line-color", light ? "#9fafb9" : "#252a2e");
   set("taxiways", "line-color", light ? "#d5dfe5" : "#686d71");
   set("taxiway-centerlines", "line-color", light ? "#d4aa00" : "#f7d24b");
@@ -2836,34 +2900,28 @@ function addAirportLayers(target: MapLibreMap): void {
     }
   });
   target.addLayer({
+    id: "runways",
+    type: "fill",
+    source: "runway-markings",
+    filter: ["==", ["get", "kind"], "pavement"],
+    paint: {
+      "fill-color": "#15191f"
+    }
+  });
+  target.addLayer({
     id: "runway-outline",
     type: "line",
-    source: "airport",
-    filter: ["==", ["get", "kind"], "runway"],
+    source: "runway-markings",
+    filter: ["==", ["get", "kind"], "pavement"],
     paint: {
       "line-color": "#dce3e8",
       "line-width": [
-        "interpolate", ["exponential", 1.55], ["zoom"],
-        10, ["+", 2, ["*", ["get", "widthMeters"], 0.045]],
-        16, ["+", 6, ["*", ["get", "widthMeters"], 0.52]]
+        "interpolate", ["linear"], ["zoom"],
+        10, 1.1,
+        17, 2.2,
+        20, 3
       ]
-    },
-    layout: { "line-cap": "butt" }
-  });
-  target.addLayer({
-    id: "runways",
-    type: "line",
-    source: "airport",
-    filter: ["==", ["get", "kind"], "runway"],
-    paint: {
-      "line-color": "#15191f",
-      "line-width": [
-        "interpolate", ["exponential", 1.55], ["zoom"],
-        10, ["max", 2, ["*", ["get", "widthMeters"], 0.04]],
-        16, ["max", 18, ["*", ["get", "widthMeters"], 0.46]]
-      ]
-    },
-    layout: { "line-cap": "butt" }
+    }
   });
   target.addLayer({
     id: "runway-centerlines",
@@ -2974,7 +3032,17 @@ function addAirportLayers(target: MapLibreMap): void {
     minzoom: 12.2,
     layout: {
       "icon-image": ["get", "badgeId"],
-      "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.55, 13, 0.68, 17, 0.82],
+      "icon-size": [
+        "interpolate", ["linear"], ["zoom"],
+        10, 0.55,
+        13, 0.68,
+        15, 0.86,
+        16, 1.05,
+        17, 1.4,
+        18, 1.85,
+        19, 2.45,
+        20, 3.2
+      ],
       "icon-rotation-alignment": "map",
       "icon-rotate": ["get", "iconRotation"],
       "icon-allow-overlap": true,
@@ -3017,14 +3085,14 @@ function addAirportLayers(target: MapLibreMap): void {
     layout: {
       "icon-image": "taxiway-label-badge-dark",
       "icon-text-fit": "both",
-      "icon-text-fit-padding": [1, 3, 1, 3],
+      "icon-text-fit-padding": [0.5, 2, 0.5, 2],
       "icon-rotation-alignment": "map",
       "icon-allow-overlap": false,
       "icon-ignore-placement": false,
       "symbol-placement": "line",
       "symbol-spacing": 145,
       "text-field": ["coalesce", ["get", "ref"], ""],
-      "text-size": ["interpolate", ["linear"], ["zoom"], 11, 10, 17, 14],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 11, 9, 17, 13],
       "text-font": ["Segoe UI", "Arial Unicode MS Regular"],
       "text-rotation-alignment": "map",
       "text-keep-upright": true,
@@ -3829,18 +3897,18 @@ function createRunwayBadgeImage(
 ): ImageData {
   const canvas = document.createElement("canvas");
   canvas.width = 132;
-  canvas.height = 92;
+  canvas.height = 100;
   const context = canvas.getContext("2d")!;
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.beginPath();
-  context.roundRect(4, 4, 124, 84, 42);
+  context.roundRect(4, 4, 124, 92, 46);
   context.fillStyle = "#b20d2c";
   context.fill();
   context.lineWidth = 6;
   context.strokeStyle = "#ffffff";
   context.stroke();
   context.beginPath();
-  context.roundRect(12, 12, 108, 68, 34);
+  context.roundRect(12, 12, 108, 76, 38);
   context.lineWidth = 2.5;
   context.strokeStyle = "rgba(255,255,255,.94)";
   context.stroke();
@@ -3848,26 +3916,28 @@ function createRunwayBadgeImage(
   context.fillStyle = "#ffffff";
   context.textAlign = "center";
   context.textBaseline = "middle";
-  let numberSize = designator.length >= 3 ? 43 : 49;
-  context.font = `900 ${numberSize}px "Arial Narrow", "Segoe UI", sans-serif`;
+  let numberSize = designator.length >= 3 ? 40 : 46;
+  context.font = `850 ${numberSize}px "Arial Narrow", "Segoe UI", sans-serif`;
   while (context.measureText(designator).width > 92 && numberSize > 34) {
     numberSize -= 1;
-    context.font = `900 ${numberSize}px "Arial Narrow", "Segoe UI", sans-serif`;
+    context.font = `850 ${numberSize}px "Arial Narrow", "Segoe UI", sans-serif`;
   }
-  context.fillText(designator, 66, 37);
+  // Keep a visible safety area above the large runway number. The separate
+  // heading line remains smaller and lower, matching the AMM reference.
+  context.fillText(designator, 66, 42);
   context.font = '700 18px "Segoe UI", sans-serif';
-  context.fillText(heading, 66, 67);
+  context.fillText(heading, 66, 75);
   return context.getImageData(0, 0, canvas.width, canvas.height);
 }
 
 function createTaxiwayBadgeImage(fill: string, stroke: string): ImageData {
   const canvas = document.createElement("canvas");
-  canvas.width = 48;
-  canvas.height = 32;
+  canvas.width = 44;
+  canvas.height = 28;
   const context = canvas.getContext("2d")!;
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.beginPath();
-  context.roundRect(1, 1, 46, 30, 3);
+  context.roundRect(1, 1, 42, 26, 6);
   context.fillStyle = fill;
   context.fill();
   context.lineWidth = 2;

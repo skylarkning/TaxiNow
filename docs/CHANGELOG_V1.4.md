@@ -27,3 +27,20 @@
 - Corrected light-mode contrast across the airport picker, About page, forms, cards, and tooltips.
 - Removed the closed side-panel shadow that created a dark vignette over the map.
 - Kept the full runway presentation available in the SVG fallback renderer used on constrained clients.
+- Kept physical runway markings inside the runway at close zoom and made the
+  runway-end capsules scale with zoom while preserving safer text padding.
+- Kept runway capsules above runway and route graphics, with map labels and the
+  aircraft remaining above the capsules.
+- Made taxiway marker plates smaller and more rounded without changing the
+  proven V1.3 placement and collision behavior.
+- Taxi planning no longer blocks the map or covers it with a light-mode
+  backdrop; pan, zoom, and right-click manual start/destination placement stay
+  available while the planner is open.
+- Added an in-panel hint explaining map interaction and right-click placement
+  of manual taxi start and destination points.
+- Added touch-screen placement: touch and hold the map for 0.6 seconds on an
+  iPad or other touch device to open the same start/destination menu. Moving
+  the finger cancels the hold so map panning remains natural.
+- Bound runway pavement, edge lines, aiming points, and touchdown-zone blocks
+  to one physical-width geometry so close zoom can no longer push painted
+  blocks outside the runway.

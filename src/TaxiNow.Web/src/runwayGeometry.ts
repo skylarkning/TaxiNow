@@ -46,6 +46,20 @@ export function buildRunwayDecorations(
       Math.max(85, width * 1.8)
     );
 
+    // Use the same physical local coordinates for the runway surface and all
+    // painted markings. This binds aiming and touchdown blocks to the runway
+    // edges at every zoom level instead of approximating pavement width in
+    // browser pixels.
+    markings.push(rectangleFeature(
+      `${feature.id}-pavement`,
+      "pavement",
+      runway,
+      runway.length / 2,
+      0,
+      runway.length,
+      width
+    ));
+
     markings.push(lineFeature(
       feature.id,
       "centerline",
@@ -94,15 +108,21 @@ export function buildRunwayDecorations(
 
       const aimingDistance = Math.min(runway.length * 0.28, 400);
       if (aimingDistance > width * 4 && aimingDistance < runway.length / 2) {
+        const aimingBarWidth = Math.max(4.5, Math.min(7, width * 0.1));
+        const edgeMargin = Math.max(1.5, width * 0.06);
+        const aimingAcross = Math.max(0, Math.min(
+          width * 0.27,
+          width / 2 - edgeMargin - aimingBarWidth / 2
+        ));
         for (const side of [-1, 1]) {
           markings.push(rectangleFeature(
             `${feature.id}-${end}-${side}`,
             "aiming",
             runway,
             origin + direction * aimingDistance,
-            side * width * 0.27,
+            side * aimingAcross,
             Math.min(45, runway.length * 0.035),
-            Math.max(4.5, Math.min(7, width * 0.1))
+            aimingBarWidth
           ));
         }
       }
@@ -121,6 +141,11 @@ export function buildRunwayDecorations(
         }
         for (const side of [-1, 1]) {
           const groupWidth = barCount * 1.8 + (barCount - 1) * 1.5;
+          const edgeMargin = Math.max(1.5, width * 0.06);
+          const groupAcross = Math.max(0, Math.min(
+            width * 0.29,
+            width / 2 - edgeMargin - groupWidth / 2
+          ));
           for (let bar = 0; bar < barCount; bar++) {
             const offset = -groupWidth / 2 + 0.9 + bar * 3.3;
             markings.push(rectangleFeature(
@@ -128,7 +153,7 @@ export function buildRunwayDecorations(
               "touchdown",
               runway,
               origin + direction * touchdownDistance,
-              side * width * 0.29 + offset,
+              side * groupAcross + offset,
               22.5,
               1.8
             ));
@@ -328,7 +353,7 @@ function lineFeature(
 
 function rectangleFeature(
   id: string,
-  kind: "threshold-stripe" | "aiming" | "touchdown",
+  kind: "pavement" | "threshold-stripe" | "aiming" | "touchdown",
   runway: LocalRunway,
   centerAlong: number,
   centerAcross: number,
