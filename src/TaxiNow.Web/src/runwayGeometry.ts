@@ -18,7 +18,6 @@ interface LocalRunway {
 
 export interface RunwayDecorationData {
   markings: FeatureCollection<LineString | Polygon>;
-  badges: FeatureCollection<Polygon>;
   labels: FeatureCollection<Point>;
   pavementLabels: FeatureCollection<Point>;
 }
@@ -27,7 +26,6 @@ export function buildRunwayDecorations(
   features: AirportFeature[]
 ): RunwayDecorationData {
   const markings: Array<Feature<LineString | Polygon>> = [];
-  const badges: Array<Feature<Polygon>> = [];
   const labels: Array<Feature<Point>> = [];
   const pavementLabels: Array<Feature<Point>> = [];
 
@@ -47,16 +45,6 @@ export function buildRunwayDecorations(
       runway.length * 0.18,
       Math.max(85, width * 1.8)
     );
-
-    // Runway edge markings make the pavement readable at the same zoom level
-    // as taxiway centerlines without changing the underlying airport data.
-    for (const side of [-1, 1]) {
-      markings.push(lineFeature(
-        `${feature.id}-edge-${side}`,
-        "edge",
-        localLine(runway, 0, side * width * 0.47, runway.length, side * width * 0.47)
-      ));
-    }
 
     markings.push(lineFeature(
       feature.id,
@@ -157,23 +145,20 @@ export function buildRunwayDecorations(
         // baseline. Using the runway heading turns the label baseline across
         // the runway, matching real threshold numerals and the AMM capsule.
         const rotation = normalizeSymbolRotation(heading);
-        const badgeAlong = Math.max(24, width * 0.62);
-        const badgeAcross = Math.max(34, width * 1.05);
-        const badgeCenter = origin - direction * width * 0.1;
-        badges.push(capsuleFeature(
-          `${feature.id}-${end}-badge`,
-          runway,
-          badgeCenter,
-          0,
-          badgeAlong,
-          badgeAcross
-        ));
+        // Keep the AMM-style capsule outside the threshold. The original
+        // designation remains painted separately on the runway pavement.
+        const badgeCenter = origin - direction * Math.max(16, width * 0.5);
         labels.push({
           type: "Feature",
           properties: {
             text,
+            badgeId: runwayBadgeId(text, heading),
             heading: `${String(heading).padStart(3, "0")}°`,
-            rotation
+            rotation,
+            // The badge artwork is a horizontal capsule. Rotating it by the
+            // same value as the pavement designation keeps the capsule's long
+            // axis and both text rows across the runway threshold.
+            iconRotation: rotation
           },
           geometry: {
             type: "Point",
@@ -201,7 +186,6 @@ export function buildRunwayDecorations(
 
   return {
     markings: { type: "FeatureCollection", features: markings },
-    badges: { type: "FeatureCollection", features: badges },
     labels: { type: "FeatureCollection", features: labels },
     pavementLabels: {
       type: "FeatureCollection",
@@ -332,7 +316,7 @@ function localLine(
 function lineFeature(
   id: string,
   kind: "centerline" | "threshold" | "threshold-stripe" |
-    "aiming" | "touchdown" | "edge",
+    "aiming" | "touchdown",
   coordinates: [[number, number], [number, number]]
 ): Feature<LineString> {
   return {
@@ -367,41 +351,6 @@ function rectangleFeature(
   };
 }
 
-function capsuleFeature(
-  id: string,
-  runway: LocalRunway,
-  centerAlong: number,
-  centerAcross: number,
-  alongSize: number,
-  acrossSize: number
-): Feature<Polygon> {
-  const radius = alongSize / 2;
-  const endOffset = Math.max(0, acrossSize / 2 - radius);
-  const coordinates: Array<[number, number]> = [];
-  for (let step = 0; step <= 8; step++) {
-    const angle = -Math.PI / 2 + step * Math.PI / 8;
-    coordinates.push(localPoint(
-      runway,
-      centerAlong + Math.cos(angle) * radius,
-      centerAcross + endOffset + Math.sin(angle) * radius
-    ));
-  }
-  for (let step = 0; step <= 8; step++) {
-    const angle = Math.PI / 2 + step * Math.PI / 8;
-    coordinates.push(localPoint(
-      runway,
-      centerAlong + Math.cos(angle) * radius,
-      centerAcross - endOffset + Math.sin(angle) * radius
-    ));
-  }
-  coordinates.push(coordinates[0]!);
-  return {
-    type: "Feature",
-    properties: { id, kind: "runway-badge" },
-    geometry: { type: "Polygon", coordinates: [coordinates] }
-  };
-}
-
 function runwayBearing(runway: LocalRunway): number {
   return (
     Math.atan2(runway.along[0], runway.along[1]) * 180 / Math.PI + 360
@@ -415,4 +364,8 @@ function normalizeAviationHeading(value: number): number {
 
 function normalizeSymbolRotation(value: number): number {
   return (value % 360 + 360) % 360;
+}
+
+function runwayBadgeId(designator: string, heading: number): string {
+  return `runway-badge-${designator.replace(/[^A-Z0-9]/gi, "-")}-${heading}`;
 }

@@ -2367,23 +2367,46 @@ function createMap(airport: AirportMap): MapLibreMap {
         type: "geojson",
         data: runwayDecorations.markings
       });
-      created.addSource("runway-badges", {
-        type: "geojson",
-        data: runwayDecorations.badges
-      });
       created.addSource("runway-labels", {
         type: "geojson",
         data: runwayDecorations.labels
       });
+      for (const feature of runwayDecorations.labels.features) {
+        const properties = feature.properties ?? {};
+        const badgeId = String(properties.badgeId ?? "");
+        const designator = String(properties.text ?? "");
+        const heading = String(properties.heading ?? "");
+        if (badgeId && designator && heading && !created.hasImage(badgeId)) {
+          created.addImage(
+            badgeId,
+            createRunwayBadgeImage(designator, heading),
+            { pixelRatio: 2 }
+          );
+        }
+      }
+      created.addImage(
+        "taxiway-label-badge-dark",
+        createTaxiwayBadgeImage("#080b0e", "#56636d"),
+        {
+          pixelRatio: 2,
+          stretchX: [[13, 35]],
+          stretchY: [[10, 22]],
+          content: [7, 5, 41, 27]
+        }
+      );
+      created.addImage(
+        "taxiway-label-badge-light",
+        createTaxiwayBadgeImage("#34454f", "#718792"),
+        {
+          pixelRatio: 2,
+          stretchX: [[13, 35]],
+          stretchY: [[10, 22]],
+          content: [7, 5, 41, 27]
+        }
+      );
       created.addSource("runway-pavement-labels", {
         type: "geojson",
         data: runwayDecorations.pavementLabels
-      });
-      created.addImage("taxiway-label-badge", createTaxiwayBadgeImage(), {
-        pixelRatio: 2,
-        stretchX: [[13, 35]],
-        stretchY: [[10, 22]],
-        content: [7, 5, 41, 27]
       });
       created.addSource("terminal-labels", {
         type: "geojson",
@@ -2476,10 +2499,18 @@ function applyMapTheme(
   set("taxiway-outline", "line-color", light ? "#9fafb9" : "#252a2e");
   set("taxiways", "line-color", light ? "#d5dfe5" : "#686d71");
   set("taxiway-centerlines", "line-color", light ? "#d4aa00" : "#f7d24b");
+  set("stand-lead-in-lines", "line-color", light ? "#617f70" : "#8cb89e");
   set("runway-labels", "text-color", light ? "#ffffff" : "#f7f9fb");
   set("runway-labels", "text-halo-color", "rgba(0,0,0,0)");
-  set("taxiway-labels", "text-color", light ? "#b88d00" : "#ffd52f");
-  set("taxiway-labels", "text-halo-color", light ? "#f6fafc" : "#080b0e");
+  set("taxiway-labels", "text-color", "#ffd52f");
+  set("taxiway-labels", "text-halo-color", "#ffd52f");
+  if (target.getLayer("taxiway-labels")) {
+    target.setLayoutProperty(
+      "taxiway-labels",
+      "icon-image",
+      light ? "taxiway-label-badge-light" : "taxiway-label-badge-dark"
+    );
+  }
   set("building-labels", "text-color", light ? "#283946" : "#eef4f8");
   set("building-labels", "text-halo-color", light ? "#f7fafb" : "#263442");
   set("stand-labels", "text-color", light ? "#28414a" : "#dffaf4");
@@ -2835,18 +2866,6 @@ function addAirportLayers(target: MapLibreMap): void {
     layout: { "line-cap": "butt" }
   });
   target.addLayer({
-    id: "runway-edge-markings",
-    type: "line",
-    source: "runway-markings",
-    filter: ["==", ["get", "kind"], "edge"],
-    minzoom: 11,
-    paint: {
-      "line-color": "#f5f7f8",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.7, 17, 2.2],
-      "line-opacity": 0.92
-    }
-  });
-  target.addLayer({
     id: "runway-centerlines",
     type: "line",
     source: "runway-markings",
@@ -2936,49 +2955,30 @@ function addAirportLayers(target: MapLibreMap): void {
     }
   });
   target.addLayer({
-    id: "runway-badge-fill",
-    type: "fill",
-    source: "runway-badges",
-    paint: {
-      "fill-color": "#b20d2c",
-      "fill-opacity": 0.98
-    }
-  });
-  target.addLayer({
-    id: "runway-badge-outline",
+    id: "stand-lead-in-lines",
     type: "line",
-    source: "runway-badges",
+    source: "airport",
+    filter: ["in", ["get", "kind"], ["literal", ["gate", "parking_position"]]],
+    minzoom: 14,
     paint: {
-      "line-color": "#ffffff",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.7, 17, 2]
-    }
+      "line-color": "#8cb89e",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 14, 0.45, 18, 1.15],
+      "line-opacity": 0.68
+    },
+    layout: { "line-cap": "round", "line-join": "round" }
   });
   target.addLayer({
     id: "runway-labels",
     type: "symbol",
     source: "runway-labels",
+    minzoom: 12.2,
     layout: {
-      "text-field": [
-        "format",
-        ["get", "text"], { "font-scale": 1.08 },
-        "\n", {},
-        ["get", "heading"], { "font-scale": 0.58 }
-      ],
-      "text-size": ["interpolate", ["linear"], ["zoom"], 10, 7, 16, 12],
-      "text-font": ["Segoe UI", "Arial Unicode MS Regular"],
-      "text-rotation-alignment": "map",
-      "text-rotate": ["get", "rotation"],
-      "text-keep-upright": true,
-      "text-allow-overlap": true,
-      "text-ignore-placement": true,
-      "text-line-height": 0.92,
-      "text-letter-spacing": 0.02,
-      "text-padding": 2
-    },
-    paint: {
-      "text-color": "#f7f9fb",
-      "text-halo-color": "rgba(0,0,0,0)",
-      "text-halo-width": 0
+      "icon-image": ["get", "badgeId"],
+      "icon-size": ["interpolate", ["linear"], ["zoom"], 10, 0.55, 13, 0.68, 17, 0.82],
+      "icon-rotation-alignment": "map",
+      "icon-rotate": ["get", "iconRotation"],
+      "icon-allow-overlap": true,
+      "icon-ignore-placement": true
     }
   });
   target.addLayer({
@@ -2999,18 +2999,23 @@ function addAirportLayers(target: MapLibreMap): void {
     },
     paint: {
       "text-color": "#f7f9fb",
-      "text-halo-color": "rgba(0,0,0,0)",
-      "text-halo-width": 0
+      "text-halo-color": "#111820",
+      "text-halo-width": 1.4
     }
   });
   target.addLayer({
     id: "taxiway-labels",
     type: "symbol",
     source: "airport",
-    filter: ["in", ["get", "kind"], ["literal", ["taxiway", "taxilane"]]],
+    filter: [
+      "all",
+      ["in", ["get", "kind"], ["literal", ["taxiway", "taxilane"]]],
+      ["has", "ref"],
+      ["!=", ["coalesce", ["get", "ref"], ""], ""]
+    ],
     minzoom: 13.5,
     layout: {
-      "icon-image": "taxiway-label-badge",
+      "icon-image": "taxiway-label-badge-dark",
       "icon-text-fit": "both",
       "icon-text-fit-padding": [1, 3, 1, 3],
       "icon-rotation-alignment": "map",
@@ -3029,8 +3034,10 @@ function addAirportLayers(target: MapLibreMap): void {
     },
     paint: {
       "text-color": "#ffd52f",
-      "text-halo-color": "#080b0e",
-      "text-halo-width": 2.5
+      // A very small same-colour halo thickens the glyphs without enlarging
+      // the V1.3 marker plate or turning the lettering into an outline.
+      "text-halo-color": "#ffd52f",
+      "text-halo-width": 0.4
     }
   });
   target.addLayer({
@@ -3816,7 +3823,44 @@ function createOwnshipImage(): ImageData {
   return context.getImageData(0, 0, 96, 96);
 }
 
-function createTaxiwayBadgeImage(): ImageData {
+function createRunwayBadgeImage(
+  designator: string,
+  heading: string
+): ImageData {
+  const canvas = document.createElement("canvas");
+  canvas.width = 132;
+  canvas.height = 92;
+  const context = canvas.getContext("2d")!;
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.beginPath();
+  context.roundRect(4, 4, 124, 84, 42);
+  context.fillStyle = "#b20d2c";
+  context.fill();
+  context.lineWidth = 6;
+  context.strokeStyle = "#ffffff";
+  context.stroke();
+  context.beginPath();
+  context.roundRect(12, 12, 108, 68, 34);
+  context.lineWidth = 2.5;
+  context.strokeStyle = "rgba(255,255,255,.94)";
+  context.stroke();
+
+  context.fillStyle = "#ffffff";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  let numberSize = designator.length >= 3 ? 43 : 49;
+  context.font = `900 ${numberSize}px "Arial Narrow", "Segoe UI", sans-serif`;
+  while (context.measureText(designator).width > 92 && numberSize > 34) {
+    numberSize -= 1;
+    context.font = `900 ${numberSize}px "Arial Narrow", "Segoe UI", sans-serif`;
+  }
+  context.fillText(designator, 66, 37);
+  context.font = '700 18px "Segoe UI", sans-serif';
+  context.fillText(heading, 66, 67);
+  return context.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+function createTaxiwayBadgeImage(fill: string, stroke: string): ImageData {
   const canvas = document.createElement("canvas");
   canvas.width = 48;
   canvas.height = 32;
@@ -3824,10 +3868,10 @@ function createTaxiwayBadgeImage(): ImageData {
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.beginPath();
   context.roundRect(1, 1, 46, 30, 3);
-  context.fillStyle = "rgba(25, 38, 47, .97)";
+  context.fillStyle = fill;
   context.fill();
   context.lineWidth = 2;
-  context.strokeStyle = "rgba(120, 139, 151, .9)";
+  context.strokeStyle = stroke;
   context.stroke();
   return context.getImageData(0, 0, canvas.width, canvas.height);
 }
@@ -3851,7 +3895,6 @@ function publishMapDiagnostics(target: MapLibreMap): void {
     "runway-threshold-stripes",
     "runway-aiming-points",
     "runway-touchdown-zone",
-    "runway-badge-fill",
     "runway-labels",
     "runway-pavement-labels",
     "selected-taxiway-highlight"
@@ -4216,15 +4259,7 @@ function createFallbackRunway(
     [screenPoint(start, along, length * 0.08), screenPoint(start, along, length * 0.92)],
     "fallback-runway-centerline"
   );
-  const leftEdge = createFallbackPolyline([
-    screenPoint(screenPoint(start, across, -width * 0.47), along, length * 0.01),
-    screenPoint(screenPoint(end, across, -width * 0.47), along, -length * 0.01)
-  ], "fallback-runway-edge");
-  const rightEdge = createFallbackPolyline([
-    screenPoint(screenPoint(start, across, width * 0.47), along, length * 0.01),
-    screenPoint(screenPoint(end, across, width * 0.47), along, -length * 0.01)
-  ], "fallback-runway-edge");
-  group.append(outline, pavement, leftEdge, rightEdge, centerline);
+  group.append(outline, pavement, centerline);
 
   for (const endIndex of [0, 1] as const) {
     const origin = endIndex === 0 ? start : end;
@@ -4383,7 +4418,7 @@ function createFallbackRunwayLabels(
     const point = screenPoint(
       origin,
       along,
-      -direction * runwayWidth * 0.1
+      -direction * Math.max(runwayWidth * 0.5, 16 * pixelsPerMeter)
     );
     const heading = normalizeRunwayHeading(
       physicalHeading + (endIndex === 0 ? 0 : 180)
@@ -4452,12 +4487,21 @@ function createFallbackRunwayBadge(
   group.dataset.x = String(point.x);
   group.dataset.y = String(point.y);
 
-  const rect = document.createElementNS(namespace, "rect");
-  rect.setAttribute("x", String(-acrossSize / 2));
-  rect.setAttribute("y", String(-alongSize / 2));
-  rect.setAttribute("width", String(acrossSize));
-  rect.setAttribute("height", String(alongSize));
-  rect.setAttribute("rx", String(alongSize / 2));
+  const capsule = document.createElementNS(namespace, "rect");
+  capsule.setAttribute("class", "fallback-runway-badge-outer");
+  capsule.setAttribute("x", String(-acrossSize / 2));
+  capsule.setAttribute("y", String(-alongSize / 2));
+  capsule.setAttribute("width", String(acrossSize));
+  capsule.setAttribute("height", String(alongSize));
+  capsule.setAttribute("rx", String(alongSize / 2));
+
+  const inner = document.createElementNS(namespace, "rect");
+  inner.setAttribute("class", "fallback-runway-badge-inner");
+  inner.setAttribute("x", String(-acrossSize / 2 + 3));
+  inner.setAttribute("y", String(-alongSize / 2 + 3));
+  inner.setAttribute("width", String(Math.max(4, acrossSize - 6)));
+  inner.setAttribute("height", String(Math.max(4, alongSize - 6)));
+  inner.setAttribute("rx", String(Math.max(2, alongSize / 2 - 3)));
 
   const number = document.createElementNS(namespace, "text");
   number.setAttribute("class", "fallback-runway-badge-number");
@@ -4478,7 +4522,7 @@ function createFallbackRunwayBadge(
     `font-size:${Math.max(5, Math.min(9, alongSize * 0.24))}px`
   );
   bearing.textContent = heading;
-  group.append(rect, number, bearing);
+  group.append(capsule, inner, number, bearing);
   return group;
 }
 

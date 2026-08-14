@@ -27,10 +27,11 @@ describe("buildRunwayDecorations", () => {
       .toEqual(["065°", "245°"]);
     expect(result.labels.features.map((feature) => feature.properties?.rotation))
       .toEqual([65, 245]);
-    expect(result.badges.features).toHaveLength(2);
-    expect(result.badges.features.every(
-      (feature) => feature.geometry.type === "Polygon"
-    )).toBe(true);
+    expect(result.labels.features.map((feature) => feature.properties?.badgeId))
+      .toEqual(["runway-badge-05-65", "runway-badge-23-245"]);
+    expect(result.labels.features.map(
+      (feature) => feature.properties?.iconRotation
+    )).toEqual([65, 245]);
     expect(result.pavementLabels.features.map(
       (feature) => feature.properties?.text
     )).toEqual(["05", "23"]);
@@ -39,9 +40,6 @@ describe("buildRunwayDecorations", () => {
     )).toBe(true);
     expect(result.markings.features.filter(
       (feature) => feature.properties?.kind === "threshold"
-    )).toHaveLength(2);
-    expect(result.markings.features.filter(
-      (feature) => feature.properties?.kind === "edge"
     )).toHaveLength(2);
     expect(result.markings.features.some(
       (feature) => feature.properties?.kind === "threshold-stripe"
@@ -57,6 +55,16 @@ describe("buildRunwayDecorations", () => {
         String(feature.properties?.kind)
       )
     ).every((feature) => feature.geometry.type === "Polygon")).toBe(true);
+
+    const touchdown = result.markings.features.find(
+      (feature) => feature.properties?.kind === "touchdown"
+    );
+    expect(touchdown?.geometry.type).toBe("Polygon");
+    if (touchdown?.geometry.type === "Polygon") {
+      const [first, second, third] = touchdown.geometry.coordinates[0]!;
+      expect(distanceMeters(first!, second!)).toBeCloseTo(22.5, 1);
+      expect(distanceMeters(second!, third!)).toBeCloseTo(1.8, 1);
+    }
   });
 
   it("matches ZBAA runway designators to physical endpoints", () => {
@@ -103,3 +111,11 @@ describe("buildRunwayDecorations", () => {
     )).toEqual(["25(NOTINUSE)", "07"]);
   });
 });
+
+function distanceMeters(left: number[], right: number[]): number {
+  const latitude = (left[1]! + right[1]!) / 2;
+  return Math.hypot(
+    (right[0]! - left[0]!) * 111_320 * Math.cos(latitude * Math.PI / 180),
+    (right[1]! - left[1]!) * 110_540
+  );
+}

@@ -23,7 +23,7 @@ the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release)
 The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
 third-party notices.
 
-Current development build: **V1.4**, internal build **117**
+Current development build: **V1.4**, internal build **118**
 (build date: August 14, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is a free-of-charge application for personal
@@ -54,7 +54,7 @@ their surrounding white canvas and create the required output sizes.
 - Shared MapLibre SPA with a full-detail CYYZ regression asset: 5 physical
   runways, 400 taxiways/taxilanes, 402 stands, and 4 terminal polygons.
 - Proportional runway pavement, centerlines, thresholds, aiming marks,
-  runway-edge lines, threshold bars, threshold stripes, touchdown-zone pairs,
+  runway-edge outlines, threshold bars, threshold stripes, touchdown-zone pairs,
   end-designators, taxiway centerlines, and zoom-dependent labels, informed by
   the proven SkyCharts map-drawing behavior.
 - Taxiway pavement is layered below runway pavement while yellow centerlines
