@@ -2,7 +2,8 @@ import type {
   Feature,
   FeatureCollection,
   LineString,
-  Point
+  Point,
+  Polygon
 } from "geojson";
 import type { AirportFeature } from "./contracts";
 
@@ -16,15 +17,19 @@ interface LocalRunway {
 }
 
 export interface RunwayDecorationData {
-  markings: FeatureCollection<LineString>;
+  markings: FeatureCollection<LineString | Polygon>;
+  badges: FeatureCollection<Polygon>;
   labels: FeatureCollection<Point>;
+  pavementLabels: FeatureCollection<Point>;
 }
 
 export function buildRunwayDecorations(
   features: AirportFeature[]
 ): RunwayDecorationData {
-  const markings: Array<Feature<LineString>> = [];
+  const markings: Array<Feature<LineString | Polygon>> = [];
+  const badges: Array<Feature<Polygon>> = [];
   const labels: Array<Feature<Point>> = [];
+  const pavementLabels: Array<Feature<Point>> = [];
 
   for (const feature of features) {
     if (feature.kind !== "runway" || feature.points.length < 2) {
@@ -37,9 +42,10 @@ export function buildRunwayDecorations(
     const width = feature.widthMeters && feature.widthMeters > 0
       ? feature.widthMeters
       : 45;
-    const threshold = Math.min(
-      Math.max(width * 1.5, 45),
-      runway.length * 0.18
+    const thresholdInset = Math.min(8, Math.max(3, width * 0.1));
+    const centerlineInset = Math.min(
+      runway.length * 0.18,
+      Math.max(85, width * 1.8)
     );
 
     // Runway edge markings make the pavement readable at the same zoom level
@@ -55,7 +61,7 @@ export function buildRunwayDecorations(
     markings.push(lineFeature(
       feature.id,
       "centerline",
-      localLine(runway, threshold + width, 0, runway.length - threshold - width, 0)
+      localLine(runway, centerlineInset, 0, runway.length - centerlineInset, 0)
     ));
 
     const designators = runwayEndDesignators(
@@ -71,9 +77,9 @@ export function buildRunwayDecorations(
         "threshold",
         localLine(
           runway,
-          origin + direction * threshold,
+          origin + direction * thresholdInset,
           -width * 0.42,
-          origin + direction * threshold,
+          origin + direction * thresholdInset,
           width * 0.42
         )
       ));
@@ -86,57 +92,59 @@ export function buildRunwayDecorations(
         const lateral = width * 0.08 + stripe *
           (width * 0.36 / Math.max(1, stripePairs - 1));
         for (const side of [-1, 1]) {
-          markings.push(lineFeature(
+          markings.push(rectangleFeature(
             `${feature.id}-${end}-stripe-${stripe}-${side}`,
             "threshold-stripe",
-            localLine(
-              runway,
-              origin + direction * (threshold + 2),
-              side * lateral,
-              origin + direction * (threshold + Math.min(30, width * 0.7)),
-              side * lateral
-            )
+            runway,
+            origin + direction * (thresholdInset + Math.min(16, width * 0.25)),
+            side * lateral,
+            Math.min(30, width * 0.7),
+            Math.max(1.5, Math.min(2.2, width * 0.035))
           ));
         }
       }
 
-      const aimingDistance = Math.min(runway.length * 0.28, 300);
+      const aimingDistance = Math.min(runway.length * 0.28, 400);
       if (aimingDistance > width * 4 && aimingDistance < runway.length / 2) {
         for (const side of [-1, 1]) {
-          markings.push(lineFeature(
+          markings.push(rectangleFeature(
             `${feature.id}-${end}-${side}`,
             "aiming",
-            localLine(
-              runway,
-              origin + direction * (aimingDistance - 18),
-              side * width * 0.27,
-              origin + direction * (aimingDistance + 18),
-              side * width * 0.27
-            )
+            runway,
+            origin + direction * aimingDistance,
+            side * width * 0.27,
+            Math.min(45, runway.length * 0.035),
+            Math.max(4.5, Math.min(7, width * 0.1))
           ));
         }
       }
 
-
-      // Touchdown-zone bars provide distance cues between the threshold and
-      // aiming point. They intentionally stop before the runway midpoint so
-      // reciprocal markings never collide on short runways.
-      for (const touchdownDistance of [150, 450, 600]) {
+      // Use the distance-coded touchdown-zone pattern: three bars at 150 m,
+      // two at 300 m, and one at 450 m from each threshold. Each bar uses the
+      // standard 22.5 m by 1.8 m proportions and therefore scales with the
+      // physical runway instead of with browser pixels.
+      for (const [touchdownDistance, barCount] of [
+        [150, 3],
+        [300, 2],
+        [450, 1]
+      ] as const) {
         if (touchdownDistance + 24 >= runway.length / 2) {
           continue;
         }
         for (const side of [-1, 1]) {
-          markings.push(lineFeature(
-            `${feature.id}-${end}-tdz-${touchdownDistance}-${side}`,
-            "touchdown",
-            localLine(
+          const groupWidth = barCount * 1.8 + (barCount - 1) * 1.5;
+          for (let bar = 0; bar < barCount; bar++) {
+            const offset = -groupWidth / 2 + 0.9 + bar * 3.3;
+            markings.push(rectangleFeature(
+              `${feature.id}-${end}-tdz-${touchdownDistance}-${side}-${bar}`,
+              "touchdown",
               runway,
-              origin + direction * (touchdownDistance - 11),
-              side * width * 0.3,
-              origin + direction * (touchdownDistance + 11),
-              side * width * 0.3
-            )
-          ));
+              origin + direction * touchdownDistance,
+              side * width * 0.29 + offset,
+              22.5,
+              1.8
+            ));
+          }
         }
       }
 
@@ -145,17 +153,44 @@ export function buildRunwayDecorations(
         const heading = normalizeAviationHeading(
           runwayBearing(runway) + (end === 0 ? 0 : 180)
         );
+        // MapLibre text rotation is measured clockwise from an east-west
+        // baseline. Using the runway heading turns the label baseline across
+        // the runway, matching real threshold numerals and the AMM capsule.
+        const rotation = normalizeSymbolRotation(heading);
+        const badgeAlong = Math.max(24, width * 0.62);
+        const badgeAcross = Math.max(34, width * 1.05);
+        const badgeCenter = origin - direction * width * 0.1;
+        badges.push(capsuleFeature(
+          `${feature.id}-${end}-badge`,
+          runway,
+          badgeCenter,
+          0,
+          badgeAlong,
+          badgeAcross
+        ));
         labels.push({
           type: "Feature",
           properties: {
             text,
-            heading: `${String(heading).padStart(3, "0")}°`
+            heading: `${String(heading).padStart(3, "0")}°`,
+            rotation
+          },
+          geometry: {
+            type: "Point",
+            coordinates: localPoint(runway, badgeCenter, 0)
+          }
+        });
+        pavementLabels.push({
+          type: "Feature",
+          properties: {
+            text,
+            rotation
           },
           geometry: {
             type: "Point",
             coordinates: localPoint(
               runway,
-              origin - direction * Math.max(50, width * 1.15),
+              origin + direction * Math.max(58, width * 1.05),
               0
             )
           }
@@ -166,7 +201,12 @@ export function buildRunwayDecorations(
 
   return {
     markings: { type: "FeatureCollection", features: markings },
-    labels: { type: "FeatureCollection", features: labels }
+    badges: { type: "FeatureCollection", features: badges },
+    labels: { type: "FeatureCollection", features: labels },
+    pavementLabels: {
+      type: "FeatureCollection",
+      features: pavementLabels
+    }
   };
 }
 
@@ -302,6 +342,66 @@ function lineFeature(
   };
 }
 
+function rectangleFeature(
+  id: string,
+  kind: "threshold-stripe" | "aiming" | "touchdown",
+  runway: LocalRunway,
+  centerAlong: number,
+  centerAcross: number,
+  length: number,
+  width: number
+): Feature<Polygon> {
+  const halfLength = length / 2;
+  const halfWidth = width / 2;
+  const coordinates = [
+    localPoint(runway, centerAlong - halfLength, centerAcross - halfWidth),
+    localPoint(runway, centerAlong + halfLength, centerAcross - halfWidth),
+    localPoint(runway, centerAlong + halfLength, centerAcross + halfWidth),
+    localPoint(runway, centerAlong - halfLength, centerAcross + halfWidth)
+  ];
+  coordinates.push(coordinates[0]!);
+  return {
+    type: "Feature",
+    properties: { id, kind },
+    geometry: { type: "Polygon", coordinates: [coordinates] }
+  };
+}
+
+function capsuleFeature(
+  id: string,
+  runway: LocalRunway,
+  centerAlong: number,
+  centerAcross: number,
+  alongSize: number,
+  acrossSize: number
+): Feature<Polygon> {
+  const radius = alongSize / 2;
+  const endOffset = Math.max(0, acrossSize / 2 - radius);
+  const coordinates: Array<[number, number]> = [];
+  for (let step = 0; step <= 8; step++) {
+    const angle = -Math.PI / 2 + step * Math.PI / 8;
+    coordinates.push(localPoint(
+      runway,
+      centerAlong + Math.cos(angle) * radius,
+      centerAcross + endOffset + Math.sin(angle) * radius
+    ));
+  }
+  for (let step = 0; step <= 8; step++) {
+    const angle = Math.PI / 2 + step * Math.PI / 8;
+    coordinates.push(localPoint(
+      runway,
+      centerAlong + Math.cos(angle) * radius,
+      centerAcross - endOffset + Math.sin(angle) * radius
+    ));
+  }
+  coordinates.push(coordinates[0]!);
+  return {
+    type: "Feature",
+    properties: { id, kind: "runway-badge" },
+    geometry: { type: "Polygon", coordinates: [coordinates] }
+  };
+}
+
 function runwayBearing(runway: LocalRunway): number {
   return (
     Math.atan2(runway.along[0], runway.along[1]) * 180 / Math.PI + 360
@@ -311,4 +411,8 @@ function runwayBearing(runway: LocalRunway): number {
 function normalizeAviationHeading(value: number): number {
   const rounded = Math.round((value % 360 + 360) % 360);
   return rounded === 0 ? 360 : rounded;
+}
+
+function normalizeSymbolRotation(value: number): number {
+  return (value % 360 + 360) % 360;
 }

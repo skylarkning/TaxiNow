@@ -24,6 +24,7 @@
 
 .manual-taxi-menu { display:grid; min-width:205px; padding:5px; gap:3px; }
 .manual-taxi-menu button { width:100%; padding:8px 10px; border-color:transparent; background:transparent; text-align:left; }
+.maplibregl-popup.manual-taxi-popup { z-index:8; }
 .maplibregl-popup-content { padding:0; border:1px solid rgba(147,181,198,.38); border-radius:9px; color:#eaf2f5; background:rgba(8,22,34,.98); box-shadow:0 12px 30px rgba(0,0,0,.46); }
 .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color:rgba(8,22,34,.98); }
 
@@ -520,18 +521,18 @@ button:disabled {
 }
 
 .fallback-runway-threshold-stripe {
-  stroke: #ffffff;
-  stroke-width: 2.2;
+  fill: #ffffff;
+  stroke: none;
 }
 
 .fallback-runway-aiming {
-  stroke: #ffffff;
-  stroke-width: 5;
+  fill: #ffffff;
+  stroke: none;
 }
 
 .fallback-runway-touchdown {
-  stroke: #ffffff;
-  stroke-width: 3.2;
+  fill: #ffffff;
+  stroke: none;
 }
 
 .fallback-runway-badge rect {
@@ -557,6 +558,15 @@ button:disabled {
 .fallback-runway-badge-heading {
   font-size: 9px;
   letter-spacing: 0.04em;
+}
+
+.fallback-runway-pavement-label text {
+  fill: #ffffff;
+  stroke: none;
+  font-family: "Segoe UI", sans-serif;
+  font-weight: 800;
+  text-anchor: middle;
+  dominant-baseline: central;
 }
 
 .fallback-taxiway-pavement {
@@ -588,6 +598,20 @@ button:disabled {
 
 .fallback-taxi-route-highlight {
   stroke: #16b5ff;
+}
+
+.fallback-selected-taxiway {
+  fill: none;
+  stroke: #ffb000;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px rgba(255, 159, 10, 0.9));
+  animation: fallback-taxiway-breathe 1.65s ease-in-out infinite;
+}
+
+@keyframes fallback-taxiway-breathe {
+  0%, 100% { opacity: 0.42; }
+  50% { opacity: 1; }
 }
 
 .fallback-gate,
@@ -1962,14 +1986,22 @@ html[data-theme="light"] .fallback-runway-pavement {
 html[data-theme="light"] .fallback-runway-outline,
 html[data-theme="light"] .fallback-runway-centerline,
 html[data-theme="light"] .fallback-runway-threshold,
-html[data-theme="light"] .fallback-runway-edge,
-html[data-theme="light"] .fallback-runway-threshold-stripe,
-html[data-theme="light"] .fallback-runway-aiming,
-html[data-theme="light"] .fallback-runway-touchdown {
+html[data-theme="light"] .fallback-runway-edge {
   stroke: #f7fafb;
 }
 
-/* Build 116 light appearance: semantic, high-contrast surfaces and controls. */
+html[data-theme="light"] .fallback-runway-threshold-stripe,
+html[data-theme="light"] .fallback-runway-aiming,
+html[data-theme="light"] .fallback-runway-touchdown {
+  fill: #f7fafb;
+}
+
+html[data-theme="light"] .fallback-taxiway-badge rect {
+  fill: #263944;
+  stroke: #607681;
+}
+
+/* Build 117 light appearance: semantic, high-contrast surfaces and controls. */
 html[data-theme="light"] {
   color-scheme: light;
   color: #1c1c1e;

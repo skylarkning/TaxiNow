@@ -25,6 +25,15 @@ describe("buildRunwayDecorations", () => {
       .toEqual(["05", "23"]);
     expect(result.labels.features.map((feature) => feature.properties?.heading))
       .toEqual(["065°", "245°"]);
+    expect(result.labels.features.map((feature) => feature.properties?.rotation))
+      .toEqual([65, 245]);
+    expect(result.badges.features).toHaveLength(2);
+    expect(result.badges.features.every(
+      (feature) => feature.geometry.type === "Polygon"
+    )).toBe(true);
+    expect(result.pavementLabels.features.map(
+      (feature) => feature.properties?.text
+    )).toEqual(["05", "23"]);
     expect(result.markings.features.some(
       (feature) => feature.properties?.kind === "centerline"
     )).toBe(true);
@@ -40,6 +49,14 @@ describe("buildRunwayDecorations", () => {
     expect(result.markings.features.some(
       (feature) => feature.properties?.kind === "touchdown"
     )).toBe(true);
+    expect(result.markings.features.filter(
+      (feature) => feature.properties?.kind === "touchdown"
+    )).toHaveLength(24);
+    expect(result.markings.features.filter((feature) =>
+      ["threshold-stripe", "aiming", "touchdown"].includes(
+        String(feature.properties?.kind)
+      )
+    ).every((feature) => feature.geometry.type === "Polygon")).toBe(true);
   });
 
   it("matches ZBAA runway designators to physical endpoints", () => {
