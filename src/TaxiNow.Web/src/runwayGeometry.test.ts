@@ -23,6 +23,8 @@ describe("buildRunwayDecorations", () => {
 
     expect(result.labels.features.map((feature) => feature.properties?.text))
       .toEqual(["05", "23"]);
+    expect(result.labels.features.map((feature) => feature.properties?.heading))
+      .toEqual(["065°", "245°"]);
     expect(result.markings.features.some(
       (feature) => feature.properties?.kind === "centerline"
     )).toBe(true);

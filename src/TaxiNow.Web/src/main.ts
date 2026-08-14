@@ -74,6 +74,12 @@ import {
   type TaxiRoute
 } from "./taxiRouting";
 
+// Vite cannot infer MapLibre's runtime worker URL from the prebuilt module on
+// every WebView/browser. Importing it as an asset ensures the worker is
+// emitted and prevents the application from unnecessarily entering SVG
+// fallback mode because `/assets/maplibre-gl-worker.mjs` was missing.
+maplibregl.setWorkerUrl("/assets/maplibre-gl-worker.mjs");
+
 const telemetrySamples: TelemetrySnapshot[] = [];
 const lastAirportStorageKey = "taxinow.lastAirport";
 const headingFollowStorageKey = "taxinow.map.headingFollow";
@@ -252,6 +258,9 @@ function setupThemeSelector(): void {
   applyTheme(initial);
 
   const selector = document.querySelector<HTMLButtonElement>("#theme-selector");
+  const quickToggle = document.querySelector<HTMLButtonElement>(
+    "#quick-theme-toggle"
+  );
   const menu = document.querySelector<HTMLElement>("#theme-menu");
   if (!selector || !menu) {
     return;
@@ -265,6 +274,14 @@ function setupThemeSelector(): void {
         "aria-checked",
         String(option.dataset.themeOption === theme)
       );
+    }
+    if (quickToggle) {
+      quickToggle.dataset.currentTheme = theme;
+      quickToggle.setAttribute(
+        "aria-label",
+        t(theme === "dark" ? "settings.switchLight" : "settings.switchDark")
+      );
+      quickToggle.title = quickToggle.getAttribute("aria-label") ?? "";
     }
   };
   sync(initial);
@@ -289,6 +306,18 @@ function setupThemeSelector(): void {
       selector.setAttribute("aria-expanded", "false");
     });
   }
+  quickToggle?.addEventListener("click", () => {
+    const theme = document.documentElement.dataset.theme === "light"
+      ? "dark"
+      : "light";
+    try {
+      window.localStorage.setItem(themeStorageKey, theme);
+    } catch {
+      // The theme remains active for this session.
+    }
+    applyTheme(theme);
+    sync(theme);
+  });
 }
 
 function applyTheme(theme: "dark" | "light"): void {
@@ -2329,6 +2358,12 @@ function createMap(airport: AirportMap): MapLibreMap {
         type: "geojson",
         data: runwayDecorations.labels
       });
+      created.addImage("runway-badge", createRunwayBadgeImage(), {
+        pixelRatio: 2,
+        stretchX: [[34, 62]],
+        stretchY: [[45, 67]],
+        content: [13, 12, 83, 100]
+      });
       created.addSource("terminal-labels", {
         type: "geojson",
         data: terminalLabelCollection(airport.features)
@@ -2409,7 +2444,7 @@ function applyMapTheme(
   set("taxiways", "line-color", light ? "#d5dfe5" : "#686d71");
   set("taxiway-centerlines", "line-color", light ? "#d4aa00" : "#f7d24b");
   set("runway-labels", "text-color", light ? "#ffffff" : "#f7f9fb");
-  set("runway-labels", "text-halo-color", light ? "#26343d" : "#080c10");
+  set("runway-labels", "text-halo-color", "rgba(0,0,0,0)");
   set("taxiway-labels", "text-color", light ? "#b88d00" : "#ffd52f");
   set("taxiway-labels", "text-halo-color", light ? "#f6fafc" : "#080b0e");
   set("building-labels", "text-color", light ? "#283946" : "#eef4f8");
@@ -2792,11 +2827,11 @@ function addAirportLayers(target: MapLibreMap): void {
     type: "line",
     source: "runway-markings",
     filter: ["==", ["get", "kind"], "threshold-stripe"],
-    minzoom: 12,
+    minzoom: 10.5,
     paint: {
       "line-color": "#f7f9fa",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 12, 1.1, 17, 3.3],
-      "line-opacity": 0.98
+      "line-width": ["interpolate", ["linear"], ["zoom"], 10.5, 0.65, 17, 3.3],
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 10.5, 0.72, 12, 0.98]
     },
     layout: { "line-cap": "butt" }
   });
@@ -2805,10 +2840,11 @@ function addAirportLayers(target: MapLibreMap): void {
     type: "line",
     source: "runway-markings",
     filter: ["==", ["get", "kind"], "aiming"],
-    minzoom: 12.5,
+    minzoom: 11,
     paint: {
       "line-color": "#f5f7f8",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 12.5, 2, 17, 6]
+      "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1.2, 17, 6],
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0.72, 13, 1]
     },
     layout: { "line-cap": "butt" }
   });
@@ -2817,11 +2853,11 @@ function addAirportLayers(target: MapLibreMap): void {
     type: "line",
     source: "runway-markings",
     filter: ["==", ["get", "kind"], "touchdown"],
-    minzoom: 13,
+    minzoom: 11.5,
     paint: {
       "line-color": "#f5f7f8",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 13, 1.4, 17, 4.2],
-      "line-opacity": 0.95
+      "line-width": ["interpolate", ["linear"], ["zoom"], 11.5, 0.85, 17, 4.2],
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 11.5, 0.68, 13, 0.95]
     },
     layout: { "line-cap": "butt" }
   });
@@ -2863,19 +2899,33 @@ function addAirportLayers(target: MapLibreMap): void {
     type: "symbol",
     source: "runway-labels",
     layout: {
-      "text-field": ["get", "text"],
-      "text-size": ["interpolate", ["linear"], ["zoom"], 10, 10, 16, 16],
+      "icon-image": "runway-badge",
+      "icon-text-fit": "both",
+      "icon-text-fit-padding": [6, 10, 6, 10],
+      "icon-size": ["interpolate", ["linear"], ["zoom"], 9.5, 0.72, 16, 1],
+      "icon-rotation-alignment": "viewport",
+      "icon-allow-overlap": true,
+      "icon-ignore-placement": true,
+      "text-field": [
+        "format",
+        ["get", "text"], { "font-scale": 1.16 },
+        "\n", {},
+        ["get", "heading"], { "font-scale": 0.68 }
+      ],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 9.5, 10, 16, 13],
       "text-font": ["Segoe UI", "Arial Unicode MS Regular"],
-      "text-rotate": ["get", "rotation"],
-      "text-rotation-alignment": "map",
+      "text-rotation-alignment": "viewport",
       "text-keep-upright": true,
-      "text-allow-overlap": false,
-      "text-padding": 4
+      "text-allow-overlap": true,
+      "text-ignore-placement": true,
+      "text-line-height": 0.92,
+      "text-letter-spacing": 0.02,
+      "text-padding": 2
     },
     paint: {
       "text-color": "#f7f9fb",
-      "text-halo-color": "#080c10",
-      "text-halo-width": 2.2
+      "text-halo-color": "rgba(0,0,0,0)",
+      "text-halo-width": 0
     }
   });
   target.addLayer({
@@ -3591,6 +3641,22 @@ function createOwnshipImage(): ImageData {
   return context.getImageData(0, 0, 96, 96);
 }
 
+function createRunwayBadgeImage(): ImageData {
+  const canvas = document.createElement("canvas");
+  canvas.width = 96;
+  canvas.height = 112;
+  const context = canvas.getContext("2d")!;
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.beginPath();
+  context.roundRect(3, 3, 90, 106, 22);
+  context.fillStyle = "#b20d2c";
+  context.fill();
+  context.lineWidth = 5;
+  context.strokeStyle = "#ffffff";
+  context.stroke();
+  return context.getImageData(0, 0, canvas.width, canvas.height);
+}
+
 function publishMapDiagnostics(target: MapLibreMap): void {
   const element = document.querySelector<HTMLOutputElement>("#map-diagnostics");
   if (!element) {
@@ -3606,6 +3672,18 @@ function publishMapDiagnostics(target: MapLibreMap): void {
   element.dataset.renderedFeatureCount = String(
     target.queryRenderedFeatures().length
   );
+  for (const layer of [
+    "runway-threshold-stripes",
+    "runway-aiming-points",
+    "runway-touchdown-zone",
+    "runway-labels"
+  ]) {
+    element.dataset[layer.replaceAll("-", "_")] = String(
+      target.getLayer(layer)
+        ? target.queryRenderedFeatures({ layers: [layer] }).length
+        : 0
+    );
+  }
 }
 
 interface FallbackProjectedFeature {
@@ -3721,9 +3799,9 @@ function activateFallbackOverlay(
         labelGroup.append(label);
         occupyFallbackLabel(
           occupied,
-          label.textContent ?? "",
-          Number(label.getAttribute("x")),
-          Number(label.getAttribute("y"))
+          label.dataset.label ?? "",
+          Number(label.dataset.x),
+          Number(label.dataset.y)
         );
       }
     }
@@ -3899,7 +3977,15 @@ function createFallbackRunway(
     [screenPoint(start, along, length * 0.08), screenPoint(start, along, length * 0.92)],
     "fallback-runway-centerline"
   );
-  group.append(outline, pavement, centerline);
+  const leftEdge = createFallbackPolyline([
+    screenPoint(screenPoint(start, across, -width * 0.47), along, length * 0.01),
+    screenPoint(screenPoint(end, across, -width * 0.47), along, -length * 0.01)
+  ], "fallback-runway-edge");
+  const rightEdge = createFallbackPolyline([
+    screenPoint(screenPoint(start, across, width * 0.47), along, length * 0.01),
+    screenPoint(screenPoint(end, across, width * 0.47), along, -length * 0.01)
+  ], "fallback-runway-edge");
+  group.append(outline, pavement, leftEdge, rightEdge, centerline);
 
   for (const endIndex of [0, 1] as const) {
     const origin = endIndex === 0 ? start : end;
@@ -3910,6 +3996,66 @@ function createFallbackRunway(
       screenPoint(thresholdCenter, across, width * 0.42)
     ], "fallback-runway-threshold");
     group.append(threshold);
+
+    const stripePairs = Math.max(3, Math.min(8, Math.round(width / 5)));
+    const stripeLength = Math.max(5, Math.min(width * 0.72, length * 0.028));
+    for (let stripe = 0; stripe < stripePairs; stripe++) {
+      const lateral = width * 0.08 + stripe *
+        (width * 0.34 / Math.max(1, stripePairs - 1));
+      for (const side of [-1, 1]) {
+        const stripeStart = screenPoint(
+          screenPoint(thresholdCenter, along, direction * 2),
+          across,
+          side * lateral
+        );
+        const stripeEnd = screenPoint(
+          screenPoint(thresholdCenter, along, direction * stripeLength),
+          across,
+          side * lateral
+        );
+        group.append(createFallbackPolyline(
+          [stripeStart, stripeEnd],
+          "fallback-runway-threshold-stripe"
+        ));
+      }
+    }
+
+    const aimingDistance = Math.min(length * 0.28, length * 300 / meters);
+    const aimingLength = Math.max(7, length * 36 / meters);
+    if (aimingDistance > width * 3 && aimingDistance < length / 2) {
+      for (const side of [-1, 1]) {
+        const center = screenPoint(
+          origin,
+          along,
+          direction * aimingDistance
+        );
+        const sideCenter = screenPoint(center, across, side * width * 0.27);
+        group.append(createFallbackPolyline([
+          screenPoint(sideCenter, along, -direction * aimingLength / 2),
+          screenPoint(sideCenter, along, direction * aimingLength / 2)
+        ], "fallback-runway-aiming"));
+      }
+    }
+
+    for (const touchdownMeters of [150, 450, 600]) {
+      const touchdownDistance = length * touchdownMeters / meters;
+      if (touchdownDistance >= length / 2) {
+        continue;
+      }
+      const barLength = Math.max(5, length * 22 / meters);
+      for (const side of [-1, 1]) {
+        const center = screenPoint(
+          origin,
+          along,
+          direction * touchdownDistance
+        );
+        const sideCenter = screenPoint(center, across, side * width * 0.3);
+        group.append(createFallbackPolyline([
+          screenPoint(sideCenter, along, -direction * barLength / 2),
+          screenPoint(sideCenter, along, direction * barLength / 2)
+        ], "fallback-runway-touchdown"));
+      }
+    }
   }
   return group;
 }
@@ -3917,7 +4063,7 @@ function createFallbackRunway(
 function createFallbackRunwayLabels(
   feature: AirportFeature,
   points: maplibregl.Point[]
-): SVGTextElement[] {
+): SVGGElement[] {
   const start = points[0]!;
   const end = points.at(-1)!;
   const dx = end.x - start.x;
@@ -3932,7 +4078,8 @@ function createFallbackRunwayLabels(
     feature.points[0]!,
     feature.points.at(-1)!
   );
-  const labels: SVGTextElement[] = [];
+  const labels: SVGGElement[] = [];
+  const physicalHeading = runwayScreenHeading(feature);
   for (const endIndex of [0, 1] as const) {
     const text = references[endIndex] ?? references[0] ?? "";
     if (!text) {
@@ -3940,10 +4087,93 @@ function createFallbackRunwayLabels(
     }
     const origin = endIndex === 0 ? start : end;
     const direction = endIndex === 0 ? 1 : -1;
-    const point = screenPoint(origin, along, direction * length * 0.09);
-    labels.push(createFallbackLabel(text, [point], "runway"));
+    const point = screenPoint(
+      origin,
+      along,
+      -direction * Math.max(14, widthInScreenPixels(feature, points) * 1.8)
+    );
+    const heading = normalizeRunwayHeading(
+      physicalHeading + (endIndex === 0 ? 0 : 180)
+    );
+    labels.push(createFallbackRunwayBadge(
+      text,
+      `${String(heading).padStart(3, "0")}°`,
+      point
+    ));
   }
   return labels;
+}
+
+function widthInScreenPixels(
+  feature: AirportFeature,
+  points: maplibregl.Point[]
+): number {
+  const start = feature.points[0]!;
+  const end = feature.points.at(-1)!;
+  const latitude = (start[1] + end[1]) / 2;
+  const meters = Math.hypot(
+    (end[0] - start[0]) * 111_320 * Math.cos(latitude * Math.PI / 180),
+    (end[1] - start[1]) * 110_540
+  );
+  const screenLength = Math.hypot(
+    points.at(-1)!.x - points[0]!.x,
+    points.at(-1)!.y - points[0]!.y
+  );
+  return Math.max(
+    7,
+    screenLength * (feature.widthMeters && feature.widthMeters > 0
+      ? feature.widthMeters
+      : 45) / Math.max(meters, 1)
+  );
+}
+
+function createFallbackRunwayBadge(
+  designator: string,
+  heading: string,
+  point: maplibregl.Point
+): SVGGElement {
+  const namespace = "http://www.w3.org/2000/svg";
+  const group = document.createElementNS(namespace, "g");
+  group.setAttribute("class", "fallback-runway-badge");
+  group.setAttribute("transform", `translate(${point.x} ${point.y})`);
+  group.dataset.label = `${designator} ${heading}`;
+  group.dataset.x = String(point.x);
+  group.dataset.y = String(point.y);
+
+  const rect = document.createElementNS(namespace, "rect");
+  rect.setAttribute("x", "-24");
+  rect.setAttribute("y", "-25");
+  rect.setAttribute("width", "48");
+  rect.setAttribute("height", "50");
+  rect.setAttribute("rx", "11");
+
+  const number = document.createElementNS(namespace, "text");
+  number.setAttribute("class", "fallback-runway-badge-number");
+  number.setAttribute("x", "0");
+  number.setAttribute("y", "-4");
+  number.textContent = designator;
+
+  const bearing = document.createElementNS(namespace, "text");
+  bearing.setAttribute("class", "fallback-runway-badge-heading");
+  bearing.setAttribute("x", "0");
+  bearing.setAttribute("y", "13");
+  bearing.textContent = heading;
+  group.append(rect, number, bearing);
+  return group;
+}
+
+function runwayScreenHeading(feature: AirportFeature): number {
+  const start = feature.points[0]!;
+  const end = feature.points.at(-1)!;
+  const latitude = (start[1] + end[1]) / 2;
+  const dx = (end[0] - start[0]) * Math.cos(latitude * Math.PI / 180);
+  const dy = end[1] - start[1];
+  return (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+}
+
+function normalizeRunwayHeading(value: number): number {
+  const rounded = Math.round((value % 360 + 360) % 360);
+  return rounded === 0 ? 360 : rounded;
 }
 
 function createFallbackPolyline(

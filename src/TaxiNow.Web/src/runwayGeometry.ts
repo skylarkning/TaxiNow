@@ -142,17 +142,20 @@ export function buildRunwayDecorations(
 
       const text = designators[end] ?? designators[0] ?? "";
       if (text) {
+        const heading = normalizeAviationHeading(
+          runwayBearing(runway) + (end === 0 ? 0 : 180)
+        );
         labels.push({
           type: "Feature",
           properties: {
             text,
-            rotation: runwayBearing(runway) + (end === 0 ? 0 : 180)
+            heading: `${String(heading).padStart(3, "0")}°`
           },
           geometry: {
             type: "Point",
             coordinates: localPoint(
               runway,
-              origin + direction * (threshold + width * 1.15),
+              origin - direction * Math.max(50, width * 1.15),
               0
             )
           }
@@ -303,4 +306,9 @@ function runwayBearing(runway: LocalRunway): number {
   return (
     Math.atan2(runway.along[0], runway.along[1]) * 180 / Math.PI + 360
   ) % 360;
+}
+
+function normalizeAviationHeading(value: number): number {
+  const rounded = Math.round((value % 360 + 360) % 360);
+  return rounded === 0 ? 360 : rounded;
 }

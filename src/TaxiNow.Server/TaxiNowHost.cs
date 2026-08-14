@@ -17,7 +17,7 @@ public static class TaxiNowHost
     public const int DefaultPort = 8780;
     public const string ProductVersion = "1.4.0";
     public const string DisplayVersion = "V1.4";
-    public const int InternalBuildId = 115;
+    public const int InternalBuildId = 116;
     public const string BuildDate = "August 13, 2026";
 
     public static string MapShellUrl =>

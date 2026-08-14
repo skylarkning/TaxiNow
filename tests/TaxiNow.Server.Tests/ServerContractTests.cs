@@ -16,9 +16,9 @@ public sealed class ServerContractTests
     {
         Assert.Equal("1.4.0", TaxiNowHost.ProductVersion);
         Assert.Equal("V1.4", TaxiNowHost.DisplayVersion);
-        Assert.Equal(115, TaxiNowHost.InternalBuildId);
+        Assert.Equal(116, TaxiNowHost.InternalBuildId);
         Assert.Equal(
-            "http://127.0.0.1:8780/?build=115",
+            "http://127.0.0.1:8780/?build=116",
             TaxiNowHost.MapShellUrl);
     }
 
