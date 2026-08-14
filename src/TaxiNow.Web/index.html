@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#08111d" />
-    <title>TaxiNow V1.3</title>
+    <title>TaxiNow V1.4</title>
   </head>
   <body>
     <main id="app">
@@ -121,6 +121,45 @@
                 <span data-i18n="settings.keepVisible">Keep window visible</span>
                 <span class="settings-check" aria-hidden="true">✓</span>
               </button>
+              <button id="auto-check-updates"
+                      class="settings-check-row"
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked="true">
+                <span data-i18n="settings.autoUpdates">Automatically check for updates</span>
+                <span class="settings-check" aria-hidden="true">✓</span>
+              </button>
+              <button id="theme-selector"
+                      class="settings-submenu-toggle"
+                      type="button"
+                      role="menuitem"
+                      aria-haspopup="menu"
+                      aria-expanded="false"
+                      aria-controls="theme-menu">
+                <span data-i18n="settings.theme">Appearance</span>
+                <span aria-hidden="true">›</span>
+              </button>
+              <div id="theme-menu"
+                   class="language-menu"
+                   role="menu"
+                   aria-label="Appearance"
+                   data-i18n-aria-label="settings.theme"
+                   hidden>
+                <button type="button" role="menuitemradio"
+                        data-theme-option="dark" aria-checked="false">
+                  <span data-i18n="settings.dark">Dark</span>
+                  <span class="language-check" aria-hidden="true">✓</span>
+                </button>
+                <button type="button" role="menuitemradio"
+                        data-theme-option="light" aria-checked="false">
+                  <span data-i18n="settings.light">Light</span>
+                  <span class="language-check" aria-hidden="true">✓</span>
+                </button>
+              </div>
+              <button id="check-updates-now"
+                      type="button"
+                      role="menuitem"
+                      data-i18n="updates.checkNow">Check for updates</button>
               <button id="language-selector"
                       class="settings-submenu-toggle"
                       type="button"
@@ -300,6 +339,18 @@
                    spellcheck="false"
                    data-i18n-placeholder="taxi.customPlaceholder"
                    placeholder="D, E, H, T1, RWY01L" />
+            <div class="taxiway-builder">
+              <span class="taxiway-builder-label"
+                    data-i18n="taxi.clickBuilder">Or build the route by selecting connected taxiways:</span>
+              <div id="selected-taxiway-pills"
+                   class="selected-taxiway-pills"
+                   aria-live="polite"></div>
+              <div id="available-taxiway-pills"
+                   class="available-taxiway-pills"></div>
+              <p id="taxiway-builder-feedback"
+                 class="taxiway-builder-feedback"
+                 data-i18n="taxi.clickHint">Choose the first taxiway. Each next choice must intersect the previous one.</p>
+            </div>
             <button id="preview-custom-taxi-route"
                     class="primary-button"
                     type="button"
@@ -682,7 +733,7 @@
             <h1 id="welcome-heading">Welcome to TaxiNow</h1>
             <p class="welcome-subtitle">欢迎使用 TaxiNow</p>
           </div>
-          <span class="welcome-version">V1.3</span>
+          <span class="welcome-version">V1.4</span>
         </div>
         <div class="welcome-languages">
           <section lang="en">
@@ -757,6 +808,43 @@
           <button id="close-welcome"
                   class="primary-button"
                   type="button">Enter TaxiNow / 进入 TaxiNow</button>
+        </div>
+      </section>
+      <button id="update-backdrop"
+              class="about-backdrop"
+              type="button"
+              aria-label="Close update information"
+              data-i18n-aria-label="updates.close"
+              hidden></button>
+      <section id="update-dialog"
+               class="update-dialog"
+               role="dialog"
+               aria-modal="true"
+               aria-labelledby="update-heading"
+               tabindex="-1"
+               hidden>
+        <div class="about-heading">
+          <div>
+            <span class="eyebrow" data-i18n="updates.available">Update available</span>
+            <h1 id="update-heading" data-i18n="updates.title">A new TaxiNow version is available</h1>
+          </div>
+          <button id="close-update" class="icon-button" type="button"
+                  aria-label="Close update information"
+                  data-i18n-aria-label="updates.close">×</button>
+        </div>
+        <p id="update-version" class="update-version"></p>
+        <pre id="update-changelog" class="update-changelog"></pre>
+        <p id="update-feedback" class="feedback" role="status"></p>
+        <div class="update-actions">
+          <a class="secondary-button" href="https://flightsim.to/addon/112712/taxinow"
+             target="_blank" rel="noopener noreferrer"
+             data-i18n="updates.flightsim">Download from flightsim.to</a>
+          <a id="update-github-link" class="secondary-button"
+             href="https://github.com/skylarkning/TaxiNow-Release/releases/latest"
+             target="_blank" rel="noopener noreferrer"
+             data-i18n="updates.github">Download from GitHub</a>
+          <button id="install-update" class="primary-button" type="button"
+                  data-i18n="updates.install">Download and install in TaxiNow</button>
         </div>
       </section>
       <button id="about-backdrop"
@@ -901,12 +989,12 @@
           </section>
           <p class="about-version">
             <span data-i18n="about.versionLabel">Version:</span>
-            <strong id="about-version-localized">V1.3</strong>
+            <strong id="about-version-localized">V1.4</strong>
             (<span data-i18n="about.buildDateLabel">Build date:</span>
             <span id="about-build-date-localized">August 9, 2026</span>).
             <br />
             <span data-i18n="about.internalBuildLabel">Internal build:</span>
-            <strong id="about-build-id-localized">114</strong>.
+            <strong id="about-build-id-localized">115</strong>.
           </p>
         </div>
         <div class="about-language about-legacy" lang="en">
@@ -1103,10 +1191,10 @@
           </details>
         </section>
         <p class="about-version">
-          Version: <strong id="about-version">V1.3</strong>
+          Version: <strong id="about-version">V1.4</strong>
           (Build date: <span id="about-build-date">August 9, 2026</span>).
           <br />
-          Internal build: <strong id="about-build-id">114</strong>.
+          Internal build: <strong id="about-build-id">115</strong>.
         </p>
         </div>
         <div class="about-chinese about-language about-legacy" lang="zh-Hans">
@@ -1274,10 +1362,10 @@
             </details>
           </section>
           <p class="about-version">
-            版本：<strong id="about-version-zh">V1.3</strong>
+            版本：<strong id="about-version-zh">V1.4</strong>
             （构建日期：<span id="about-build-date-zh">2026年8月2日</span>）。
             <br />
-            内部构建号：<strong id="about-build-id-zh">114</strong>。
+            内部构建号：<strong id="about-build-id-zh">115</strong>。
           </p>
         </div>
       </section>
@@ -1287,7 +1375,7 @@
         </span>
         <span id="map-summary"></span>
         <span class="footer-right">
-          <span id="footer-version">V1.3</span>
+          <span id="footer-version">V1.4</span>
           <span id="attribution"
                 data-i18n="footer.fixture">Bundled TaxiNow fixture</span>
         </span>

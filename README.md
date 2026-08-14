@@ -23,8 +23,8 @@ the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release)
 The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
 third-party notices.
 
-Current release: **V1.3**, internal build **114**
-(build date: August 9, 2026). The About dialog
+Current development build: **V1.4**, internal build **115**
+(build date: August 13, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is a free-of-charge application for personal
 flight-simulator use only.
@@ -54,6 +54,7 @@ their surrounding white canvas and create the required output sizes.
 - Shared MapLibre SPA with a full-detail CYYZ regression asset: 5 physical
   runways, 400 taxiways/taxilanes, 402 stands, and 4 terminal polygons.
 - Proportional runway pavement, centerlines, thresholds, aiming marks,
+  runway-edge lines, threshold bars, threshold stripes, touchdown-zone pairs,
   end-designators, taxiway centerlines, and zoom-dependent labels, informed by
   the proven SkyCharts map-drawing behavior.
 - Taxiway pavement is layered below runway pavement while yellow centerlines
@@ -89,6 +90,15 @@ their surrounding white canvas and create the required output sizes.
   `D, E, H, T1, RWY01L`. TaxiNow validates identifiers against the active map,
   highlights valid custom routes, suggests likely typo corrections, and offers
   automatic route finding when the requested sequence cannot be connected.
+- V1.4 supplements custom text entry with an intersection-aware taxiway picker:
+  every selection narrows the next choices to physically connected taxiways,
+  and removable sequence pills make corrections immediate. Right-clicking the
+  map can set a manual taxi start and destination, including while no simulator
+  position is available.
+- V1.4 adds persistent light and dark appearances plus optional automatic
+  update checks. The update dialog shows the available version and changelog,
+  links to both official download channels, or can securely fetch and launch
+  the official release installer after validating its GitHub SHA-256 digest.
 - V1.3 adds Korean alongside English, Simplified Chinese, Traditional Chinese,
   Japanese, French, and German; remembers the last displayed airport; and adds
   an optional heading-up map lock that follows the aircraft at the lower center

@@ -58,6 +58,7 @@ import {
 } from "./regionNames";
 import {
   buildTaxiGraph,
+  listConnectingTaxiwayRefs,
   listGateDestinations,
   listRunwayDestinations,
   listTaxiwayRefs,
@@ -76,6 +77,9 @@ import {
 const telemetrySamples: TelemetrySnapshot[] = [];
 const lastAirportStorageKey = "taxinow.lastAirport";
 const headingFollowStorageKey = "taxinow.map.headingFollow";
+const themeStorageKey = "taxinow.theme";
+const autoUpdateStorageKey = "taxinow.updates.autoCheck";
+const updateCheckedAtStorageKey = "taxinow.updates.lastCheckedAt";
 let lastOwnshipFrameAt = 0;
 let lastRenderedOwnship: InterpolatedOwnship | null = null;
 let ownshipVisible = false;
@@ -107,6 +111,10 @@ let lastTaxiCameraAt = 0;
 let headingFollowEnabled = readBooleanPreference(headingFollowStorageKey);
 let pendingCustomTaxiCorrection: string | null = null;
 let pendingCustomTaxiDestination: TaxiDestination | null = null;
+let selectedTaxiwaySequence: string[] = [];
+let manualTaxiStart: Coordinate | null = null;
+let manualTaxiDestination: TaxiDestination | null = null;
+let updateRelease: UpdateRelease | null = null;
 const assetGroupOpenState = new Map<string, boolean>();
 const downloadProgressWatch = new Map<
   string,
@@ -130,6 +138,35 @@ interface DesktopStorageMessage {
 interface DesktopWindowSettingsMessage {
   type: "window-settings";
   keepVisible: boolean;
+}
+
+interface DesktopUpdateStatusMessage {
+  type: "update-install:status";
+  state: "downloading" | "launching" | "error";
+  message: string;
+}
+
+interface GitHubReleaseAsset {
+  name: string;
+  browser_download_url: string;
+  digest?: string | null;
+}
+
+interface GitHubRelease {
+  tag_name: string;
+  name: string | null;
+  body: string | null;
+  html_url: string;
+  assets: GitHubReleaseAsset[];
+}
+
+interface UpdateRelease {
+  version: string;
+  build: number;
+  changelog: string;
+  pageUrl: string;
+  installerUrl: string;
+  digest: string | null;
 }
 
 function readLastAirport(): string | null {
@@ -168,6 +205,7 @@ function writeBooleanPreference(key: string, value: boolean): void {
 
 async function start(): Promise<void> {
   setupLanguageSelector();
+  setupThemeSelector();
   setupResponsiveHeader();
   setupDesktopWindowSettings();
   setupTaxiPlanner();
@@ -177,6 +215,7 @@ async function start(): Promise<void> {
   setupWelcomeDialog();
   const appStatus = await getJson<AppStatus>("/api/v1/status");
   applyProductMetadata(appStatus);
+  setupUpdateExperience(appStatus);
   const serverLink =
     document.querySelector<HTMLAnchorElement>("#server-url")!;
   serverLink.href = appStatus.localUrl;
@@ -199,6 +238,220 @@ async function start(): Promise<void> {
   }
   await loadAirport(initialIcao);
   await connectTelemetry();
+}
+
+function setupThemeSelector(): void {
+  const saved = (() => {
+    try {
+      return window.localStorage.getItem(themeStorageKey);
+    } catch {
+      return null;
+    }
+  })();
+  const initial = saved === "light" ? "light" : "dark";
+  applyTheme(initial);
+
+  const selector = document.querySelector<HTMLButtonElement>("#theme-selector");
+  const menu = document.querySelector<HTMLElement>("#theme-menu");
+  if (!selector || !menu) {
+    return;
+  }
+  const options = Array.from(
+    menu.querySelectorAll<HTMLButtonElement>("[data-theme-option]")
+  );
+  const sync = (theme: "dark" | "light"): void => {
+    for (const option of options) {
+      option.setAttribute(
+        "aria-checked",
+        String(option.dataset.themeOption === theme)
+      );
+    }
+  };
+  sync(initial);
+  selector.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const open = menu.hidden;
+    menu.hidden = !open;
+    selector.setAttribute("aria-expanded", String(open));
+    document.querySelector<HTMLElement>("#language-menu")!.hidden = true;
+  });
+  for (const option of options) {
+    option.addEventListener("click", () => {
+      const theme = option.dataset.themeOption === "light" ? "light" : "dark";
+      try {
+        window.localStorage.setItem(themeStorageKey, theme);
+      } catch {
+        // The theme remains active for this session.
+      }
+      applyTheme(theme);
+      sync(theme);
+      menu.hidden = true;
+      selector.setAttribute("aria-expanded", "false");
+    });
+  }
+}
+
+function applyTheme(theme: "dark" | "light"): void {
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme;
+  document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    ?.setAttribute("content", theme === "light" ? "#eaf2f6" : "#08111d");
+  if (mapInitialized && typeof map !== "undefined" && map) {
+    try {
+      applyMapTheme(map, theme);
+      map.triggerRepaint();
+    } catch (error) {
+      console.warn("TaxiNow could not immediately update the map theme.", error);
+    }
+  }
+}
+
+function setupUpdateExperience(appStatus: AppStatus): void {
+  const toggle = document.querySelector<HTMLButtonElement>("#auto-check-updates")!;
+  const checkNow = document.querySelector<HTMLButtonElement>("#check-updates-now")!;
+  const install = document.querySelector<HTMLButtonElement>("#install-update")!;
+  const bridge = (
+    window as typeof window & { chrome?: { webview?: DesktopWebViewBridge } }
+  ).chrome?.webview;
+  let enabled = true;
+  try {
+    enabled = window.localStorage.getItem(autoUpdateStorageKey) !== "false";
+  } catch {
+    // Automatic checks are enabled by default.
+  }
+  toggle.setAttribute("aria-checked", String(enabled));
+  toggle.addEventListener("click", () => {
+    enabled = toggle.getAttribute("aria-checked") !== "true";
+    toggle.setAttribute("aria-checked", String(enabled));
+    try {
+      window.localStorage.setItem(autoUpdateStorageKey, String(enabled));
+    } catch {
+      // Keep the choice for this session.
+    }
+  });
+  checkNow.addEventListener("click", () => {
+    void checkForUpdates(appStatus, true);
+  });
+  install.hidden = !bridge;
+  install.addEventListener("click", () => {
+    if (!bridge || !updateRelease) {
+      return;
+    }
+    install.disabled = true;
+    bridge.postMessage({
+      type: "update-install:start",
+      downloadUrl: updateRelease.installerUrl,
+      digest: updateRelease.digest
+    });
+  });
+  bridge?.addEventListener("message", (event) => {
+    const message = event.data as Partial<DesktopUpdateStatusMessage> | null;
+    if (message?.type !== "update-install:status" ||
+        typeof message.message !== "string") {
+      return;
+    }
+    const feedback = document.querySelector<HTMLElement>("#update-feedback")!;
+    feedback.textContent = message.message;
+    feedback.className = message.state === "error" ? "feedback error" : "feedback";
+    if (message.state === "error") {
+      install.disabled = false;
+    }
+  });
+
+  if (enabled && shouldRunAutomaticUpdateCheck()) {
+    void checkForUpdates(appStatus, false);
+  }
+}
+
+function shouldRunAutomaticUpdateCheck(): boolean {
+  try {
+    const previous = Number(window.localStorage.getItem(updateCheckedAtStorageKey));
+    return !Number.isFinite(previous) || Date.now() - previous >= 12 * 60 * 60 * 1000;
+  } catch {
+    return true;
+  }
+}
+
+async function checkForUpdates(
+  appStatus: AppStatus,
+  userInitiated: boolean
+): Promise<void> {
+  try {
+    const response = await fetch(
+      "https://api.github.com/repos/skylarkning/TaxiNow-Release/releases/latest",
+      { headers: { Accept: "application/vnd.github+json" } }
+    );
+    if (!response.ok) {
+      throw new Error(t("updates.checkFailed"));
+    }
+    const release = await response.json() as GitHubRelease;
+    try {
+      window.localStorage.setItem(updateCheckedAtStorageKey, String(Date.now()));
+    } catch {
+      // A failed preference write must not hide a valid update.
+    }
+    const installers = release.assets
+      .map((asset) => ({
+        asset,
+        build: Number(/Build[-_ ]?(\d+)/i.exec(asset.name)?.[1] ?? 0)
+      }))
+      .filter((item) => item.build > 0 && /Setup\.exe$/i.test(item.asset.name))
+      .sort((left, right) => right.build - left.build);
+    const latest = installers[0];
+    if (!latest || latest.build <= appStatus.internalBuildId) {
+      if (userInitiated) {
+        showUpdateDialog(null, t("updates.current", {
+          version: appStatus.displayVersion,
+          build: appStatus.internalBuildId
+        }));
+      }
+      return;
+    }
+    updateRelease = {
+      version: release.name?.trim() || release.tag_name,
+      build: latest.build,
+      changelog: release.body?.trim() || t("updates.noChangelog"),
+      pageUrl: release.html_url,
+      installerUrl: latest.asset.browser_download_url,
+      digest: latest.asset.digest ?? null
+    };
+    showUpdateDialog(updateRelease);
+  } catch (error) {
+    if (userInitiated) {
+      showUpdateDialog(null, error instanceof Error
+        ? error.message
+        : t("updates.checkFailed"));
+    }
+  }
+}
+
+function showUpdateDialog(release: UpdateRelease | null, message = ""): void {
+  const dialog = document.querySelector<HTMLElement>("#update-dialog")!;
+  const backdrop = document.querySelector<HTMLButtonElement>("#update-backdrop")!;
+  const version = document.querySelector<HTMLElement>("#update-version")!;
+  const changelog = document.querySelector<HTMLElement>("#update-changelog")!;
+  const feedback = document.querySelector<HTMLElement>("#update-feedback")!;
+  const actions = document.querySelector<HTMLElement>(".update-actions")!;
+  const github = document.querySelector<HTMLAnchorElement>("#update-github-link")!;
+  version.textContent = release
+    ? t("updates.version", { version: release.version, build: release.build })
+    : t("updates.none");
+  changelog.textContent = release?.changelog ?? "";
+  feedback.textContent = message;
+  feedback.className = message ? "feedback" : "feedback";
+  actions.hidden = !release;
+  if (release) {
+    github.href = release.pageUrl;
+  }
+  dialog.hidden = false;
+  backdrop.hidden = false;
+  dialog.focus();
+  const close = (): void => {
+    dialog.hidden = true;
+    backdrop.hidden = true;
+  };
+  document.querySelector<HTMLButtonElement>("#close-update")!.onclick = close;
+  backdrop.onclick = close;
 }
 
 const headerCollapseClasses = [
@@ -361,10 +614,15 @@ function setupTaxiPlanner(): void {
     backdrop.hidden = !open;
     if (open) {
       populateTaxiDestinations();
+      renderTaxiwayBuilder();
       document.querySelector<HTMLElement>("#taxi-runway")?.focus();
     }
   };
   const syncKind = (): void => {
+    if (manualTaxiDestination) {
+      manualTaxiDestination = null;
+      updateManualTaxiPoints();
+    }
     const runway = kind.value === "runway";
     document.querySelector<HTMLElement>("#taxi-runway-field")!.hidden = !runway;
     document.querySelector<HTMLElement>("#taxi-gate-field")!.hidden = runway;
@@ -374,11 +632,20 @@ function setupTaxiPlanner(): void {
   closeButton.addEventListener("click", () => setOpen(false));
   backdrop.addEventListener("click", () => setOpen(false));
   kind.addEventListener("change", syncKind);
+  document.querySelector("#taxi-runway")?.addEventListener("change", () => {
+    manualTaxiDestination = null;
+    updateManualTaxiPoints();
+  });
+  document.querySelector("#taxi-gate")?.addEventListener("input", () => {
+    manualTaxiDestination = null;
+    updateManualTaxiPoints();
+  });
   customToggle.addEventListener("click", () => {
     const open = customSection.hidden;
     customSection.hidden = !open;
     customToggle.setAttribute("aria-expanded", String(open));
     if (open) {
+      renderTaxiwayBuilder();
       document.querySelector<HTMLInputElement>(
         "#taxi-custom-route-input"
       )?.focus();
@@ -414,12 +681,98 @@ function setupTaxiPlanner(): void {
   document.querySelector("#stop-taxi-guidance")!.addEventListener("click", () => {
     clearTaxiRoute();
   });
+  document.querySelector<HTMLInputElement>("#taxi-custom-route-input")!
+    .addEventListener("input", syncTaxiwayBuilderFromInput);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && panel.classList.contains("open")) {
       setOpen(false);
     }
   });
   syncKind();
+}
+
+function syncTaxiwayBuilderFromInput(): void {
+  if (!taxiGraph) {
+    return;
+  }
+  const available = new Set(listTaxiwayRefs(taxiGraph));
+  const tokens = document.querySelector<HTMLInputElement>(
+    "#taxi-custom-route-input"
+  )!.value.split(",")
+    .map((token) => token.trim().toUpperCase())
+    .filter((token) => available.has(token));
+  selectedTaxiwaySequence = tokens;
+  renderTaxiwayBuilder();
+}
+
+function renderTaxiwayBuilder(): void {
+  const selected = document.querySelector<HTMLElement>(
+    "#selected-taxiway-pills"
+  );
+  const available = document.querySelector<HTMLElement>(
+    "#available-taxiway-pills"
+  );
+  const feedback = document.querySelector<HTMLElement>(
+    "#taxiway-builder-feedback"
+  );
+  if (!selected || !available || !feedback) {
+    return;
+  }
+  selected.replaceChildren();
+  available.replaceChildren();
+  if (!taxiGraph) {
+    feedback.textContent = t("taxi.noNetwork");
+    return;
+  }
+
+  selectedTaxiwaySequence.forEach((ref, index) => {
+    const pill = document.createElement("span");
+    pill.className = "selected-taxiway-pill";
+    pill.append(document.createTextNode(ref));
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.title = t("taxi.removeTaxiway", { taxiway: ref });
+    remove.setAttribute("aria-label", remove.title);
+    remove.addEventListener("click", () => {
+      // Later choices depend on this intersection, so truncate the invalid tail.
+      selectedTaxiwaySequence = selectedTaxiwaySequence.slice(0, index);
+      writeTaxiwayBuilderInput();
+      renderTaxiwayBuilder();
+    });
+    pill.append(remove);
+    selected.append(pill);
+  });
+
+  const previous = selectedTaxiwaySequence.at(-1);
+  const candidates = previous
+    ? listConnectingTaxiwayRefs(taxiGraph, previous)
+    : listTaxiwayRefs(taxiGraph);
+  const remaining = candidates.filter(
+    (ref) => !selectedTaxiwaySequence.includes(ref)
+  );
+  for (const ref of remaining) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "available-taxiway-pill";
+    button.textContent = ref;
+    button.addEventListener("click", () => {
+      selectedTaxiwaySequence.push(ref);
+      writeTaxiwayBuilderInput();
+      renderTaxiwayBuilder();
+    });
+    available.append(button);
+  }
+  feedback.textContent = previous
+    ? remaining.length > 0
+      ? t("taxi.clickNext", { taxiway: previous })
+      : t("taxi.clickDeadEnd", { taxiway: previous })
+    : t("taxi.clickHint");
+}
+
+function writeTaxiwayBuilderInput(): void {
+  document.querySelector<HTMLInputElement>("#taxi-custom-route-input")!.value =
+    selectedTaxiwaySequence.join(", ");
 }
 
 function populateTaxiDestinations(): void {
@@ -454,9 +807,12 @@ function previewCustomTaxiRoute(): void {
   const feedback = document.querySelector<HTMLElement>(
     "#taxi-custom-feedback"
   )!;
-  const position = currentAircraftCoordinate();
+  const position = taxiPlanningStart();
   if (!position || !currentAirportMap || !taxiGraph) {
-    showCustomTaxiFeedback(t("taxi.needPosition"), true);
+    showCustomTaxiFeedback(
+      !position ? t("taxi.needStart") : t("taxi.needPosition"),
+      true
+    );
     return;
   }
   // Never leave an older blue route on screen while reporting that the newly
@@ -469,14 +825,33 @@ function previewCustomTaxiRoute(): void {
     .split(",")
     .map((token) => token.trim().toUpperCase())
     .filter(Boolean);
-  if (tokens.length < 2) {
+  if (tokens.length < 1) {
     showCustomTaxiFeedback(t("taxi.customNeedFormat"), true);
     input.focus();
     return;
   }
 
   const destinationToken = tokens.at(-1)!;
-  const destinationMatch = resolveCustomTaxiDestination(destinationToken);
+  let destinationMatch = resolveCustomTaxiDestination(destinationToken);
+  let requestedRefs = tokens.slice(0, -1);
+  const graph = taxiGraph;
+  const taxiwayRefs = new Set(listTaxiwayRefs(graph));
+  const builderOwnsSequence = selectedTaxiwaySequence.length === tokens.length &&
+    selectedTaxiwaySequence.every((ref, index) => ref === tokens[index]);
+  if ((builderOwnsSequence || !destinationMatch.destination) &&
+      tokens.every((token) => taxiwayRefs.has(token))) {
+    const selectedDestination = selectedPlannerDestination();
+    if (selectedDestination) {
+      destinationMatch = {
+        destination: selectedDestination,
+        token: selectedDestination.kind === "runway"
+          ? `RWY${selectedDestination.ref}`
+          : selectedDestination.label,
+        suggestion: null
+      };
+      requestedRefs = tokens;
+    }
+  }
   if (!destinationMatch.destination) {
     const correction = destinationMatch.suggestion
       ? [...tokens.slice(0, -1), destinationMatch.suggestion].join(", ")
@@ -492,7 +867,6 @@ function previewCustomTaxiRoute(): void {
     return;
   }
 
-  const requestedRefs = tokens.slice(0, -1);
   const availableRefs = new Set(listTaxiwayRefs(taxiGraph));
   const unknown = requestedRefs.filter((ref) => !availableRefs.has(ref));
   if (unknown.length > 0) {
@@ -536,7 +910,9 @@ function previewCustomTaxiRoute(): void {
     position,
     destinationMatch.destination,
     requestedRefs,
-    nearestStandLabel(currentAirportMap.features, position)
+    manualTaxiStart
+      ? t("taxi.manualStart")
+      : nearestStandLabel(currentAirportMap.features, position)
   );
   if (!route) {
     showCustomTaxiFeedback(
@@ -644,13 +1020,16 @@ function findTaxiRoutes(destinationOverride?: TaxiDestination): void {
     }
     setCustomTaxiRecovery(null, null);
   }
-  const position = currentAircraftCoordinate();
+  const position = taxiPlanningStart();
   if (!position || !currentAirportMap || !taxiGraph) {
-    feedback.textContent = t("taxi.needPosition");
+    feedback.textContent = !position
+      ? t("taxi.needStart")
+      : t("taxi.needPosition");
     feedback.className = "feedback error";
     return;
   }
-  let destination: TaxiDestination | undefined = destinationOverride;
+  let destination: TaxiDestination | undefined =
+    destinationOverride ?? manualTaxiDestination ?? undefined;
   if (!destination) {
     const kind = document.querySelector<HTMLSelectElement>(
       "#taxi-destination-kind"
@@ -683,9 +1062,15 @@ function findTaxiRoutes(destinationOverride?: TaxiDestination): void {
     taxiGraph,
     position,
     destination,
-    nearestStandLabel(currentAirportMap.features, position),
+    manualTaxiStart
+      ? t("taxi.manualStart")
+      : nearestStandLabel(currentAirportMap.features, position),
     5,
-    { startHeadingDegrees: currentAircraftHeading() ?? undefined }
+    {
+      startHeadingDegrees: manualTaxiStart
+        ? undefined
+        : currentAircraftHeading() ?? undefined
+    }
   );
   if (taxiRouteOptions.length === 0) {
     feedback.textContent = t("taxi.noNetwork");
@@ -697,6 +1082,25 @@ function findTaxiRoutes(destinationOverride?: TaxiDestination): void {
   feedback.className = "feedback success";
   selectTaxiRoute(taxiRouteOptions[0]!);
   renderTaxiRouteOptions();
+}
+
+function selectedPlannerDestination(): TaxiDestination | undefined {
+  if (manualTaxiDestination) {
+    return manualTaxiDestination;
+  }
+  const kind = document.querySelector<HTMLSelectElement>(
+    "#taxi-destination-kind"
+  )?.value;
+  if (kind === "runway") {
+    const ref = document.querySelector<HTMLSelectElement>("#taxi-runway")?.value;
+    return taxiRunways.find((item) => item.ref === ref);
+  }
+  const ref = document.querySelector<HTMLInputElement>("#taxi-gate")
+    ?.value.trim().toUpperCase();
+  return taxiGates.find((item) =>
+    item.ref.toUpperCase() === ref ||
+    item.ref.toUpperCase().split(/[\/,]/).includes(ref ?? "")
+  );
 }
 
 function renderTaxiRouteOptions(): void {
@@ -818,6 +1222,10 @@ function currentAircraftCoordinate(): Coordinate | null {
     : null;
 }
 
+function taxiPlanningStart(): Coordinate | null {
+  return manualTaxiStart ?? currentAircraftCoordinate();
+}
+
 function currentAircraftHeading(): number | null {
   if (lastRenderedOwnship?.visible) {
     return lastRenderedOwnship.heading;
@@ -895,6 +1303,9 @@ function applyProductMetadata(status: AppStatus): void {
 
 async function loadAirport(icao: string): Promise<void> {
   clearTaxiRoute();
+  manualTaxiStart = null;
+  manualTaxiDestination = null;
+  selectedTaxiwaySequence = [];
   const downloadedAirport = await getJson<AirportMap>(
     `/api/v1/airports/${encodeURIComponent(icao)}/map`
   );
@@ -1926,6 +2337,10 @@ function createMap(airport: AirportMap): MapLibreMap {
         type: "geojson",
         data: taxiRouteCollection([])
       });
+      created.addSource("manual-taxi-points", {
+        type: "geojson",
+        data: manualTaxiPointCollection()
+      });
       created.addSource("ownship", {
         type: "geojson",
         data: ownshipFeature(
@@ -1938,6 +2353,11 @@ function createMap(airport: AirportMap): MapLibreMap {
       });
       addAirportLayers(created);
       addTaxiRouteLayers(created);
+      addManualTaxiPointLayers(created);
+      applyMapTheme(
+        created,
+        document.documentElement.dataset.theme === "light" ? "light" : "dark"
+      );
       created.addImage("ownship-plane", createOwnshipImage(), { pixelRatio: 2 });
       addOwnshipLayer(created);
       created.moveLayer("taxiway-labels");
@@ -1962,7 +2382,155 @@ function createMap(airport: AirportMap): MapLibreMap {
       console.error(error);
     }
   });
+  created.on("contextmenu", (event) => {
+    openManualTaxiContextMenu(created, [event.lngLat.lng, event.lngLat.lat]);
+  });
   return created;
+}
+
+function applyMapTheme(
+  target: MapLibreMap,
+  theme: "dark" | "light"
+): void {
+  const light = theme === "light";
+  const set = (layer: string, property: string, value: unknown): void => {
+    if (target.getLayer(layer)) {
+      target.setPaintProperty(layer, property as never, value as never);
+    }
+  };
+  set("background", "background-color", light ? "#edf3f6" : "#0a1624");
+  set("aprons", "fill-color", light ? "#c7d3db" : "#2a3948");
+  set("aprons", "fill-outline-color", light ? "#9aacb8" : "#53677b");
+  set("terminals", "fill-color", light ? "#f6f8fa" : "#8795a4");
+  set("terminals", "fill-outline-color", light ? "#8699a8" : "#d8e1e8");
+  set("runway-outline", "line-color", light ? "#ffffff" : "#dce3e8");
+  set("runways", "line-color", light ? "#26343d" : "#15191f");
+  set("taxiway-outline", "line-color", light ? "#9fafb9" : "#252a2e");
+  set("taxiways", "line-color", light ? "#d5dfe5" : "#686d71");
+  set("taxiway-centerlines", "line-color", light ? "#d4aa00" : "#f7d24b");
+  set("runway-labels", "text-color", light ? "#ffffff" : "#f7f9fb");
+  set("runway-labels", "text-halo-color", light ? "#26343d" : "#080c10");
+  set("taxiway-labels", "text-color", light ? "#b88d00" : "#ffd52f");
+  set("taxiway-labels", "text-halo-color", light ? "#f6fafc" : "#080b0e");
+  set("building-labels", "text-color", light ? "#283946" : "#eef4f8");
+  set("building-labels", "text-halo-color", light ? "#f7fafb" : "#263442");
+  set("stand-labels", "text-color", light ? "#28414a" : "#dffaf4");
+  set("stand-labels", "text-halo-color", light ? "#edf3f6" : "#0a1624");
+  set("taxi-route-casing", "line-color", light ? "#ffffff" : "#07131e");
+}
+
+function openManualTaxiContextMenu(
+  target: MapLibreMap,
+  coordinate: Coordinate
+): void {
+  const menu = document.createElement("div");
+  menu.className = "manual-taxi-menu";
+  const popup = new maplibregl.Popup({
+    closeButton: false,
+    closeOnClick: true,
+    offset: 8
+  }).setLngLat(coordinate).setDOMContent(menu).addTo(target);
+
+  const addAction = (
+    label: string,
+    action: () => void
+  ): void => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.addEventListener("click", () => {
+      action();
+      popup.remove();
+    });
+    menu.append(button);
+  };
+  addAction(t("taxi.addStart"), () => {
+    manualTaxiStart = [...coordinate] as Coordinate;
+    updateManualTaxiPoints();
+    if (manualTaxiDestination) {
+      findTaxiRoutes(manualTaxiDestination);
+    }
+  });
+  addAction(t("taxi.addDestination"), () => {
+    manualTaxiDestination = {
+      kind: "point",
+      ref: "CUSTOM",
+      label: t("taxi.manualDestination"),
+      coordinate: [...coordinate] as Coordinate
+    };
+    updateManualTaxiPoints();
+    document.querySelector<HTMLButtonElement>("#open-taxi-plan")?.click();
+    findTaxiRoutes(manualTaxiDestination);
+  });
+  if (manualTaxiStart || manualTaxiDestination) {
+    addAction(t("taxi.clearPoints"), () => {
+      manualTaxiStart = null;
+      manualTaxiDestination = null;
+      clearTaxiRoute();
+      updateManualTaxiPoints();
+    });
+  }
+}
+
+function manualTaxiPointCollection(): FeatureCollection<Point> {
+  const features: Array<Feature<Point>> = [];
+  if (manualTaxiStart) {
+    features.push({
+      type: "Feature",
+      properties: { role: "start", label: "S" },
+      geometry: { type: "Point", coordinates: manualTaxiStart }
+    });
+  }
+  if (manualTaxiDestination) {
+    features.push({
+      type: "Feature",
+      properties: { role: "destination", label: "D" },
+      geometry: {
+        type: "Point",
+        coordinates: manualTaxiDestination.coordinate
+      }
+    });
+  }
+  return { type: "FeatureCollection", features };
+}
+
+function updateManualTaxiPoints(): void {
+  if (!mapInitialized || !map?.getSource("manual-taxi-points")) {
+    return;
+  }
+  (map.getSource("manual-taxi-points") as GeoJSONSource)
+    .setData(manualTaxiPointCollection());
+}
+
+function addManualTaxiPointLayers(target: MapLibreMap): void {
+  target.addLayer({
+    id: "manual-taxi-points",
+    type: "circle",
+    source: "manual-taxi-points",
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 8, 17, 14],
+      "circle-color": [
+        "case",
+        ["==", ["get", "role"], "start"],
+        "#24c78e",
+        "#ff7b54"
+      ],
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 2
+    }
+  });
+  target.addLayer({
+    id: "manual-taxi-point-labels",
+    type: "symbol",
+    source: "manual-taxi-points",
+    layout: {
+      "text-field": ["get", "label"],
+      "text-size": 12,
+      "text-font": ["Segoe UI", "Arial Unicode MS Regular"],
+      "text-allow-overlap": true
+    },
+    paint: { "text-color": "#ffffff" }
+  });
 }
 
 class TelemetryRefreshControl implements maplibregl.IControl {
@@ -2185,6 +2753,18 @@ function addAirportLayers(target: MapLibreMap): void {
     layout: { "line-cap": "butt" }
   });
   target.addLayer({
+    id: "runway-edge-markings",
+    type: "line",
+    source: "runway-markings",
+    filter: ["==", ["get", "kind"], "edge"],
+    minzoom: 11,
+    paint: {
+      "line-color": "#f5f7f8",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.7, 17, 2.2],
+      "line-opacity": 0.92
+    }
+  });
+  target.addLayer({
     id: "runway-centerlines",
     type: "line",
     source: "runway-markings",
@@ -2208,6 +2788,19 @@ function addAirportLayers(target: MapLibreMap): void {
     }
   });
   target.addLayer({
+    id: "runway-threshold-stripes",
+    type: "line",
+    source: "runway-markings",
+    filter: ["==", ["get", "kind"], "threshold-stripe"],
+    minzoom: 12,
+    paint: {
+      "line-color": "#f7f9fa",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 12, 1.1, 17, 3.3],
+      "line-opacity": 0.98
+    },
+    layout: { "line-cap": "butt" }
+  });
+  target.addLayer({
     id: "runway-aiming-points",
     type: "line",
     source: "runway-markings",
@@ -2216,6 +2809,19 @@ function addAirportLayers(target: MapLibreMap): void {
     paint: {
       "line-color": "#f5f7f8",
       "line-width": ["interpolate", ["linear"], ["zoom"], 12.5, 2, 17, 6]
+    },
+    layout: { "line-cap": "butt" }
+  });
+  target.addLayer({
+    id: "runway-touchdown-zone",
+    type: "line",
+    source: "runway-markings",
+    filter: ["==", ["get", "kind"], "touchdown"],
+    minzoom: 13,
+    paint: {
+      "line-color": "#f5f7f8",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 13, 1.4, 17, 4.2],
+      "line-opacity": 0.95
     },
     layout: { "line-cap": "butt" }
   });

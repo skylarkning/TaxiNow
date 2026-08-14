@@ -26,7 +26,7 @@ export interface TaxiGraph {
 }
 
 export interface TaxiDestination {
-  kind: "runway" | "gate";
+  kind: "runway" | "gate" | "point";
   ref: string;
   label: string;
   coordinate: Coordinate;
@@ -406,6 +406,31 @@ export function listTaxiwayRefs(graph: TaxiGraph): string[] {
     numeric: true,
     sensitivity: "base"
   }));
+}
+
+export function listConnectingTaxiwayRefs(
+  graph: TaxiGraph,
+  reference: string
+): string[] {
+  const normalized = normalizeTaxiwayRef(reference);
+  if (!normalized) {
+    return listTaxiwayRefs(graph);
+  }
+  const connected = new Set<string>();
+  for (const node of graph.nodes) {
+    const refs = new Set(node.edges.map((edge) => edge.ref).filter(Boolean));
+    if (!refs.has(normalized)) {
+      continue;
+    }
+    for (const ref of refs) {
+      if (ref !== normalized) {
+        connected.add(ref);
+      }
+    }
+  }
+  return [...connected].sort((left, right) =>
+    left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" })
+  );
 }
 
 export function suggestTaxiwayRefs(

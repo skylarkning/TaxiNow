@@ -9,6 +9,7 @@ import {
   toTraditionalTranslations
 } from "./localization.zh-hant-ja";
 import { koreanTranslations } from "./localization.ko";
+import { v14Translations } from "./localization.v14";
 
 const STORAGE_KEY = "taxinow.language";
 
@@ -412,6 +413,7 @@ const settingsTranslations: Record<AppLocale, Record<string, string>> = {
 for (const locale of Object.keys(translations) as AppLocale[]) {
   Object.assign(translations[locale], extendedTranslations[locale]);
   Object.assign(translations[locale], settingsTranslations[locale]);
+  Object.assign(translations[locale], v14Translations[locale]);
 }
 translations["zh-Hant"]["faq.warp.a"] =
   translations["zh-Hant"]["faq.warp.a"]
@@ -543,6 +545,14 @@ export function setupLanguageSelector(): void {
     settingsButton.setAttribute("aria-expanded", String(open));
     if (!open) {
       setLanguageOpen(false);
+      const themeMenu = document.querySelector<HTMLElement>("#theme-menu");
+      const themeSelector = document.querySelector<HTMLElement>(
+        "#theme-selector"
+      );
+      if (themeMenu) {
+        themeMenu.hidden = true;
+      }
+      themeSelector?.setAttribute("aria-expanded", "false");
     }
   };
   for (const option of options) {
@@ -574,6 +584,14 @@ export function setupLanguageSelector(): void {
   languageButton.addEventListener("click", (event) => {
     event.stopPropagation();
     const open = menu.hidden;
+    const themeMenu = document.querySelector<HTMLElement>("#theme-menu");
+    const themeSelector = document.querySelector<HTMLElement>(
+      "#theme-selector"
+    );
+    if (themeMenu) {
+      themeMenu.hidden = true;
+    }
+    themeSelector?.setAttribute("aria-expanded", "false");
     setLanguageOpen(open);
     if (open) {
       options.find(

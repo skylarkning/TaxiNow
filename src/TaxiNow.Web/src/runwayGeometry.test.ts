@@ -29,6 +29,15 @@ describe("buildRunwayDecorations", () => {
     expect(result.markings.features.filter(
       (feature) => feature.properties?.kind === "threshold"
     )).toHaveLength(2);
+    expect(result.markings.features.filter(
+      (feature) => feature.properties?.kind === "edge"
+    )).toHaveLength(2);
+    expect(result.markings.features.some(
+      (feature) => feature.properties?.kind === "threshold-stripe"
+    )).toBe(true);
+    expect(result.markings.features.some(
+      (feature) => feature.properties?.kind === "touchdown"
+    )).toBe(true);
   });
 
   it("matches ZBAA runway designators to physical endpoints", () => {

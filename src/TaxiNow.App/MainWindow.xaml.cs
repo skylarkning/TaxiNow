@@ -1,4 +1,7 @@
 using System.IO;
+using System.Diagnostics;
+using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
@@ -13,6 +16,7 @@ public partial class MainWindow : Window
     private readonly Func<bool, bool> _changeKeepWindowVisible;
     private string _storageRoot;
     private bool _keepWindowVisible;
+    private bool _updateInstallInProgress;
 
     public MainWindow(
         string storageRoot,
@@ -116,6 +120,62 @@ public partial class MainWindow : Window
             PostWindowSettings();
             return;
         }
+        if (type == "update-install:start")
+        {
+            if (_updateInstallInProgress)
+            {
+                PostUpdateInstallStatus(
+                    "error",
+                    "An update download is already in progress.");
+                return;
+            }
+
+            string? downloadUrl;
+            string? digest;
+            try
+            {
+                using var document = JsonDocument.Parse(e.WebMessageAsJson);
+                downloadUrl = document.RootElement
+                    .GetProperty("downloadUrl")
+                    .GetString();
+                digest = document.RootElement.TryGetProperty("digest", out var value)
+                    ? value.GetString()
+                    : null;
+            }
+            catch (Exception exception)
+                when (exception is JsonException or KeyNotFoundException)
+            {
+                PostUpdateInstallStatus("error", "The update request was invalid.");
+                return;
+            }
+
+            _updateInstallInProgress = true;
+            try
+            {
+                PostUpdateInstallStatus(
+                    "downloading",
+                    "Downloading the verified TaxiNow installer…");
+                var installer = await DownloadUpdateInstallerAsync(
+                    downloadUrl,
+                    digest);
+                PostUpdateInstallStatus(
+                    "launching",
+                    "Download complete. Opening the TaxiNow installer…");
+                Process.Start(new ProcessStartInfo(installer)
+                {
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception exception)
+            {
+                PostUpdateInstallStatus("error", exception.Message);
+            }
+            finally
+            {
+                _updateInstallInProgress = false;
+            }
+            return;
+        }
         if (type != "storage-location:choose")
         {
             return;
@@ -142,6 +202,108 @@ public partial class MainWindow : Window
 
         _storageRoot = Path.GetFullPath(picker.SelectedPath);
         PostStorageLocation(restartRequired: true);
+    }
+
+    private async Task<string> DownloadUpdateInstallerAsync(
+        string? downloadUrl,
+        string? digest)
+    {
+        if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri) ||
+            uri.Scheme != Uri.UriSchemeHttps ||
+            !uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) ||
+            !uri.AbsolutePath.StartsWith(
+                "/skylarkning/TaxiNow-Release/releases/download/",
+                StringComparison.OrdinalIgnoreCase) ||
+            !uri.AbsolutePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "TaxiNow only installs official HTTPS release installers from skylarkning/TaxiNow-Release.");
+        }
+
+        var expected = digest?.StartsWith(
+            "sha256:",
+            StringComparison.OrdinalIgnoreCase) == true
+            ? digest[7..].Trim()
+            : null;
+        if (expected is null || expected.Length != 64 ||
+            expected.Any(character => !Uri.IsHexDigit(character)))
+        {
+            throw new InvalidDataException(
+                "GitHub did not provide a valid SHA-256 digest for this installer. Use an official download button instead.");
+        }
+
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            "TaxiNow",
+            "Updates");
+        Directory.CreateDirectory(directory);
+        var fileName = Path.GetFileName(Uri.UnescapeDataString(uri.AbsolutePath));
+        var destination = Path.Combine(directory, fileName);
+        var temporary = destination + ".download";
+
+        using var client = new HttpClient
+        {
+            Timeout = TimeSpan.FromMinutes(15)
+        };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(
+            $"TaxiNow/{TaxiNowHost.ProductVersion}");
+        using var response = await client.GetAsync(
+            uri,
+            HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+        await using (var input = await response.Content.ReadAsStreamAsync())
+        await using (var output = new FileStream(
+            temporary,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.None,
+            81920,
+            useAsync: true))
+        {
+            await input.CopyToAsync(output);
+        }
+
+        if (new FileInfo(temporary).Length < 2)
+        {
+            File.Delete(temporary);
+            throw new InvalidDataException("The downloaded installer is empty.");
+        }
+        await using (var stream = File.OpenRead(temporary))
+        {
+            if (stream.ReadByte() != 'M' || stream.ReadByte() != 'Z')
+            {
+                stream.Close();
+                File.Delete(temporary);
+                throw new InvalidDataException(
+                    "The downloaded file is not a valid Windows installer.");
+            }
+        }
+
+        await using (var stream = File.OpenRead(temporary))
+        {
+            var actual = Convert.ToHexString(
+                await SHA256.HashDataAsync(stream));
+            if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
+            {
+                stream.Close();
+                File.Delete(temporary);
+                throw new InvalidDataException(
+                    "The installer SHA-256 verification failed. Use the GitHub download button instead.");
+            }
+        }
+
+        File.Move(temporary, destination, overwrite: true);
+        return destination;
+    }
+
+    private void PostUpdateInstallStatus(string state, string message)
+    {
+        MapView.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(new
+        {
+            type = "update-install:status",
+            state,
+            message
+        }));
     }
 
     private void PostWindowSettings()

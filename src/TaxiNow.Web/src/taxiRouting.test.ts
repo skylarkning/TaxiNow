@@ -5,6 +5,7 @@ import type { AirportMap } from "./contracts";
 import {
   buildTaxiGraph,
   listGateDestinations,
+  listConnectingTaxiwayRefs,
   listRunwayDestinations,
   listTaxiwayRefs,
   planCustomTaxiRoute,
@@ -61,6 +62,13 @@ describe("taxi routing", () => {
     expect(routes[0]!.summary).toMatch(/^Gate 105 → /);
     expect(routes[0]!.summary).toContain("RWY09");
     expect(routes.every((route) => route.distanceMeters > 0)).toBe(true);
+  });
+
+  it("offers only named taxiways connected to the latest custom selection", () => {
+    const graph = buildTaxiGraph(airport);
+
+    expect(listConnectingTaxiwayRefs(graph, "H")).toEqual(["A", "Q"]);
+    expect(listConnectingTaxiwayRefs(graph, "Q")).toEqual(["B", "H"]);
   });
 
   it("prefers a highly connected main taxiway over a marginal shortcut", () => {

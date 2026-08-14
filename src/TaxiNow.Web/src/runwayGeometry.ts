@@ -42,6 +42,16 @@ export function buildRunwayDecorations(
       runway.length * 0.18
     );
 
+    // Runway edge markings make the pavement readable at the same zoom level
+    // as taxiway centerlines without changing the underlying airport data.
+    for (const side of [-1, 1]) {
+      markings.push(lineFeature(
+        `${feature.id}-edge-${side}`,
+        "edge",
+        localLine(runway, 0, side * width * 0.47, runway.length, side * width * 0.47)
+      ));
+    }
+
     markings.push(lineFeature(
       feature.id,
       "centerline",
@@ -68,6 +78,28 @@ export function buildRunwayDecorations(
         )
       ));
 
+      // Threshold "piano keys" run in the landing direction. The number of
+      // stripes scales with pavement width so narrow regional runways do not
+      // become a solid white block.
+      const stripePairs = Math.max(3, Math.min(8, Math.round(width / 8)));
+      for (let stripe = 0; stripe < stripePairs; stripe++) {
+        const lateral = width * 0.08 + stripe *
+          (width * 0.36 / Math.max(1, stripePairs - 1));
+        for (const side of [-1, 1]) {
+          markings.push(lineFeature(
+            `${feature.id}-${end}-stripe-${stripe}-${side}`,
+            "threshold-stripe",
+            localLine(
+              runway,
+              origin + direction * (threshold + 2),
+              side * lateral,
+              origin + direction * (threshold + Math.min(30, width * 0.7)),
+              side * lateral
+            )
+          ));
+        }
+      }
+
       const aimingDistance = Math.min(runway.length * 0.28, 300);
       if (aimingDistance > width * 4 && aimingDistance < runway.length / 2) {
         for (const side of [-1, 1]) {
@@ -80,6 +112,29 @@ export function buildRunwayDecorations(
               side * width * 0.27,
               origin + direction * (aimingDistance + 18),
               side * width * 0.27
+            )
+          ));
+        }
+      }
+
+
+      // Touchdown-zone bars provide distance cues between the threshold and
+      // aiming point. They intentionally stop before the runway midpoint so
+      // reciprocal markings never collide on short runways.
+      for (const touchdownDistance of [150, 450, 600]) {
+        if (touchdownDistance + 24 >= runway.length / 2) {
+          continue;
+        }
+        for (const side of [-1, 1]) {
+          markings.push(lineFeature(
+            `${feature.id}-${end}-tdz-${touchdownDistance}-${side}`,
+            "touchdown",
+            localLine(
+              runway,
+              origin + direction * (touchdownDistance - 11),
+              side * width * 0.3,
+              origin + direction * (touchdownDistance + 11),
+              side * width * 0.3
             )
           ));
         }
@@ -233,7 +288,8 @@ function localLine(
 
 function lineFeature(
   id: string,
-  kind: "centerline" | "threshold" | "aiming",
+  kind: "centerline" | "threshold" | "threshold-stripe" |
+    "aiming" | "touchdown" | "edge",
   coordinates: [[number, number], [number, number]]
 ): Feature<LineString> {
   return {
