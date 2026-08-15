@@ -14,11 +14,11 @@ public sealed class ServerContractTests
     [Fact]
     public void ProductMetadata_UsesBuildSpecificMapShellUrl()
     {
-        Assert.Equal("1.4.1", TaxiNowHost.ProductVersion);
-        Assert.Equal("V1.4.1", TaxiNowHost.DisplayVersion);
-        Assert.Equal(119, TaxiNowHost.InternalBuildId);
+        Assert.Equal("1.4.2", TaxiNowHost.ProductVersion);
+        Assert.Equal("V1.4.2", TaxiNowHost.DisplayVersion);
+        Assert.Equal(120, TaxiNowHost.InternalBuildId);
         Assert.Equal(
-            "http://127.0.0.1:8780/?build=119",
+            "http://127.0.0.1:8780/?build=120",
             TaxiNowHost.MapShellUrl);
     }
 

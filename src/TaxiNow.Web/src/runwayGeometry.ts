@@ -58,10 +58,11 @@ export function buildRunwayDecorations(
       width
     ));
 
-    // Use a short, generic blast-pad presentation outside each runway end.
-    // Yellow chevrons distinguish the non-runway area from the white threshold
-    // and landing markings without inventing a magnetic heading value.
-    const blastPadLength = Math.max(36, Math.min(75, width * 1.35));
+    // The source centerline does not reliably expose a separate blast-pad or
+    // stopway length. Draw a compact, standardized blast-pad extension at
+    // each end: yellow chevrons outside the runway and a white demarcation bar
+    // at the join. This replaces the old duplicated white "piano keys".
+    const leadInLength = Math.max(36, Math.min(75, width * 1.35));
     for (const end of [0, 1] as const) {
       const direction = end === 0 ? 1 : -1;
       const origin = end === 0 ? 0 : runway.length;
@@ -69,19 +70,19 @@ export function buildRunwayDecorations(
         `${feature.id}-${end}-blastpad`,
         "blastpad",
         runway,
-        origin - direction * blastPadLength / 2,
+        origin - direction * leadInLength / 2,
         0,
-        blastPadLength,
+        leadInLength,
         width
       ));
-      const chevronDepth = Math.min(blastPadLength * 0.22, width * 0.38);
+      const chevronDepth = Math.min(leadInLength * 0.22, width * 0.38);
       for (let chevron = 0; chevron < 3; chevron++) {
-        const centerDistance = blastPadLength * (chevron + 0.52) / 3;
+        const centerDistance = leadInLength * (chevron + 0.52) / 3;
         const baseAlong = origin - direction * (centerDistance + chevronDepth / 2);
         const apexAlong = origin - direction * (centerDistance - chevronDepth / 2);
         markings.push(lineFeature(
-          `${feature.id}-${end}-blastpad-chevron-${chevron}`,
-          "blastpad-chevron",
+          `${feature.id}-${end}-leadin-chevron-${chevron}`,
+          "leadin-chevron",
           [
             localPoint(runway, baseAlong, -width * 0.36),
             localPoint(runway, apexAlong, 0),
@@ -89,6 +90,11 @@ export function buildRunwayDecorations(
           ]
         ));
       }
+      markings.push(lineFeature(
+        `${feature.id}-${end}-blastpad-demarcation`,
+        "blastpad-demarcation",
+        localLine(runway, origin, -width * 0.48, origin, width * 0.48)
+      ));
     }
 
     markings.push(lineFeature(
@@ -117,32 +123,13 @@ export function buildRunwayDecorations(
         )
       ));
 
-      // Threshold "piano keys" run in the landing direction. The number of
-      // stripes scales with pavement width so narrow regional runways do not
-      // become a solid white block.
-      const stripePairs = Math.max(3, Math.min(8, Math.round(width / 8)));
-      for (let stripe = 0; stripe < stripePairs; stripe++) {
-        const lateral = width * 0.08 + stripe *
-          (width * 0.36 / Math.max(1, stripePairs - 1));
-        for (const side of [-1, 1]) {
-          markings.push(rectangleFeature(
-            `${feature.id}-${end}-stripe-${stripe}-${side}`,
-            "threshold-stripe",
-            runway,
-            origin + direction * (thresholdInset + Math.min(16, width * 0.25)),
-            side * lateral,
-            Math.min(30, width * 0.7),
-            Math.max(1.5, Math.min(2.2, width * 0.035))
-          ));
-        }
-      }
-
-      const aimingDistance = Math.min(runway.length * 0.28, 400);
+      const aimingDistance = Math.min(runway.length * 0.28, 300);
       if (aimingDistance > width * 4 && aimingDistance < runway.length / 2) {
         const aimingBarWidth = Math.max(4.5, Math.min(7, width * 0.1));
         const edgeMargin = Math.max(1.5, width * 0.06);
+        const centerlineClearance = width * 0.32;
         const aimingAcross = Math.max(0, Math.min(
-          width * 0.34,
+          centerlineClearance + aimingBarWidth / 2,
           width / 2 - edgeMargin - aimingBarWidth / 2
         ));
         for (const side of [-1, 1]) {
@@ -158,14 +145,13 @@ export function buildRunwayDecorations(
         }
       }
 
-      // Use the distance-coded touchdown-zone pattern: three bars at 150 m,
-      // two at 300 m, and one at 450 m from each threshold. Each bar uses the
-      // standard 22.5 m by 1.8 m proportions and therefore scales with the
-      // physical runway instead of with browser pixels.
+      // Keep a 150 m longitudinal rhythm: three bars at 150 m, the large
+      // aiming-point blocks at 300 m, two bars at 450 m, and one at 600 m.
+      // This avoids the old 400 m/450 m crowding.
       for (const [touchdownDistance, barCount] of [
         [150, 3],
-        [300, 2],
-        [450, 1]
+        [450, 2],
+        [600, 1]
       ] as const) {
         if (touchdownDistance + 24 >= runway.length / 2) {
           continue;
@@ -173,8 +159,9 @@ export function buildRunwayDecorations(
         for (const side of [-1, 1]) {
           const groupWidth = barCount * 1.8 + (barCount - 1) * 1.5;
           const edgeMargin = Math.max(1.5, width * 0.06);
+          const centerlineClearance = width * 0.32;
           const groupAcross = Math.max(0, Math.min(
-            width * 0.36,
+            centerlineClearance + groupWidth / 2,
             width / 2 - edgeMargin - groupWidth / 2
           ));
           for (let bar = 0; bar < barCount; bar++) {
@@ -209,7 +196,7 @@ export function buildRunwayDecorations(
             type: "Point",
             coordinates: localPoint(
               runway,
-              origin + direction * Math.max(58, width * 1.05),
+              origin + direction * Math.max(30, width * 0.72),
               0
             )
           }
@@ -348,8 +335,8 @@ function localLine(
 
 function lineFeature(
   id: string,
-  kind: "centerline" | "threshold" | "threshold-stripe" |
-    "aiming" | "touchdown" | "blastpad-chevron",
+  kind: "centerline" | "threshold" | "aiming" | "touchdown" |
+    "leadin-chevron" | "blastpad-demarcation",
   coordinates: Array<[number, number]>
 ): Feature<LineString> {
   return {
@@ -361,7 +348,7 @@ function lineFeature(
 
 function rectangleFeature(
   id: string,
-  kind: "pavement" | "blastpad" | "threshold-stripe" | "aiming" | "touchdown",
+  kind: "pavement" | "blastpad" | "aiming" | "touchdown",
   runway: LocalRunway,
   centerAlong: number,
   centerAcross: number,

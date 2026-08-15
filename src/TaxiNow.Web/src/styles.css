@@ -490,7 +490,6 @@ button:disabled {
 .fallback-runway-pavement,
 .fallback-runway-centerline,
 .fallback-runway-threshold,
-.fallback-runway-threshold-stripe,
 .fallback-runway-aiming,
 .fallback-runway-touchdown {
   fill: none;
@@ -516,11 +515,6 @@ button:disabled {
   stroke-width: 2;
 }
 
-.fallback-runway-threshold-stripe {
-  fill: #ffffff;
-  stroke: none;
-}
-
 .fallback-runway-aiming {
   fill: #ffffff;
   stroke: none;
@@ -531,13 +525,7 @@ button:disabled {
   stroke: none;
 }
 
-.fallback-runway-blastpad {
-  fill: #15191f;
-  stroke: #dce3e8;
-  stroke-width: 1;
-}
-
-.fallback-runway-blastpad-chevron {
+.fallback-runway-leadin-chevron {
   fill: none;
   stroke: #f3d21d;
   stroke-width: 2;
@@ -551,7 +539,7 @@ button:disabled {
   stroke-width: 2.5;
   paint-order: stroke;
   font-family: "Segoe UI", sans-serif;
-  font-weight: 800;
+  font-weight: 850;
   text-anchor: middle;
   dominant-baseline: central;
 }
@@ -1976,7 +1964,6 @@ html[data-theme="light"] .fallback-runway-threshold {
   stroke: #f7fafb;
 }
 
-html[data-theme="light"] .fallback-runway-threshold-stripe,
 html[data-theme="light"] .fallback-runway-aiming,
 html[data-theme="light"] .fallback-runway-touchdown {
   fill: #f7fafb;
@@ -1987,7 +1974,7 @@ html[data-theme="light"] .fallback-taxiway-badge rect {
   stroke: #607681;
 }
 
-/* Build 119 light appearance: semantic, high-contrast surfaces and controls. */
+/* Build 120 light appearance: semantic, high-contrast surfaces and controls. */
 html[data-theme="light"] {
   color-scheme: light;
   color: #1c1c1e;

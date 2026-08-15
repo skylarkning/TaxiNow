@@ -31,17 +31,20 @@ describe("buildRunwayDecorations", () => {
       (feature) => feature.properties?.kind === "pavement"
     )).toHaveLength(1);
     expect(result.markings.features.filter(
+      (feature) => feature.properties?.kind === "leadin-chevron"
+    )).toHaveLength(6);
+    expect(result.markings.features.filter(
       (feature) => feature.properties?.kind === "blastpad"
     )).toHaveLength(2);
     expect(result.markings.features.filter(
-      (feature) => feature.properties?.kind === "blastpad-chevron"
-    )).toHaveLength(6);
+      (feature) => feature.properties?.kind === "blastpad-demarcation"
+    )).toHaveLength(2);
     expect(result.markings.features.filter(
       (feature) => feature.properties?.kind === "threshold"
     )).toHaveLength(2);
     expect(result.markings.features.some(
       (feature) => feature.properties?.kind === "threshold-stripe"
-    )).toBe(true);
+    )).toBe(false);
     expect(result.markings.features.some(
       (feature) => feature.properties?.kind === "touchdown"
     )).toBe(true);
@@ -49,7 +52,7 @@ describe("buildRunwayDecorations", () => {
       (feature) => feature.properties?.kind === "touchdown"
     )).toHaveLength(24);
     expect(result.markings.features.filter((feature) =>
-      ["threshold-stripe", "aiming", "touchdown"].includes(
+      ["aiming", "touchdown"].includes(
         String(feature.properties?.kind)
       )
     ).every((feature) => feature.geometry.type === "Polygon")).toBe(true);
@@ -63,6 +66,35 @@ describe("buildRunwayDecorations", () => {
       expect(distanceMeters(first!, second!)).toBeCloseTo(22.5, 1);
       expect(distanceMeters(second!, third!)).toBeCloseTo(1.8, 1);
     }
+  });
+
+  it("places yellow lead-in chevrons outside the runway pavement", () => {
+    const result = buildRunwayDecorations([runway]);
+    const chevrons = result.markings.features.filter(
+      (feature) => feature.properties?.kind === "leadin-chevron"
+    );
+
+    expect(chevrons).toHaveLength(6);
+    const alongDistances = chevrons.flatMap((feature) => {
+      expect(feature.geometry.type).toBe("LineString");
+      if (feature.geometry.type !== "LineString") {
+        return [];
+      }
+      return feature.geometry.coordinates.map((point) =>
+        longitudinalDistanceMeters(
+          runway.points[0]!,
+          runway.points.at(-1)!,
+          point as [number, number]
+        )
+      );
+    });
+    expect(alongDistances.some((distance) => distance < -0.1)).toBe(true);
+    expect(alongDistances.some(
+      (distance) => distance > runwayLengthMeters() + 0.1
+    )).toBe(true);
+    expect(alongDistances.every((distance) =>
+      distance <= 0.1 || distance >= runwayLengthMeters() - 0.1
+    )).toBe(true);
   });
 
   it("keeps aiming and touchdown geometry inside the physical runway edges", () => {
@@ -102,7 +134,7 @@ describe("buildRunwayDecorations", () => {
           runway.points[0]!,
           runway.points.at(-1)!,
           point as [number, number]
-        )).toBeGreaterThanOrEqual((runway.widthMeters ?? 45) * 0.25);
+        )).toBeGreaterThanOrEqual((runway.widthMeters ?? 45) * 0.30);
       }
     }
   });
@@ -174,4 +206,24 @@ function lateralDistanceMeters(
   const pointY = (point[1] - start[1]) * scaleY;
   return Math.abs(runwayX * pointY - runwayY * pointX) /
     Math.hypot(runwayX, runwayY);
+}
+
+function longitudinalDistanceMeters(
+  start: [number, number],
+  end: [number, number],
+  point: [number, number]
+): number {
+  const latitude = (start[1] + end[1]) / 2;
+  const scaleX = 111_320 * Math.cos(latitude * Math.PI / 180);
+  const scaleY = 110_540;
+  const runwayX = (end[0] - start[0]) * scaleX;
+  const runwayY = (end[1] - start[1]) * scaleY;
+  const pointX = (point[0] - start[0]) * scaleX;
+  const pointY = (point[1] - start[1]) * scaleY;
+  return (pointX * runwayX + pointY * runwayY) /
+    Math.hypot(runwayX, runwayY);
+}
+
+function runwayLengthMeters(): number {
+  return distanceMeters(runway.points[0]!, runway.points.at(-1)!);
 }

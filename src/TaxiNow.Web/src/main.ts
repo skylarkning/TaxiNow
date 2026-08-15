@@ -2887,19 +2887,6 @@ function addAirportLayers(target: MapLibreMap): void {
     }
   });
   target.addLayer({
-    id: "runway-blastpad-chevrons",
-    type: "line",
-    source: "runway-markings",
-    filter: ["==", ["get", "kind"], "blastpad-chevron"],
-    minzoom: 10.5,
-    paint: {
-      "line-color": "#f3d21d",
-      "line-width": ["interpolate", ["linear"], ["zoom"], 10.5, 0.8, 17, 2.4],
-      "line-opacity": ["interpolate", ["linear"], ["zoom"], 10.5, 0.74, 12, 1]
-    },
-    layout: { "line-cap": "square", "line-join": "miter" }
-  });
-  target.addLayer({
     id: "runways",
     type: "fill",
     source: "runway-markings",
@@ -2936,6 +2923,30 @@ function addAirportLayers(target: MapLibreMap): void {
     }
   });
   target.addLayer({
+    id: "runway-leadin-chevrons",
+    type: "line",
+    source: "runway-markings",
+    filter: ["==", ["get", "kind"], "leadin-chevron"],
+    minzoom: 10.5,
+    paint: {
+      "line-color": "#f3d21d",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 10.5, 0.8, 17, 2.4],
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 10.5, 0.74, 12, 1]
+    },
+    layout: { "line-cap": "square", "line-join": "miter" }
+  });
+  target.addLayer({
+    id: "runway-blastpad-demarcations",
+    type: "line",
+    source: "runway-markings",
+    filter: ["==", ["get", "kind"], "blastpad-demarcation"],
+    minzoom: 10.5,
+    paint: {
+      "line-color": "#f5f7f8",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 10.5, 1, 17, 3]
+    }
+  });
+  target.addLayer({
     id: "runway-thresholds",
     type: "line",
     source: "runway-markings",
@@ -2944,17 +2955,6 @@ function addAirportLayers(target: MapLibreMap): void {
     paint: {
       "line-color": "#f5f7f8",
       "line-width": ["interpolate", ["linear"], ["zoom"], 11, 1, 17, 3]
-    }
-  });
-  target.addLayer({
-    id: "runway-threshold-stripes",
-    type: "fill",
-    source: "runway-markings",
-    filter: ["==", ["get", "kind"], "threshold-stripe"],
-    minzoom: 10.5,
-    paint: {
-      "fill-color": "#f7f9fa",
-      "fill-opacity": ["interpolate", ["linear"], ["zoom"], 10.5, 0.72, 12, 0.98]
     }
   });
   target.addLayer({
@@ -3032,19 +3032,19 @@ function addAirportLayers(target: MapLibreMap): void {
     minzoom: 11.5,
     layout: {
       "text-field": ["get", "text"],
-      "text-size": ["interpolate", ["linear"], ["zoom"], 11.5, 7, 17, 22],
-      "text-font": ["Segoe UI", "Arial Unicode MS Regular"],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 11.5, 9.5, 17, 28],
+      "text-font": ["Segoe UI Semibold", "Segoe UI", "Arial Unicode MS Regular"],
       "text-rotation-alignment": "map",
       "text-rotate": ["get", "rotation"],
       "text-keep-upright": true,
       "text-allow-overlap": true,
       "text-ignore-placement": true,
-      "text-letter-spacing": 0.04
+      "text-letter-spacing": 0.025
     },
     paint: {
       "text-color": "#f7f9fb",
       "text-halo-color": "#111820",
-      "text-halo-width": 1.4
+      "text-halo-width": 1.8
     }
   });
   target.addLayer({
@@ -3899,10 +3899,9 @@ function publishMapDiagnostics(target: MapLibreMap): void {
     target.queryRenderedFeatures().length
   );
   for (const layer of [
-    "runway-threshold-stripes",
     "runway-aiming-points",
     "runway-touchdown-zone",
-    "runway-blastpad-chevrons",
+    "runway-leadin-chevrons",
     "runway-pavement-labels",
     "selected-taxiway-highlight"
   ]) {
@@ -4271,26 +4270,28 @@ function createFallbackRunway(
   for (const endIndex of [0, 1] as const) {
     const origin = endIndex === 0 ? start : end;
     const direction = endIndex === 0 ? 1 : -1;
-    const blastPadMeters = Math.max(
+    const leadInMeters = Math.max(
       36,
       Math.min(75, runwayWidthMeters * 1.35)
     );
-    const blastPadLength = blastPadMeters * pixelsPerMeter;
-    group.append(createFallbackMarkingRectangle(
-      screenPoint(origin, along, -direction * blastPadLength / 2),
+    const leadInLength = leadInMeters * pixelsPerMeter;
+    const blastpadEnd = screenPoint(
+      origin,
       along,
-      across,
-      blastPadLength,
-      width,
-      0,
-      "fallback-runway-blastpad"
-    ));
+      -direction * leadInLength
+    );
+    const blastpad = createFallbackPolyline(
+      [blastpadEnd, origin],
+      "fallback-runway-pavement"
+    );
+    blastpad.setAttribute("stroke-width", String(width));
+    group.insertBefore(blastpad, group.firstChild);
     const chevronDepth = Math.min(
-      blastPadMeters * 0.22,
+      leadInMeters * 0.22,
       runwayWidthMeters * 0.38
     ) * pixelsPerMeter;
     for (let chevron = 0; chevron < 3; chevron++) {
-      const centerDistance = blastPadLength * (chevron + 0.52) / 3;
+      const centerDistance = leadInLength * (chevron + 0.52) / 3;
       const base = screenPoint(
         origin,
         along,
@@ -4305,8 +4306,12 @@ function createFallbackRunway(
         screenPoint(base, across, -width * 0.36),
         apex,
         screenPoint(base, across, width * 0.36)
-      ], "fallback-runway-blastpad-chevron"));
+      ], "fallback-runway-leadin-chevron"));
     }
+    group.append(createFallbackPolyline([
+      screenPoint(origin, across, -width * 0.48),
+      screenPoint(origin, across, width * 0.48)
+    ], "fallback-runway-threshold"));
     const thresholdInsetMeters = Math.min(
       8,
       Math.max(3, runwayWidthMeters * 0.1)
@@ -4322,39 +4327,7 @@ function createFallbackRunway(
     ], "fallback-runway-threshold");
     group.append(threshold);
 
-    const stripePairs = Math.max(
-      3,
-      Math.min(8, Math.round(runwayWidthMeters / 8))
-    );
-    const stripeLength = Math.min(30, runwayWidthMeters * 0.7) * pixelsPerMeter;
-    const stripeWidth = Math.max(
-      1,
-      Math.min(2.2, runwayWidthMeters * 0.035) * pixelsPerMeter
-    );
-    for (let stripe = 0; stripe < stripePairs; stripe++) {
-      const lateral = width * 0.08 + stripe *
-        (width * 0.34 / Math.max(1, stripePairs - 1));
-      for (const side of [-1, 1]) {
-        group.append(createFallbackMarkingRectangle(
-          screenPoint(
-            thresholdCenter,
-            along,
-            direction * (
-              stripeLength / 2 +
-              Math.min(16, runwayWidthMeters * 0.25) * pixelsPerMeter
-            )
-          ),
-          along,
-          across,
-          stripeLength,
-          stripeWidth,
-          side * lateral,
-          "fallback-runway-threshold-stripe"
-        ));
-      }
-    }
-
-    const aimingDistance = Math.min(length * 0.28, 400 * pixelsPerMeter);
+    const aimingDistance = Math.min(length * 0.28, 300 * pixelsPerMeter);
     const aimingLength = Math.min(45, meters * 0.035) * pixelsPerMeter;
     const aimingWidth = Math.max(
       1.5,
@@ -4365,7 +4338,7 @@ function createFallbackRunway(
       Math.min(7, runwayWidthMeters * 0.1)
     );
     const aimingAcross = Math.min(
-      runwayWidthMeters * 0.34,
+      runwayWidthMeters * 0.32 + aimingWidthMeters / 2,
       runwayWidthMeters / 2 - Math.max(1.5, runwayWidthMeters * 0.06) -
         aimingWidthMeters / 2
     ) * pixelsPerMeter;
@@ -4390,8 +4363,8 @@ function createFallbackRunway(
 
     for (const [touchdownMeters, barCount] of [
       [150, 3],
-      [300, 2],
-      [450, 1]
+      [450, 2],
+      [600, 1]
     ] as const) {
       const touchdownDistance = length * touchdownMeters / meters;
       if (touchdownDistance + 24 * pixelsPerMeter >= length / 2) {
@@ -4409,7 +4382,7 @@ function createFallbackRunway(
           (barCount - 1) * 1.5 * pixelsPerMeter;
         const physicalGroupWidth = barCount * 1.8 + (barCount - 1) * 1.5;
         const touchdownAcross = Math.min(
-          runwayWidthMeters * 0.36,
+          runwayWidthMeters * 0.32 + physicalGroupWidth / 2,
           runwayWidthMeters / 2 - Math.max(1.5, runwayWidthMeters * 0.06) -
             physicalGroupWidth / 2
         ) * pixelsPerMeter;
@@ -4462,6 +4435,10 @@ function createFallbackRunwayLabels(
     (feature.points.at(-1)![1] - feature.points[0]![1]) * 110_540
   );
   const pixelsPerMeter = length / Math.max(1, runwayMeters);
+  const leadInMeters = Math.max(
+    36,
+    Math.min(75, (feature.widthMeters ?? 45) * 1.35)
+  );
   const labelRotation = normalizeReadableRotation(
     Math.atan2(across.y, across.x) * 180 / Math.PI
   );
@@ -4477,10 +4454,12 @@ function createFallbackRunwayLabels(
       screenPoint(
         origin,
         along,
-        direction * Math.max(runwayWidth * 1.05, 58 * pixelsPerMeter)
+        direction * (
+          Math.max(30, (feature.widthMeters ?? 45) * 0.72)
+        ) * pixelsPerMeter
       ),
       labelRotation,
-      Math.max(8, Math.min(22, runwayWidth * 0.46))
+      Math.max(11, Math.min(29, runwayWidth * 0.58))
     ));
   }
   return labels;
