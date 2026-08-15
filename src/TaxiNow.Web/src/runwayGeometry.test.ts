@@ -18,20 +18,9 @@ const runway: AirportFeature = {
 };
 
 describe("buildRunwayDecorations", () => {
-  it("creates markings and one designator per runway end", () => {
+  it("creates physical markings and one pavement designator per runway end", () => {
     const result = buildRunwayDecorations([runway]);
 
-    expect(result.labels.features.map((feature) => feature.properties?.text))
-      .toEqual(["05", "23"]);
-    expect(result.labels.features.map((feature) => feature.properties?.heading))
-      .toEqual(["065°", "245°"]);
-    expect(result.labels.features.map((feature) => feature.properties?.rotation))
-      .toEqual([65, 245]);
-    expect(result.labels.features.map((feature) => feature.properties?.badgeId))
-      .toEqual(["runway-badge-05-65", "runway-badge-23-245"]);
-    expect(result.labels.features.map(
-      (feature) => feature.properties?.iconRotation
-    )).toEqual([65, 245]);
     expect(result.pavementLabels.features.map(
       (feature) => feature.properties?.text
     )).toEqual(["05", "23"]);
@@ -41,6 +30,12 @@ describe("buildRunwayDecorations", () => {
     expect(result.markings.features.filter(
       (feature) => feature.properties?.kind === "pavement"
     )).toHaveLength(1);
+    expect(result.markings.features.filter(
+      (feature) => feature.properties?.kind === "blastpad"
+    )).toHaveLength(2);
+    expect(result.markings.features.filter(
+      (feature) => feature.properties?.kind === "blastpad-chevron"
+    )).toHaveLength(6);
     expect(result.markings.features.filter(
       (feature) => feature.properties?.kind === "threshold"
     )).toHaveLength(2);
@@ -87,6 +82,27 @@ describe("buildRunwayDecorations", () => {
           runway.points.at(-1)!,
           point as [number, number]
         )).toBeLessThanOrEqual((runway.widthMeters ?? 45) / 2 + 0.1);
+      }
+    }
+  });
+
+  it("keeps a readable centerline gap between paired landing-zone blocks", () => {
+    const result = buildRunwayDecorations([runway]);
+    const paintedBlocks = result.markings.features.filter((feature) =>
+      ["aiming", "touchdown"].includes(String(feature.properties?.kind))
+    );
+
+    for (const feature of paintedBlocks) {
+      expect(feature.geometry.type).toBe("Polygon");
+      if (feature.geometry.type !== "Polygon") {
+        continue;
+      }
+      for (const point of feature.geometry.coordinates[0]!) {
+        expect(lateralDistanceMeters(
+          runway.points[0]!,
+          runway.points.at(-1)!,
+          point as [number, number]
+        )).toBeGreaterThanOrEqual((runway.widthMeters ?? 45) * 0.25);
       }
     }
   });

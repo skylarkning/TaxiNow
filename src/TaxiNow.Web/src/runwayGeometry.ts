@@ -18,7 +18,6 @@ interface LocalRunway {
 
 export interface RunwayDecorationData {
   markings: FeatureCollection<LineString | Polygon>;
-  labels: FeatureCollection<Point>;
   pavementLabels: FeatureCollection<Point>;
 }
 
@@ -26,7 +25,6 @@ export function buildRunwayDecorations(
   features: AirportFeature[]
 ): RunwayDecorationData {
   const markings: Array<Feature<LineString | Polygon>> = [];
-  const labels: Array<Feature<Point>> = [];
   const pavementLabels: Array<Feature<Point>> = [];
 
   for (const feature of features) {
@@ -59,6 +57,39 @@ export function buildRunwayDecorations(
       runway.length,
       width
     ));
+
+    // Use a short, generic blast-pad presentation outside each runway end.
+    // Yellow chevrons distinguish the non-runway area from the white threshold
+    // and landing markings without inventing a magnetic heading value.
+    const blastPadLength = Math.max(36, Math.min(75, width * 1.35));
+    for (const end of [0, 1] as const) {
+      const direction = end === 0 ? 1 : -1;
+      const origin = end === 0 ? 0 : runway.length;
+      markings.push(rectangleFeature(
+        `${feature.id}-${end}-blastpad`,
+        "blastpad",
+        runway,
+        origin - direction * blastPadLength / 2,
+        0,
+        blastPadLength,
+        width
+      ));
+      const chevronDepth = Math.min(blastPadLength * 0.22, width * 0.38);
+      for (let chevron = 0; chevron < 3; chevron++) {
+        const centerDistance = blastPadLength * (chevron + 0.52) / 3;
+        const baseAlong = origin - direction * (centerDistance + chevronDepth / 2);
+        const apexAlong = origin - direction * (centerDistance - chevronDepth / 2);
+        markings.push(lineFeature(
+          `${feature.id}-${end}-blastpad-chevron-${chevron}`,
+          "blastpad-chevron",
+          [
+            localPoint(runway, baseAlong, -width * 0.36),
+            localPoint(runway, apexAlong, 0),
+            localPoint(runway, baseAlong, width * 0.36)
+          ]
+        ));
+      }
+    }
 
     markings.push(lineFeature(
       feature.id,
@@ -111,7 +142,7 @@ export function buildRunwayDecorations(
         const aimingBarWidth = Math.max(4.5, Math.min(7, width * 0.1));
         const edgeMargin = Math.max(1.5, width * 0.06);
         const aimingAcross = Math.max(0, Math.min(
-          width * 0.27,
+          width * 0.34,
           width / 2 - edgeMargin - aimingBarWidth / 2
         ));
         for (const side of [-1, 1]) {
@@ -143,7 +174,7 @@ export function buildRunwayDecorations(
           const groupWidth = barCount * 1.8 + (barCount - 1) * 1.5;
           const edgeMargin = Math.max(1.5, width * 0.06);
           const groupAcross = Math.max(0, Math.min(
-            width * 0.29,
+            width * 0.36,
             width / 2 - edgeMargin - groupWidth / 2
           ));
           for (let bar = 0; bar < barCount; bar++) {
@@ -163,33 +194,11 @@ export function buildRunwayDecorations(
 
       const text = designators[end] ?? designators[0] ?? "";
       if (text) {
-        const heading = normalizeAviationHeading(
-          runwayBearing(runway) + (end === 0 ? 0 : 180)
-        );
+        const heading = runwayBearing(runway) + (end === 0 ? 0 : 180);
         // MapLibre text rotation is measured clockwise from an east-west
         // baseline. Using the runway heading turns the label baseline across
         // the runway, matching real threshold numerals and the AMM capsule.
         const rotation = normalizeSymbolRotation(heading);
-        // Keep the AMM-style capsule outside the threshold. The original
-        // designation remains painted separately on the runway pavement.
-        const badgeCenter = origin - direction * Math.max(16, width * 0.5);
-        labels.push({
-          type: "Feature",
-          properties: {
-            text,
-            badgeId: runwayBadgeId(text, heading),
-            heading: `${String(heading).padStart(3, "0")}°`,
-            rotation,
-            // The badge artwork is a horizontal capsule. Rotating it by the
-            // same value as the pavement designation keeps the capsule's long
-            // axis and both text rows across the runway threshold.
-            iconRotation: rotation
-          },
-          geometry: {
-            type: "Point",
-            coordinates: localPoint(runway, badgeCenter, 0)
-          }
-        });
         pavementLabels.push({
           type: "Feature",
           properties: {
@@ -211,7 +220,6 @@ export function buildRunwayDecorations(
 
   return {
     markings: { type: "FeatureCollection", features: markings },
-    labels: { type: "FeatureCollection", features: labels },
     pavementLabels: {
       type: "FeatureCollection",
       features: pavementLabels
@@ -341,8 +349,8 @@ function localLine(
 function lineFeature(
   id: string,
   kind: "centerline" | "threshold" | "threshold-stripe" |
-    "aiming" | "touchdown",
-  coordinates: [[number, number], [number, number]]
+    "aiming" | "touchdown" | "blastpad-chevron",
+  coordinates: Array<[number, number]>
 ): Feature<LineString> {
   return {
     type: "Feature",
@@ -353,7 +361,7 @@ function lineFeature(
 
 function rectangleFeature(
   id: string,
-  kind: "pavement" | "threshold-stripe" | "aiming" | "touchdown",
+  kind: "pavement" | "blastpad" | "threshold-stripe" | "aiming" | "touchdown",
   runway: LocalRunway,
   centerAlong: number,
   centerAcross: number,
@@ -382,15 +390,6 @@ function runwayBearing(runway: LocalRunway): number {
   ) % 360;
 }
 
-function normalizeAviationHeading(value: number): number {
-  const rounded = Math.round((value % 360 + 360) % 360);
-  return rounded === 0 ? 360 : rounded;
-}
-
 function normalizeSymbolRotation(value: number): number {
   return (value % 360 + 360) % 360;
-}
-
-function runwayBadgeId(designator: string, heading: number): string {
-  return `runway-badge-${designator.replace(/[^A-Z0-9]/gi, "-")}-${heading}`;
 }

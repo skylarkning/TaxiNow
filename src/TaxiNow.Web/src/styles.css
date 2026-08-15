@@ -531,36 +531,18 @@ button:disabled {
   stroke: none;
 }
 
-.fallback-runway-badge-outer {
-  fill: #b20d2c;
-  stroke: #ffffff;
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-}
-
-.fallback-runway-badge-inner {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.94);
+.fallback-runway-blastpad {
+  fill: #15191f;
+  stroke: #dce3e8;
   stroke-width: 1;
-  vector-effect: non-scaling-stroke;
 }
 
-.fallback-runway-badge text {
-  fill: #ffffff;
-  stroke: none;
-  font-family: "Segoe UI", sans-serif;
-  font-weight: 800;
-  text-anchor: middle;
-  dominant-baseline: central;
-}
-
-.fallback-runway-badge-number {
-  font-size: 16px;
-}
-
-.fallback-runway-badge-heading {
-  font-size: 9px;
-  letter-spacing: 0.04em;
+.fallback-runway-blastpad-chevron {
+  fill: none;
+  stroke: #f3d21d;
+  stroke-width: 2;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
 }
 
 .fallback-runway-pavement-label text {
@@ -2005,7 +1987,7 @@ html[data-theme="light"] .fallback-taxiway-badge rect {
   stroke: #607681;
 }
 
-/* Build 118 light appearance: semantic, high-contrast surfaces and controls. */
+/* Build 119 light appearance: semantic, high-contrast surfaces and controls. */
 html[data-theme="light"] {
   color-scheme: light;
   color: #1c1c1e;
