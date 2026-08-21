@@ -15,10 +15,14 @@ namespace TaxiNow.Server;
 public static class TaxiNowHost
 {
     public const int DefaultPort = 8780;
-    public const string ProductVersion = "1.4.2";
-    public const string DisplayVersion = "V1.4.2";
-    public const int InternalBuildId = 120;
-    public const string BuildDate = "August 14, 2026";
+    public const string VmasAllowedOrigin = "https://vmas.my";
+    public const string VmasPresencePath =
+        "/api/v1/integrations/vmas/presence";
+    private const string VmasPresenceCorsPolicy = "VmasPresence";
+    public const string ProductVersion = "1.4.3";
+    public const string DisplayVersion = "V1.4.3";
+    public const int InternalBuildId = 121;
+    public const string BuildDate = "August 21, 2026";
 
     public static string MapShellUrl =>
         $"http://127.0.0.1:{DefaultPort}/?build={InternalBuildId}";
@@ -58,6 +62,18 @@ public static class TaxiNowHost
             protocol.PayloadSerializerOptions.Converters.Add(
                 new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
         });
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy(VmasPresenceCorsPolicy, policy =>
+                policy
+                    .WithOrigins(VmasAllowedOrigin)
+                    .WithMethods(HttpMethods.Get)
+                    .WithHeaders("Accept"));
+        });
+        builder.Services.AddSingleton(new VmasPresenceSettings(
+            builder.Configuration.GetValue(
+                "TaxiNow:Integrations:VmasPresenceEnabled",
+                false)));
 
         var storageRoot = builder.Configuration["TaxiNow:StorageRoot"];
         var storagePaths = string.IsNullOrWhiteSpace(storageRoot)
@@ -98,6 +114,30 @@ public static class TaxiNowHost
         builder.Services.AddHostedService<TelemetryPublisher>();
 
         var app = builder.Build();
+        app.Use(async (context, next) =>
+        {
+            var settings = context.RequestServices
+                .GetRequiredService<VmasPresenceSettings>();
+            var privateNetworkRequest = string.Equals(
+                context.Request.Headers["Access-Control-Request-Private-Network"],
+                "true",
+                StringComparison.OrdinalIgnoreCase);
+            if (settings.Enabled &&
+                context.Request.Path.Equals(VmasPresencePath) &&
+                IsVmasPresenceOriginAllowed(
+                    context.Request.Headers.Origin.ToString()) &&
+                privateNetworkRequest)
+            {
+                context.Response.OnStarting(() =>
+                {
+                    context.Response.Headers[
+                        "Access-Control-Allow-Private-Network"] = "true";
+                    return Task.CompletedTask;
+                });
+            }
+            await next().ConfigureAwait(false);
+        });
+        app.UseCors();
         app.UseDefaultFiles();
         app.UseStaticFiles(new StaticFileOptions
         {
@@ -143,6 +183,29 @@ public static class TaxiNowHost
 
     private static void MapApi(WebApplication app)
     {
+        app.MapGet(VmasPresencePath, (
+            HttpContext context,
+            VmasPresenceSettings settings) =>
+        {
+            if (!settings.Enabled)
+            {
+                return Results.NotFound();
+            }
+
+            var origin = context.Request.Headers.Origin.ToString();
+            if (!IsVmasPresenceOriginAllowed(origin))
+            {
+                return Results.StatusCode(StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(new
+            {
+                available = true,
+                version = ProductVersion,
+                build = InternalBuildId
+            });
+        }).RequireCors(VmasPresenceCorsPolicy);
+
         app.MapGet("/api/v1/status", (
             TelemetryState telemetry,
             IConfiguration configuration) =>
@@ -284,6 +347,12 @@ public static class TaxiNowHost
             ? "msfs"
             : "replay";
     }
+
+    public static bool IsVmasPresenceOriginAllowed(string? origin) =>
+        string.IsNullOrEmpty(origin) || string.Equals(
+            origin,
+            VmasAllowedOrigin,
+            StringComparison.Ordinal);
 
     private static string ResolveWebRoot()
     {

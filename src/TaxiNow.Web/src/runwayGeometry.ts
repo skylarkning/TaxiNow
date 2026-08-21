@@ -232,9 +232,20 @@ export function runwayEndDesignators(
     .split("/")
     .map((value) => value.trim())
     .filter(Boolean);
+  if (values.length === 1) {
+    const bearing = designatorBearing(values[0]!);
+    if (bearing === null) {
+      return [values[0]!, ""];
+    }
+    const physical = coordinateBearing(start, end);
+    const reciprocal = (physical + 180) % 360;
+    return angularDistance(bearing, reciprocal) <
+      angularDistance(bearing, physical)
+      ? ["", values[0]!]
+      : [values[0]!, ""];
+  }
   if (values.length !== 2) {
-    const first = values[0] ?? "";
-    return [first, values[1] ?? first];
+    return ["", ""];
   }
 
   const firstBearing = designatorBearing(values[0]!);

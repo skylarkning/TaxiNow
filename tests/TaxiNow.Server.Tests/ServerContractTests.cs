@@ -14,12 +14,33 @@ public sealed class ServerContractTests
     [Fact]
     public void ProductMetadata_UsesBuildSpecificMapShellUrl()
     {
-        Assert.Equal("1.4.2", TaxiNowHost.ProductVersion);
-        Assert.Equal("V1.4.2", TaxiNowHost.DisplayVersion);
-        Assert.Equal(120, TaxiNowHost.InternalBuildId);
+        Assert.Equal("1.4.3", TaxiNowHost.ProductVersion);
+        Assert.Equal("V1.4.3", TaxiNowHost.DisplayVersion);
+        Assert.Equal(121, TaxiNowHost.InternalBuildId);
         Assert.Equal(
-            "http://127.0.0.1:8780/?build=120",
+            "http://127.0.0.1:8780/?build=121",
             TaxiNowHost.MapShellUrl);
+    }
+
+    [Fact]
+    public void VmasPresence_UsesAnExactOriginAllowlist()
+    {
+        Assert.True(TaxiNowHost.IsVmasPresenceOriginAllowed(null));
+        Assert.True(TaxiNowHost.IsVmasPresenceOriginAllowed(""));
+        Assert.True(TaxiNowHost.IsVmasPresenceOriginAllowed("https://vmas.my"));
+        Assert.False(TaxiNowHost.IsVmasPresenceOriginAllowed("http://vmas.my"));
+        Assert.False(TaxiNowHost.IsVmasPresenceOriginAllowed("https://www.vmas.my"));
+        Assert.False(TaxiNowHost.IsVmasPresenceOriginAllowed("https://vmas.my.evil.test"));
+    }
+
+    [Fact]
+    public void VmasPresence_IsDisabledByDefaultAndCanBeEnabledAtRuntime()
+    {
+        var settings = new VmasPresenceSettings();
+
+        Assert.False(settings.Enabled);
+        settings.Enabled = true;
+        Assert.True(settings.Enabled);
     }
 
     [Fact]

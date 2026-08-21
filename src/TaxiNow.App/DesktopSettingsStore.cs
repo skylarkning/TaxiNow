@@ -5,7 +5,8 @@ namespace TaxiNow.App;
 
 internal sealed record DesktopSettings(
     string? StorageRoot = null,
-    bool KeepWindowVisible = false);
+    bool KeepWindowVisible = false,
+    bool EnableVmasPresence = false);
 
 internal static class DesktopSettingsStore
 {

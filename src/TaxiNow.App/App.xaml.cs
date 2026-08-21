@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using TaxiNow.Server;
 using TaxiNow.Storage;
 using Forms = System.Windows.Forms;
@@ -25,6 +26,7 @@ public partial class App : System.Windows.Application
     private bool _quitStarted;
     private string _storageRoot = StoragePaths.Default.Root;
     private bool _keepWindowVisible;
+    private bool _vmasPresenceEnabled;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -49,12 +51,15 @@ public partial class App : System.Windows.Application
         CreateTrayIcon();
         var desktopSettings = DesktopSettingsStore.Load();
         _keepWindowVisible = desktopSettings.KeepWindowVisible;
+        _vmasPresenceEnabled = desktopSettings.EnableVmasPresence;
         _storageRoot = ResolveStorageRoot(desktopSettings);
         _window = new MainWindow(
             _storageRoot,
             _keepWindowVisible,
+            _vmasPresenceEnabled,
             ChangeStorageRootAsync,
-            ChangeKeepWindowVisible);
+            ChangeKeepWindowVisible,
+            ChangeVmasPresenceEnabled);
         MainWindow = _window;
         _window.Closing += OnWindowClosing;
         _window.StateChanged += OnWindowStateChanged;
@@ -69,7 +74,12 @@ public partial class App : System.Windows.Application
             _server = TaxiNowHost.Build(
                 args,
                 builder =>
-                    builder.Configuration["TaxiNow:StorageRoot"] = _storageRoot);
+                {
+                    builder.Configuration["TaxiNow:StorageRoot"] = _storageRoot;
+                    builder.Configuration[
+                        "TaxiNow:Integrations:VmasPresenceEnabled"] =
+                        _vmasPresenceEnabled.ToString();
+                });
             await _server.StartAsync();
             await window.LoadMapAsync();
         }
@@ -149,7 +159,8 @@ public partial class App : System.Windows.Application
         {
             DesktopSettingsStore.Save(new DesktopSettings(
                 selected,
-                _keepWindowVisible));
+                _keepWindowVisible,
+                _vmasPresenceEnabled));
         }
         catch (Exception exception)
         {
@@ -190,7 +201,8 @@ public partial class App : System.Windows.Application
         {
             DesktopSettingsStore.Save(new DesktopSettings(
                 _storageRoot,
-                enabled));
+                enabled,
+                _vmasPresenceEnabled));
         }
         catch (Exception exception)
         {
@@ -207,6 +219,34 @@ public partial class App : System.Windows.Application
         if (_window is not null)
         {
             _window.Topmost = enabled;
+        }
+        return true;
+    }
+
+    private bool ChangeVmasPresenceEnabled(bool enabled)
+    {
+        try
+        {
+            DesktopSettingsStore.Save(new DesktopSettings(
+                _storageRoot,
+                _keepWindowVisible,
+                enabled));
+        }
+        catch (Exception exception)
+        {
+            System.Windows.MessageBox.Show(
+                $"TaxiNow could not save the vMAS presence setting.\n\n" +
+                exception.Message,
+                "Integration setting could not be saved",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return false;
+        }
+
+        _vmasPresenceEnabled = enabled;
+        if (_server?.Services.GetService<VmasPresenceSettings>() is { } settings)
+        {
+            settings.Enabled = enabled;
         }
         return true;
     }

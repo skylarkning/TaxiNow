@@ -152,6 +152,11 @@ interface DesktopWindowSettingsMessage {
   keepVisible: boolean;
 }
 
+interface DesktopIntegrationSettingsMessage {
+  type: "integration-settings";
+  vmasPresenceEnabled: boolean;
+}
+
 interface DesktopUpdateStatusMessage {
   type: "update-install:status";
   state: "downloading" | "launching" | "error";
@@ -220,6 +225,7 @@ async function start(): Promise<void> {
   setupThemeSelector();
   setupResponsiveHeader();
   setupDesktopWindowSettings();
+  setupDesktopIntegrationSettings();
   setupTaxiPlanner();
   setupAssetManager();
   setupAirportPicker();
@@ -1702,6 +1708,42 @@ function setupDesktopWindowSettings(): void {
     toggle.setAttribute("aria-checked", String(message.keepVisible));
   });
   bridge.postMessage({ type: "window-settings:get" });
+}
+
+function setupDesktopIntegrationSettings(): void {
+  const bridge = (
+    window as typeof window & {
+      chrome?: { webview?: DesktopWebViewBridge };
+    }
+  ).chrome?.webview;
+  const toggle = document.querySelector<HTMLButtonElement>(
+    "#enable-vmas-presence"
+  );
+  if (!bridge || !toggle) {
+    return;
+  }
+
+  toggle.hidden = false;
+  toggle.addEventListener("click", () => {
+    const enabled = toggle.getAttribute("aria-checked") !== "true";
+    bridge.postMessage({
+      type: "integration-settings:set",
+      vmasPresenceEnabled: enabled
+    });
+  });
+  bridge.addEventListener("message", (event) => {
+    const message = event.data as
+      Partial<DesktopIntegrationSettingsMessage> | null;
+    if (message?.type !== "integration-settings" ||
+        typeof message.vmasPresenceEnabled !== "boolean") {
+      return;
+    }
+    toggle.setAttribute(
+      "aria-checked",
+      String(message.vmasPresenceEnabled)
+    );
+  });
+  bridge.postMessage({ type: "integration-settings:get" });
 }
 
 function ensureAssetPolling(): void {

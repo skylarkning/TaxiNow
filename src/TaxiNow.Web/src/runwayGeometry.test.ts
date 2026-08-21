@@ -175,6 +175,20 @@ describe("buildRunwayDecorations", () => {
     )).toEqual(["09", "27"]);
   });
 
+  it("places a single-ended designator only at its matching threshold", () => {
+    expect(runwayEndDesignators(
+      "18",
+      [8.54, 50.05],
+      [8.54, 49.98]
+    )).toEqual(["18", ""]);
+
+    expect(runwayEndDesignators(
+      "18",
+      [8.54, 49.98],
+      [8.54, 50.05]
+    )).toEqual(["", "18"]);
+  });
+
   it("uses numeric headings while preserving source annotations", () => {
     expect(runwayEndDesignators(
       "07/25(NOTINUSE)",

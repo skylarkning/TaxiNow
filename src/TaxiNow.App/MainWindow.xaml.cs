@@ -14,20 +14,26 @@ public partial class MainWindow : Window
 {
     private readonly Func<string, Task<bool>> _changeStorageRootAsync;
     private readonly Func<bool, bool> _changeKeepWindowVisible;
+    private readonly Func<bool, bool> _changeVmasPresenceEnabled;
     private string _storageRoot;
     private bool _keepWindowVisible;
+    private bool _vmasPresenceEnabled;
     private bool _updateInstallInProgress;
 
     public MainWindow(
         string storageRoot,
         bool keepWindowVisible,
+        bool vmasPresenceEnabled,
         Func<string, Task<bool>> changeStorageRootAsync,
-        Func<bool, bool> changeKeepWindowVisible)
+        Func<bool, bool> changeKeepWindowVisible,
+        Func<bool, bool> changeVmasPresenceEnabled)
     {
         _storageRoot = storageRoot;
         _keepWindowVisible = keepWindowVisible;
+        _vmasPresenceEnabled = vmasPresenceEnabled;
         _changeStorageRootAsync = changeStorageRootAsync;
         _changeKeepWindowVisible = changeKeepWindowVisible;
+        _changeVmasPresenceEnabled = changeVmasPresenceEnabled;
         InitializeComponent();
         Title = $"TaxiNow {TaxiNowHost.DisplayVersion}";
         Topmost = keepWindowVisible;
@@ -94,6 +100,34 @@ public partial class MainWindow : Window
         if (type == "window-settings:get")
         {
             PostWindowSettings();
+            return;
+        }
+        if (type == "integration-settings:get")
+        {
+            PostIntegrationSettings();
+            return;
+        }
+        if (type == "integration-settings:set")
+        {
+            bool enabled;
+            try
+            {
+                using var document = JsonDocument.Parse(e.WebMessageAsJson);
+                enabled = document.RootElement.GetProperty("vmasPresenceEnabled")
+                    .GetBoolean();
+            }
+            catch (Exception exception)
+                when (exception is JsonException or KeyNotFoundException or
+                    InvalidOperationException)
+            {
+                return;
+            }
+
+            if (_changeVmasPresenceEnabled(enabled))
+            {
+                _vmasPresenceEnabled = enabled;
+            }
+            PostIntegrationSettings();
             return;
         }
         if (type == "window-settings:set")
@@ -312,6 +346,15 @@ public partial class MainWindow : Window
         {
             type = "window-settings",
             keepVisible = _keepWindowVisible
+        }));
+    }
+
+    private void PostIntegrationSettings()
+    {
+        MapView.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(new
+        {
+            type = "integration-settings",
+            vmasPresenceEnabled = _vmasPresenceEnabled
         }));
     }
 

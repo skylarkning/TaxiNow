@@ -4,6 +4,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   en: {
     "taxi.mapHint": "You can pan and zoom the map while planning. Right-click, or touch and hold on a touchscreen, to quickly add a starting point or taxi destination.",
     "settings.autoUpdates": "Automatically check for updates",
+    "settings.vmasPresence": "Allow vMAS to check whether TaxiNow is online",
     "settings.theme": "Appearance",
     "settings.dark": "Dark",
     "settings.light": "Light",
@@ -36,6 +37,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   "zh-Hans": {
     "taxi.mapHint": "规划滑行时仍可平移和缩放地图。右键点击地图；使用触摸屏时长按地图，可快速添加起点或滑行目的地。",
     "settings.autoUpdates": "自动检查更新",
+    "settings.vmasPresence": "允许vMAS检查TaxiNow是否在线",
     "settings.theme": "外观",
     "settings.dark": "深色",
     "settings.light": "浅色",
@@ -68,6 +70,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   "zh-Hant": {
     "taxi.mapHint": "規劃滑行時仍可平移及縮放地圖。在地圖上按右鍵；使用觸控螢幕時長按地圖，可快速新增起點或滑行目的地。",
     "settings.autoUpdates": "自動檢查更新",
+    "settings.vmasPresence": "允許vMAS檢查TaxiNow是否在線",
     "settings.theme": "外觀",
     "settings.dark": "深色",
     "settings.light": "淺色",
@@ -100,6 +103,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   ja: {
     "taxi.mapHint": "計画中も地図を移動・拡大縮小できます。地図を右クリックするか、タッチ画面で長押しすると、出発地点またはタキシング目的地をすばやく追加できます。",
     "settings.autoUpdates": "更新を自動的に確認",
+    "settings.vmasPresence": "vMASによるTaxiNowのオンライン確認を許可",
     "settings.theme": "外観",
     "settings.dark": "ダーク",
     "settings.light": "ライト",
@@ -132,6 +136,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   fr: {
     "taxi.mapHint": "Vous pouvez déplacer et zoomer la carte pendant la planification. Faites un clic droit, ou appuyez longuement sur un écran tactile, pour ajouter rapidement un point de départ ou une destination de roulage.",
     "settings.autoUpdates": "Rechercher automatiquement les mises à jour",
+    "settings.vmasPresence": "Autoriser vMAS à vérifier si TaxiNow est en ligne",
     "settings.theme": "Apparence",
     "settings.dark": "Sombre",
     "settings.light": "Clair",
@@ -164,6 +169,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   de: {
     "taxi.mapHint": "Sie können die Karte während der Planung verschieben und zoomen. Mit einem Rechtsklick oder durch längeres Berühren auf einem Touchscreen fügen Sie schnell einen Startpunkt oder ein Rollziel hinzu.",
     "settings.autoUpdates": "Automatisch nach Updates suchen",
+    "settings.vmasPresence": "vMAS erlauben, den Online-Status von TaxiNow zu prüfen",
     "settings.theme": "Darstellung",
     "settings.dark": "Dunkel",
     "settings.light": "Hell",
@@ -196,6 +202,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   ko: {
     "taxi.mapHint": "계획 중에도 지도를 이동하고 확대·축소할 수 있습니다. 지도를 우클릭하거나 터치스크린에서 길게 누르면 시작 지점이나 택시 목적지를 빠르게 추가할 수 있습니다.",
     "settings.autoUpdates": "업데이트 자동 확인",
+    "settings.vmasPresence": "vMAS가 TaxiNow 온라인 상태를 확인하도록 허용",
     "settings.theme": "화면 모드",
     "settings.dark": "다크",
     "settings.light": "라이트",

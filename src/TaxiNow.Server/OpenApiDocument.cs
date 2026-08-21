@@ -14,6 +14,8 @@ internal static class OpenApiDocument
         servers = new[] { new { url = "http://127.0.0.1:8780" } },
         paths = new Dictionary<string, object>
         {
+            ["/api/v1/integrations/vmas/presence"] = Get(
+                "Minimal opt-in TaxiNow presence for the authorized vMAS origin"),
             ["/api/v1/status"] = Get("Application and simulator status"),
             ["/api/v1/telemetry"] = Get("Latest telemetry snapshot"),
             ["/api/v1/telemetry/refresh"] =
