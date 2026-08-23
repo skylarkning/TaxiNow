@@ -99,6 +99,9 @@ let airportPerimeter: GeographicBounds | null = null;
 let ownshipAnimationStarted = false;
 let ownshipMapSynchronized = false;
 let fallbackOwnshipSynchronized = false;
+let domOwnshipSynchronized = false;
+let domOwnshipMarker: maplibregl.Marker | null = null;
+let domOwnshipElement: HTMLElement | null = null;
 let fallbackOwnship: SVGGElement | null = null;
 let fallbackTaxiRouteCasing: SVGPolylineElement | null = null;
 let fallbackTaxiRouteHighlight: SVGPolylineElement | null = null;
@@ -1408,6 +1411,9 @@ async function loadAirport(icao: string): Promise<void> {
   });
 
   if (mapInitialized) {
+    domOwnshipMarker?.remove();
+    domOwnshipMarker = null;
+    domOwnshipElement = null;
     fallbackOverlayCleanup?.();
     fallbackOverlayCleanup = null;
     map.remove();
@@ -1419,6 +1425,7 @@ async function loadAirport(icao: string): Promise<void> {
   }
   ownshipMapSynchronized = false;
   fallbackOwnshipSynchronized = false;
+  domOwnshipSynchronized = false;
   map = createMap(airport);
   mapInitialized = true;
   renderAirportPicker(
@@ -2480,6 +2487,7 @@ function createMap(airport: AirportMap): MapLibreMap {
       );
       created.addImage("ownship-plane", createOwnshipImage(), { pixelRatio: 2 });
       addOwnshipLayer(created);
+      installDomOwnshipMarker(created, airport.airport.center);
       created.moveLayer("taxiway-labels");
       created.moveLayer("building-labels");
       created.moveLayer("ownship");
@@ -3037,7 +3045,7 @@ function addAirportLayers(target: MapLibreMap): void {
     filter: ["in", ["get", "kind"], ["literal", ["taxiway", "taxilane"]]],
     paint: {
       "line-color": "#252a2e",
-      "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 10, 2, 17, 20]
+      "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 10, 2.4, 17, 24]
     },
     layout: { "line-cap": "round", "line-join": "round" }
   });
@@ -3048,7 +3056,7 @@ function addAirportLayers(target: MapLibreMap): void {
     filter: ["in", ["get", "kind"], ["literal", ["taxiway", "taxilane"]]],
     paint: {
       "line-color": "#686d71",
-      "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 10, 1, 17, 15]
+      "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 10, 1.2, 17, 18]
     },
     layout: { "line-cap": "round", "line-join": "round" }
   });
@@ -3386,6 +3394,7 @@ function renderOwnship(frameTime = performance.now()): void {
       : undefined;
     const mapReady = Boolean(mapSource);
     const fallbackReady = fallbackOwnship !== null;
+    const domReady = domOwnshipMarker !== null && domOwnshipElement !== null;
     const frameChanged = !isSameOwnshipFrame(
       lastRenderedOwnship,
       renderedOwnship
@@ -3393,6 +3402,7 @@ function renderOwnship(frameTime = performance.now()): void {
     if (frameChanged) {
       ownshipMapSynchronized = false;
       fallbackOwnshipSynchronized = false;
+      domOwnshipSynchronized = false;
     }
     if (!mapReady) {
       ownshipMapSynchronized = false;
@@ -3400,7 +3410,10 @@ function renderOwnship(frameTime = performance.now()): void {
     if (!fallbackReady) {
       fallbackOwnshipSynchronized = false;
     }
-    if (!ownshipNeedsSynchronization(
+    if (!domReady) {
+      domOwnshipSynchronized = false;
+    }
+    const rendererNeedsSynchronization = ownshipNeedsSynchronization(
       lastRenderedOwnship,
       renderedOwnship,
       {
@@ -3410,7 +3423,8 @@ function renderOwnship(frameTime = performance.now()): void {
           synchronized: fallbackOwnshipSynchronized
         }
       }
-    )) {
+    ) || (domReady && !domOwnshipSynchronized);
+    if (!rendererNeedsSynchronization) {
       if (headingFollowEnabled && renderedOwnship.visible) {
         updateHeadingFollowCamera(
           [renderedOwnship.longitude, renderedOwnship.latitude],
@@ -3435,7 +3449,7 @@ function renderOwnship(frameTime = performance.now()): void {
       map.setLayoutProperty(
         "ownship",
         "visibility",
-        renderedOwnship.visible ? "visible" : "none"
+        renderedOwnship.visible && !domReady ? "visible" : "none"
       );
       ownshipMapSynchronized = true;
     }
@@ -3448,9 +3462,24 @@ function renderOwnship(frameTime = performance.now()): void {
         "transform",
         `translate(${point.x} ${point.y}) rotate(${renderedOwnship.heading})`
       );
-      fallbackOwnship.style.display = renderedOwnship.visible ? "" : "none";
+      fallbackOwnship.style.display = renderedOwnship.visible && !domReady
+        ? ""
+        : "none";
       fallbackOwnship.style.opacity = renderedOwnship.stale ? "0.45" : "1";
       fallbackOwnshipSynchronized = true;
+    }
+    if (domOwnshipMarker && domOwnshipElement) {
+      domOwnshipMarker
+        .setLngLat([renderedOwnship.longitude, renderedOwnship.latitude])
+        .setRotation(renderedOwnship.heading);
+      domOwnshipElement.style.visibility = renderedOwnship.visible
+        ? "visible"
+        : "hidden";
+      const shape = domOwnshipElement.firstElementChild as SVGElement | null;
+      if (shape) {
+        shape.style.opacity = renderedOwnship.stale ? "0.45" : "1";
+      }
+      domOwnshipSynchronized = true;
     }
     ownshipVisible = renderedOwnship.visible;
     if (renderedOwnship.visible && activeTaxiRoute) {
@@ -3473,6 +3502,9 @@ function renderOwnship(frameTime = performance.now()): void {
     }
     if (fallbackOwnship) {
       fallbackOwnship.style.display = "none";
+    }
+    if (domOwnshipElement) {
+      domOwnshipElement.style.visibility = "hidden";
     }
     ownshipVisible = false;
   }
@@ -3941,6 +3973,50 @@ function createOwnshipImage(): ImageData {
   return context.getImageData(0, 0, 96, 96);
 }
 
+function installDomOwnshipMarker(
+  target: MapLibreMap,
+  initialPosition: Coordinate
+): void {
+  domOwnshipMarker?.remove();
+  domOwnshipElement = createDomOwnshipElement();
+  domOwnshipMarker = new maplibregl.Marker({
+    element: domOwnshipElement,
+    anchor: "center",
+    rotationAlignment: "map",
+    pitchAlignment: "map",
+    subpixelPositioning: true
+  })
+    .setLngLat(initialPosition)
+    .addTo(target);
+  domOwnshipSynchronized = false;
+  const diagnostics = document.querySelector<HTMLOutputElement>(
+    "#map-diagnostics"
+  );
+  if (diagnostics) {
+    diagnostics.dataset.ownshipRenderer = "dom";
+  }
+}
+
+function createDomOwnshipElement(): HTMLElement {
+  const namespace = "http://www.w3.org/2000/svg";
+  const element = document.createElement("div");
+  element.className = "ownship-dom-marker";
+  element.setAttribute("aria-hidden", "true");
+  element.style.visibility = "hidden";
+  const svg = document.createElementNS(namespace, "svg");
+  svg.setAttribute("viewBox", "-22 -22 44 44");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(namespace, "path");
+  path.setAttribute(
+    "d",
+    "M0 -18 L4 -5 L16 2 L16 6 L4 4 L3 14 L8 18 L0 16 L-8 18 L-3 14 L-4 4 L-16 6 L-16 2 L-4 -5 Z"
+  );
+  path.setAttribute("class", "fallback-ownship-shape");
+  svg.append(path);
+  element.append(svg);
+  return element;
+}
+
 function createTaxiwayBadgeImage(fill: string, stroke: string): ImageData {
   const canvas = document.createElement("canvas");
   canvas.width = 44;
@@ -4255,7 +4331,7 @@ function createFallbackTaxiwayLayers(
   );
   pavement.setAttribute(
     "stroke-width",
-    String(Math.max(3, (zoom - 9) * 1.8))
+    String(Math.max(3.6, (zoom - 9) * 2.16))
   );
   const centerline = createFallbackPolyline(
     points,
