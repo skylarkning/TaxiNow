@@ -33,6 +33,10 @@ import {
   type InterpolatedOwnship
 } from "./interpolation";
 import {
+  isSameOwnshipFrame,
+  ownshipNeedsSynchronization
+} from "./ownshipPresentation";
+import {
   buildRunwayDecorations,
   runwayEndDesignators
 } from "./runwayGeometry";
@@ -93,6 +97,8 @@ let map: MapLibreMap;
 let airportBounds: LngLatBoundsLike;
 let airportPerimeter: GeographicBounds | null = null;
 let ownshipAnimationStarted = false;
+let ownshipMapSynchronized = false;
+let fallbackOwnshipSynchronized = false;
 let fallbackOwnship: SVGGElement | null = null;
 let fallbackTaxiRouteCasing: SVGPolylineElement | null = null;
 let fallbackTaxiRouteHighlight: SVGPolylineElement | null = null;
@@ -1411,6 +1417,8 @@ async function loadAirport(icao: string): Promise<void> {
     fallbackTaxiRouteHighlight = null;
     fallbackTaxiwaySelectionGroup = null;
   }
+  ownshipMapSynchronized = false;
+  fallbackOwnshipSynchronized = false;
   map = createMap(airport);
   mapInitialized = true;
   renderAirportPicker(
@@ -2475,6 +2483,7 @@ function createMap(airport: AirportMap): MapLibreMap {
       created.moveLayer("taxiway-labels");
       created.moveLayer("building-labels");
       created.moveLayer("ownship");
+      startOwnshipAnimation();
       fitAirport();
       created.on("sourcedata", (event) => {
         if (event.sourceId === "airport" && event.isSourceLoaded) {
@@ -3372,14 +3381,36 @@ function renderOwnship(frameTime = performance.now()): void {
           airportPerimeter
         )
     };
-    if (
-      lastRenderedOwnship &&
-      Math.abs(lastRenderedOwnship.longitude - renderedOwnship.longitude) < 1e-9 &&
-      Math.abs(lastRenderedOwnship.latitude - renderedOwnship.latitude) < 1e-9 &&
-      Math.abs(lastRenderedOwnship.heading - renderedOwnship.heading) < 0.05 &&
-      lastRenderedOwnship.visible === renderedOwnship.visible &&
-      lastRenderedOwnship.stale === renderedOwnship.stale
-    ) {
+    const mapSource = map?.isStyleLoaded() && map.getLayer("ownship")
+      ? map.getSource("ownship") as GeoJSONSource | undefined
+      : undefined;
+    const mapReady = Boolean(mapSource);
+    const fallbackReady = fallbackOwnship !== null;
+    const frameChanged = !isSameOwnshipFrame(
+      lastRenderedOwnship,
+      renderedOwnship
+    );
+    if (frameChanged) {
+      ownshipMapSynchronized = false;
+      fallbackOwnshipSynchronized = false;
+    }
+    if (!mapReady) {
+      ownshipMapSynchronized = false;
+    }
+    if (!fallbackReady) {
+      fallbackOwnshipSynchronized = false;
+    }
+    if (!ownshipNeedsSynchronization(
+      lastRenderedOwnship,
+      renderedOwnship,
+      {
+        map: { ready: mapReady, synchronized: ownshipMapSynchronized },
+        fallback: {
+          ready: fallbackReady,
+          synchronized: fallbackOwnshipSynchronized
+        }
+      }
+    )) {
       if (headingFollowEnabled && renderedOwnship.visible) {
         updateHeadingFollowCamera(
           [renderedOwnship.longitude, renderedOwnship.latitude],
@@ -3391,9 +3422,8 @@ function renderOwnship(frameTime = performance.now()): void {
       return;
     }
     lastRenderedOwnship = renderedOwnship;
-    if (map?.isStyleLoaded() && map.getLayer("ownship")) {
-      const source = map.getSource("ownship") as GeoJSONSource | undefined;
-      source?.setData(
+    if (mapSource) {
+      mapSource.setData(
         ownshipFeature(
           renderedOwnship.longitude,
           renderedOwnship.latitude,
@@ -3407,6 +3437,7 @@ function renderOwnship(frameTime = performance.now()): void {
         "visibility",
         renderedOwnship.visible ? "visible" : "none"
       );
+      ownshipMapSynchronized = true;
     }
     if (fallbackOwnship) {
       const point = map.project([
@@ -3419,6 +3450,7 @@ function renderOwnship(frameTime = performance.now()): void {
       );
       fallbackOwnship.style.display = renderedOwnship.visible ? "" : "none";
       fallbackOwnship.style.opacity = renderedOwnship.stale ? "0.45" : "1";
+      fallbackOwnshipSynchronized = true;
     }
     ownshipVisible = renderedOwnship.visible;
     if (renderedOwnship.visible && activeTaxiRoute) {
@@ -3976,6 +4008,7 @@ function syncFallbackOverlay(
   if (nativeReady) {
     fallbackOverlayCleanup?.();
     fallbackOverlayCleanup = null;
+    fallbackOwnshipSynchronized = false;
     return;
   }
   if (target.loaded() && !document.querySelector("#airport-fallback")) {
@@ -4029,6 +4062,7 @@ function activateFallbackOverlay(
     fallbackTaxiRouteHighlight
   );
   fallbackOwnship = createFallbackOwnship();
+  fallbackOwnshipSynchronized = false;
   fallbackOwnship.style.display = "none";
   svg.append(fallbackOwnship);
   const labelGroup = document.createElementNS(namespace, "g");
@@ -4203,6 +4237,7 @@ function activateFallbackOverlay(
     svg.remove();
     fallbackOverlayRedraw = null;
     fallbackOwnship = null;
+    fallbackOwnshipSynchronized = false;
     fallbackTaxiRouteCasing = null;
     fallbackTaxiRouteHighlight = null;
     fallbackTaxiwaySelectionGroup = null;

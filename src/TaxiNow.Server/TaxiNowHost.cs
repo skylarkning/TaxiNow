@@ -19,10 +19,10 @@ public static class TaxiNowHost
     public const string VmasPresencePath =
         "/api/v1/integrations/vmas/presence";
     private const string VmasPresenceCorsPolicy = "VmasPresence";
-    public const string ProductVersion = "1.4.3";
-    public const string DisplayVersion = "V1.4.3";
-    public const int InternalBuildId = 121;
-    public const string BuildDate = "August 21, 2026";
+    public const string ProductVersion = "1.4.4";
+    public const string DisplayVersion = "V1.4.4";
+    public const int InternalBuildId = 122;
+    public const string BuildDate = "August 22, 2026";
 
     public static string MapShellUrl =>
         $"http://127.0.0.1:{DefaultPort}/?build={InternalBuildId}";
