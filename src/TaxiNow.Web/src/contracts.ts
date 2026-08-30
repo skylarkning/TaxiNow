@@ -88,6 +88,25 @@ export interface AppStatus {
   lanEnabled: boolean;
 }
 
+export interface VatsimTrafficAircraft {
+  callsign: string;
+  latitude: number;
+  longitude: number;
+  headingDegrees: number;
+  altitudeFeet: number;
+  groundSpeedKnots: number;
+  aircraftType: string | null;
+  lastUpdatedUtc: string | null;
+}
+
+export interface VatsimTrafficResponse {
+  feedUpdatedAtUtc: string | null;
+  retrievedAtUtc: string;
+  isStale: boolean;
+  count: number;
+  aircraft: VatsimTrafficAircraft[];
+}
+
 export interface StoredMapAsset {
   icao: string;
   name: string;

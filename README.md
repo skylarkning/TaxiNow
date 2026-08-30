@@ -23,8 +23,8 @@ the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release)
 The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
 third-party notices.
 
-Current development build: **V1.4.5**, internal build **123**
-(build date: August 23, 2026). The About dialog
+Current development build: **V1.5**, internal build **126**
+(build date: August 30, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is a free-of-charge application for personal
 flight-simulator use only.
@@ -49,6 +49,18 @@ their surrounding white canvas and create the required output sizes.
 
 ## Current vertical slice
 
+- V1.5 can optionally display nearby live VATSIM traffic. TaxiNow retrieves the
+  official public network-data feed through its local PC service, refreshes a
+  shared cache at the feed's 15-second cadence, and sends only anonymous
+  aircraft fields within the selected airport area to desktop and iPad maps.
+  The user's MSFS aircraft remains cyan; VATSIM aircraft use smaller orange
+  versions of the same plane silhouette with an upright callsign label below
+  each icon. The setting is off by default and is stored independently on each
+  browser/device.
+- Build 126 documents VATSIM's approximately 15-second traffic-data refresh
+  cadence in the FAQ. Customized taxi routes now accept commas, spaces, or a
+  mixture of both as separators, while preserving destinations such as
+  `GATE B19`.
 - ASP.NET Core host with status, airport-map, storage, download-job, and
   telemetry endpoints.
 - Shared MapLibre SPA with a full-detail CYYZ regression asset: 5 physical
@@ -85,9 +97,9 @@ their surrounding white canvas and create the required output sizes.
   distance, and an off-route warning, while reusing the existing low-overhead
   SimConnect position stream. Routing is advisory only and never overrides
   ATC instructions, airport signs, closures, or pilot judgment.
-- An experimental custom-route editor accepts ordered, comma-separated
-  taxiways ending in a runway or gate, for example
-  `D, E, H, T1, RWY01L`. TaxiNow validates identifiers against the active map,
+- An experimental custom-route editor accepts ordered taxiways separated by
+  commas or spaces and ending in a runway or gate, for example
+  `D E H T1 RWY01L`. TaxiNow validates identifiers against the active map,
   highlights valid custom routes, suggests likely typo corrections, and offers
   automatic route finding when the requested sequence cannot be connected.
 - V1.4 supplements custom text entry with an intersection-aware taxiway picker:

@@ -24,7 +24,9 @@ import type {
   DownloadJob,
   StorageSummary,
   StoredMapAsset,
-  TelemetrySnapshot
+  TelemetrySnapshot,
+  VatsimTrafficAircraft,
+  VatsimTrafficResponse
 } from "./contracts";
 import {
   interpolateOwnship,
@@ -36,6 +38,7 @@ import {
   isSameOwnshipFrame,
   ownshipNeedsSynchronization
 } from "./ownshipPresentation";
+import { parseCustomTaxiRouteInput } from "./customTaxiRouteInput";
 import {
   buildRunwayDecorations,
   runwayEndDesignators
@@ -90,6 +93,10 @@ const headingFollowStorageKey = "taxinow.map.headingFollow";
 const themeStorageKey = "taxinow.theme";
 const autoUpdateStorageKey = "taxinow.updates.autoCheck";
 const updateCheckedAtStorageKey = "taxinow.updates.lastCheckedAt";
+const vatsimTrafficStorageKey = "taxinow.map.vatsimTraffic";
+const vatsimTrafficRefreshMilliseconds = 15_000;
+const aircraftPathData =
+  "M0 -18 L4 -5 L16 2 L16 6 L4 4 L3 14 L8 18 L0 16 L-8 18 L-3 14 L-4 4 L-16 6 L-16 2 L-4 -5 Z";
 let lastOwnshipFrameAt = 0;
 let lastRenderedOwnship: InterpolatedOwnship | null = null;
 let ownshipVisible = false;
@@ -136,6 +143,10 @@ let activeManualTaxiPopup: maplibregl.Popup | null = null;
 let taxiwaySelectionAnimationFrame: number | null = null;
 let lastTaxiwaySelectionPaintAt = 0;
 let updateRelease: UpdateRelease | null = null;
+let vatsimTrafficEnabled = readBooleanPreference(vatsimTrafficStorageKey);
+let vatsimTrafficRefreshTimer: number | null = null;
+let vatsimTrafficRefreshInFlight = false;
+const vatsimTrafficMarkers = new Map<string, maplibregl.Marker>();
 const assetGroupOpenState = new Map<string, boolean>();
 const downloadProgressWatch = new Map<
   string,
@@ -232,6 +243,7 @@ function writeBooleanPreference(key: string, value: boolean): void {
 async function start(): Promise<void> {
   setupLanguageSelector();
   setupThemeSelector();
+  setupVatsimTrafficSettings();
   setupResponsiveHeader();
   setupDesktopWindowSettings();
   setupDesktopIntegrationSettings();
@@ -354,6 +366,191 @@ function applyTheme(theme: "dark" | "light"): void {
       console.warn("TaxiNow could not immediately update the map theme.", error);
     }
   }
+}
+
+function setupVatsimTrafficSettings(): void {
+  const toggle = document.querySelector<HTMLButtonElement>(
+    "#show-vatsim-traffic"
+  );
+  if (!toggle) {
+    return;
+  }
+
+  const sync = (): void => {
+    toggle.setAttribute("aria-checked", String(vatsimTrafficEnabled));
+  };
+  sync();
+  toggle.addEventListener("click", () => {
+    vatsimTrafficEnabled = !vatsimTrafficEnabled;
+    writeBooleanPreference(vatsimTrafficStorageKey, vatsimTrafficEnabled);
+    sync();
+    if (vatsimTrafficEnabled) {
+      startVatsimTrafficPolling();
+      void refreshVatsimTraffic();
+    } else {
+      stopVatsimTrafficPolling();
+      clearVatsimTrafficMarkers();
+    }
+  });
+
+  if (vatsimTrafficEnabled) {
+    startVatsimTrafficPolling();
+  }
+}
+
+function startVatsimTrafficPolling(): void {
+  if (vatsimTrafficRefreshTimer !== null) {
+    return;
+  }
+  vatsimTrafficRefreshTimer = window.setInterval(
+    () => void refreshVatsimTraffic(),
+    vatsimTrafficRefreshMilliseconds
+  );
+}
+
+function stopVatsimTrafficPolling(): void {
+  if (vatsimTrafficRefreshTimer === null) {
+    return;
+  }
+  window.clearInterval(vatsimTrafficRefreshTimer);
+  vatsimTrafficRefreshTimer = null;
+}
+
+async function refreshVatsimTraffic(): Promise<void> {
+  if (!vatsimTrafficEnabled || !mapInitialized || !currentAirportMap ||
+      vatsimTrafficRefreshInFlight) {
+    return;
+  }
+
+  vatsimTrafficRefreshInFlight = true;
+  const targetMap = map;
+  const targetAirport = selectedAirportIcao;
+  const bounds = currentAirportMap.airport.bounds;
+  const longitudePadding = Math.max(
+    (bounds.maxLon - bounds.minLon) * 0.15,
+    0.01
+  );
+  const latitudePadding = Math.max(
+    (bounds.maxLat - bounds.minLat) * 0.15,
+    0.01
+  );
+  const query = new URLSearchParams({
+    west: String(Math.max(-180, bounds.minLon - longitudePadding)),
+    south: String(Math.max(-90, bounds.minLat - latitudePadding)),
+    east: String(Math.min(180, bounds.maxLon + longitudePadding)),
+    north: String(Math.min(90, bounds.maxLat + latitudePadding))
+  });
+
+  try {
+    const response = await getJson<VatsimTrafficResponse>(
+      `/api/v1/integrations/vatsim/traffic?${query}`
+    );
+    if (!vatsimTrafficEnabled || map !== targetMap ||
+        selectedAirportIcao !== targetAirport) {
+      return;
+    }
+    reconcileVatsimTrafficMarkers(response, targetMap);
+  } catch (error) {
+    console.warn("TaxiNow could not refresh VATSIM traffic.", error);
+  } finally {
+    vatsimTrafficRefreshInFlight = false;
+  }
+}
+
+function reconcileVatsimTrafficMarkers(
+  response: VatsimTrafficResponse,
+  targetMap: MapLibreMap
+): void {
+  const activeCallsigns = new Set<string>();
+  for (const aircraft of response.aircraft) {
+    activeCallsigns.add(aircraft.callsign);
+    let marker = vatsimTrafficMarkers.get(aircraft.callsign);
+    if (!marker) {
+      marker = new maplibregl.Marker({
+        element: createVatsimTrafficElement(aircraft, targetMap),
+        anchor: "center",
+        rotationAlignment: "viewport",
+        pitchAlignment: "viewport",
+        subpixelPositioning: true
+      })
+        .setLngLat([aircraft.longitude, aircraft.latitude])
+        .addTo(targetMap);
+      vatsimTrafficMarkers.set(aircraft.callsign, marker);
+    }
+    marker.setLngLat([aircraft.longitude, aircraft.latitude]);
+    updateVatsimTrafficElement(marker.getElement(), aircraft, targetMap);
+  }
+
+  for (const [callsign, marker] of vatsimTrafficMarkers) {
+    if (!activeCallsigns.has(callsign)) {
+      marker.remove();
+      vatsimTrafficMarkers.delete(callsign);
+    }
+  }
+}
+
+function createVatsimTrafficElement(
+  aircraft: VatsimTrafficAircraft,
+  targetMap: MapLibreMap
+): HTMLElement {
+  const namespace = "http://www.w3.org/2000/svg";
+  const element = document.createElement("div");
+  element.className = "vatsim-traffic-marker";
+  element.setAttribute("aria-hidden", "true");
+  const svg = document.createElementNS(namespace, "svg");
+  svg.setAttribute("class", "vatsim-traffic-icon");
+  svg.setAttribute("viewBox", "-22 -22 44 44");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(namespace, "path");
+  path.setAttribute("d", aircraftPathData);
+  path.setAttribute("class", "vatsim-traffic-shape");
+  svg.append(path);
+  const label = document.createElement("span");
+  label.className = "vatsim-traffic-label";
+  element.append(svg, label);
+  updateVatsimTrafficElement(element, aircraft, targetMap);
+  return element;
+}
+
+function updateVatsimTrafficElement(
+  element: HTMLElement,
+  aircraft: VatsimTrafficAircraft,
+  targetMap: MapLibreMap
+): void {
+  const type = aircraft.aircraftType ? ` · ${aircraft.aircraftType}` : "";
+  element.title = `${aircraft.callsign}${type} · ${aircraft.altitudeFeet} ft · ${aircraft.groundSpeedKnots} kt`;
+  element.dataset.headingDegrees = String(aircraft.headingDegrees);
+  element.querySelector<HTMLElement>(".vatsim-traffic-label")!.textContent =
+    aircraft.callsign;
+  updateVatsimTrafficMarkerHeading(element, targetMap.getBearing());
+}
+
+function updateVatsimTrafficMarkerHeading(
+  element: HTMLElement,
+  mapBearingDegrees: number
+): void {
+  const headingDegrees = Number(element.dataset.headingDegrees ?? 0);
+  element.style.setProperty(
+    "--vatsim-screen-heading",
+    `${headingDegrees - mapBearingDegrees}deg`
+  );
+}
+
+function syncVatsimTrafficMarkerHeadings(targetMap: MapLibreMap): void {
+  if (!mapInitialized || map !== targetMap) {
+    return;
+  }
+  const bearing = targetMap.getBearing();
+  for (const marker of vatsimTrafficMarkers.values()) {
+    updateVatsimTrafficMarkerHeading(marker.getElement(), bearing);
+  }
+}
+
+function clearVatsimTrafficMarkers(): void {
+  for (const marker of vatsimTrafficMarkers.values()) {
+    marker.remove();
+  }
+  vatsimTrafficMarkers.clear();
 }
 
 function setupUpdateExperience(appStatus: AppStatus): void {
@@ -749,10 +946,11 @@ function syncTaxiwayBuilderFromInput(): void {
     return;
   }
   const available = new Set(listTaxiwayRefs(taxiGraph));
-  const tokens = document.querySelector<HTMLInputElement>(
-    "#taxi-custom-route-input"
-  )!.value.split(",")
-    .map((token) => token.trim().toUpperCase())
+  const tokens = parseCustomTaxiRouteInput(
+    document.querySelector<HTMLInputElement>(
+      "#taxi-custom-route-input"
+    )!.value
+  )
     .filter((token) => available.has(token));
   selectedTaxiwaySequence = tokens;
   renderTaxiwayBuilder();
@@ -876,10 +1074,7 @@ function previewCustomTaxiRoute(): void {
   const input = document.querySelector<HTMLInputElement>(
     "#taxi-custom-route-input"
   )!;
-  const tokens = input.value
-    .split(",")
-    .map((token) => token.trim().toUpperCase())
-    .filter(Boolean);
+  const tokens = parseCustomTaxiRouteInput(input.value);
   if (tokens.length < 1) {
     showCustomTaxiFeedback(t("taxi.customNeedFormat"), true);
     input.focus();
@@ -1411,6 +1606,7 @@ async function loadAirport(icao: string): Promise<void> {
   });
 
   if (mapInitialized) {
+    clearVatsimTrafficMarkers();
     domOwnshipMarker?.remove();
     domOwnshipMarker = null;
     domOwnshipElement = null;
@@ -1428,6 +1624,11 @@ async function loadAirport(icao: string): Promise<void> {
   domOwnshipSynchronized = false;
   map = createMap(airport);
   mapInitialized = true;
+  const activeMap = map;
+  activeMap.on("rotate", () => syncVatsimTrafficMarkerHeadings(activeMap));
+  if (vatsimTrafficEnabled) {
+    void refreshVatsimTraffic();
+  }
   renderAirportPicker(
     document.querySelector<HTMLInputElement>("#airport-search")!.value
   );
@@ -4007,10 +4208,7 @@ function createDomOwnshipElement(): HTMLElement {
   svg.setAttribute("viewBox", "-22 -22 44 44");
   svg.setAttribute("aria-hidden", "true");
   const path = document.createElementNS(namespace, "path");
-  path.setAttribute(
-    "d",
-    "M0 -18 L4 -5 L16 2 L16 6 L4 4 L3 14 L8 18 L0 16 L-8 18 L-3 14 L-4 4 L-16 6 L-16 2 L-4 -5 Z"
-  );
+  path.setAttribute("d", aircraftPathData);
   path.setAttribute("class", "fallback-ownship-shape");
   svg.append(path);
   element.append(svg);
@@ -4986,10 +5184,7 @@ function createFallbackOwnship(): SVGGElement {
   const group = document.createElementNS(namespace, "g");
   group.id = "fallback-ownship";
   const path = document.createElementNS(namespace, "path");
-  path.setAttribute(
-    "d",
-    "M0 -18 L4 -5 L16 2 L16 6 L4 4 L3 14 L8 18 L0 16 L-8 18 L-3 14 L-4 4 L-16 6 L-16 2 L-4 -5 Z"
-  );
+  path.setAttribute("d", aircraftPathData);
   path.setAttribute("class", "fallback-ownship-shape");
   group.append(path);
   return group;

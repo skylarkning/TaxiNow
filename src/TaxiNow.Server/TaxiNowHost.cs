@@ -6,6 +6,7 @@ using TaxiNow.Core.Telemetry;
 using TaxiNow.Server.Airports;
 using TaxiNow.Server.Downloads;
 using TaxiNow.Server.Telemetry;
+using TaxiNow.Server.Vatsim;
 using TaxiNow.SimConnect.Managed;
 using TaxiNow.SimConnect.Replay;
 using TaxiNow.Storage;
@@ -18,11 +19,13 @@ public static class TaxiNowHost
     public const string VmasAllowedOrigin = "https://vmas.my";
     public const string VmasPresencePath =
         "/api/v1/integrations/vmas/presence";
+    public const string VatsimTrafficPath =
+        "/api/v1/integrations/vatsim/traffic";
     private const string VmasPresenceCorsPolicy = "VmasPresence";
-    public const string ProductVersion = "1.4.5";
-    public const string DisplayVersion = "V1.4.5";
-    public const int InternalBuildId = 123;
-    public const string BuildDate = "August 23, 2026";
+    public const string ProductVersion = "1.5.0";
+    public const string DisplayVersion = "V1.5";
+    public const int InternalBuildId = 126;
+    public const string BuildDate = "August 30, 2026";
 
     public static string MapShellUrl =>
         $"http://127.0.0.1:{DefaultPort}/?build={InternalBuildId}";
@@ -86,6 +89,8 @@ public static class TaxiNowHost
         builder.Services.AddSingleton<TelemetryState>();
         builder.Services.AddSingleton<TelemetryRefreshSignal>();
         builder.Services.AddSingleton<DownloadJobService>();
+        builder.Services.AddSingleton(
+            _ => VatsimTrafficService.CreateDefault(ProductVersion));
         builder.Services.AddSingleton<ITelemetrySource>(services =>
         {
             var configuration = services.GetRequiredService<IConfiguration>();
@@ -205,6 +210,46 @@ public static class TaxiNowHost
                 build = InternalBuildId
             });
         }).RequireCors(VmasPresenceCorsPolicy);
+
+        app.MapGet(VatsimTrafficPath, async (
+            double? west,
+            double? south,
+            double? east,
+            double? north,
+            VatsimTrafficService traffic,
+            CancellationToken token) =>
+        {
+            if (!VatsimTrafficBounds.TryCreate(
+                    west,
+                    south,
+                    east,
+                    north,
+                    out var bounds))
+            {
+                return Results.BadRequest(new
+                {
+                    error = "Provide valid west, south, east, and north bounds no larger than 30 degrees."
+                });
+            }
+
+            try
+            {
+                return Results.Ok(await traffic
+                    .GetTrafficAsync(bounds, token)
+                    .ConfigureAwait(false));
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception error) when (
+                error is HttpRequestException or JsonException or TaskCanceledException)
+            {
+                return Results.Problem(
+                    title: "VATSIM traffic is temporarily unavailable.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
 
         app.MapGet("/api/v1/status", (
             TelemetryState telemetry,

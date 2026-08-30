@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#08111d" />
-    <title>TaxiNow V1.4.5</title>
+    <title>TaxiNow V1.5</title>
   </head>
   <body>
     <main id="app">
@@ -139,6 +139,14 @@
                       role="menuitemcheckbox"
                       aria-checked="true">
                 <span data-i18n="settings.autoUpdates">Automatically check for updates</span>
+                <span class="settings-check" aria-hidden="true">✓</span>
+              </button>
+              <button id="show-vatsim-traffic"
+                      class="settings-check-row"
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked="false">
+                <span data-i18n="settings.vatsimTraffic">Show VATSIM Traffic</span>
                 <span class="settings-check" aria-hidden="true">✓</span>
               </button>
               <button id="enable-vmas-presence"
@@ -352,9 +360,9 @@
                       class="info-tooltip"
                       role="tooltip">
                   <span data-i18n="taxi.customHelp">
-                    Enter comma-separated taxiways and finish with a runway or
-                    gate. Example: D, E, H, T1, RWY01L. Gate example: A, B,
-                    GATE B19. Names must match this airport map.
+                    Enter taxiways separated by commas or spaces and finish
+                    with a runway or gate. Example: D E H T1 RWY01L. Gate
+                    example: A B GATE B19. Names must match this airport map.
                   </span>
                 </span>
               </span>
@@ -364,7 +372,7 @@
                    autocomplete="off"
                    spellcheck="false"
                    data-i18n-placeholder="taxi.customPlaceholder"
-                   placeholder="D, E, H, T1, RWY01L" />
+                   placeholder="D E H T1 RWY01L" />
             <div class="taxiway-builder">
               <span class="taxiway-builder-label"
                     data-i18n="taxi.clickBuilder">Or build the route by selecting connected taxiways:</span>
@@ -759,7 +767,7 @@
             <h1 id="welcome-heading">Welcome to TaxiNow</h1>
             <p class="welcome-subtitle">欢迎使用 TaxiNow</p>
           </div>
-          <span class="welcome-version">V1.4.5</span>
+          <span class="welcome-version">V1.5</span>
         </div>
         <div class="welcome-languages">
           <section lang="en">
@@ -999,6 +1007,10 @@
               <p data-i18n="faq.warp.a">This can be normal because the simulator may not publish the updated aircraft position immediately after a warp or teleport. First click the position-refresh button above the zoom controls. If the position is still stale, begin moving the aircraft; the map should update when the simulator sends its next position change.</p>
             </details>
             <details>
+              <summary data-i18n="faq.vatsimRefresh.q">Why is VATSIM traffic only refreshed once in a while?</summary>
+              <p data-i18n="faq.vatsimRefresh.a">The official VATSIM network-data feed is regenerated about every 15 seconds. TaxiNow follows that cadence and shares one PC-side cache across the desktop and iPad views to avoid redundant requests. Network latency can make a refresh appear slightly later; this is normal.</p>
+            </details>
+            <details>
               <summary data-i18n="faq.routing.q">Can I treat a planned taxi route as an ATC clearance?</summary>
               <p data-i18n="faq.routing.a">No. Automatic routes use a generic pathfinding algorithm and might not reflect the real taxi route. The planner cannot reliably account for taxiway direction, wingspan and aircraft-size limits, temporary closures, local procedures, or live ATC instructions. Always follow ATC and airport signage. If you do not like an automatic route, use Enter Customized Taxi Route to highlight the route you intend to follow.</p>
             </details>
@@ -1015,12 +1027,12 @@
           </section>
           <p class="about-version">
             <span data-i18n="about.versionLabel">Version:</span>
-            <strong id="about-version-localized">V1.4.5</strong>
+            <strong id="about-version-localized">V1.5</strong>
             (<span data-i18n="about.buildDateLabel">Build date:</span>
-            <span id="about-build-date-localized">August 23, 2026</span>).
+            <span id="about-build-date-localized">August 30, 2026</span>).
             <br />
             <span data-i18n="about.internalBuildLabel">Internal build:</span>
-            <strong id="about-build-id-localized">123</strong>.
+            <strong id="about-build-id-localized">126</strong>.
           </p>
         </div>
         <div class="about-language about-legacy" lang="en">
@@ -1196,6 +1208,16 @@
             </p>
           </details>
           <details>
+            <summary>Why is VATSIM traffic only refreshed once in a while?</summary>
+            <p>
+              The official VATSIM network-data feed is regenerated about every
+              15 seconds. TaxiNow follows that cadence and shares one PC-side
+              cache across the desktop and iPad views to avoid redundant
+              requests. Network latency can make a refresh appear slightly
+              later; this is normal.
+            </p>
+          </details>
+          <details>
             <summary>Can I treat a planned taxi route as an ATC clearance?</summary>
             <p>
               No. Automatic routes are generated by a generic pathfinding
@@ -1217,10 +1239,10 @@
           </details>
         </section>
         <p class="about-version">
-          Version: <strong id="about-version">V1.4.5</strong>
-          (Build date: <span id="about-build-date">August 23, 2026</span>).
+          Version: <strong id="about-version">V1.5</strong>
+          (Build date: <span id="about-build-date">August 30, 2026</span>).
           <br />
-          Internal build: <strong id="about-build-id">123</strong>.
+          Internal build: <strong id="about-build-id">126</strong>.
         </p>
         </div>
         <div class="about-chinese about-language about-legacy" lang="zh-Hans">
@@ -1372,6 +1394,14 @@
               </p>
             </details>
             <details>
+              <summary>为什么VATSIM交通不是持续刷新，而是隔一段时间才更新？</summary>
+              <p>
+                VATSIM官方网络数据源大约每15秒生成一次。TaxiNow遵循这一更新
+                频率，并让桌面端和iPad共用PC端缓存，避免重复请求。网络延迟
+                有时会让刷新稍晚一些，这是正常现象。
+              </p>
+            </details>
+            <details>
               <summary>规划出的滑行路线可以视为 ATC 许可吗？</summary>
               <p>
                 不可以。自动路线仅由通用寻路算法生成，不一定符合真实机场的滑行路线。
@@ -1388,10 +1418,10 @@
             </details>
           </section>
           <p class="about-version">
-            版本：<strong id="about-version-zh">V1.4.5</strong>
-            （构建日期：<span id="about-build-date-zh">2026年8月23日</span>）。
+            版本：<strong id="about-version-zh">V1.5</strong>
+            （构建日期：<span id="about-build-date-zh">2026年8月30日</span>）。
             <br />
-            内部构建号：<strong id="about-build-id-zh">123</strong>。
+            内部构建号：<strong id="about-build-id-zh">126</strong>。
           </p>
         </div>
       </section>
@@ -1401,7 +1431,7 @@
         </span>
         <span id="map-summary"></span>
         <span class="footer-right">
-          <span id="footer-version">V1.4.5</span>
+          <span id="footer-version">V1.5</span>
           <span id="attribution"
                 data-i18n="footer.fixture">Bundled TaxiNow fixture</span>
         </span>

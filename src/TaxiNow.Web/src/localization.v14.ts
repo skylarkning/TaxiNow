@@ -4,6 +4,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   en: {
     "taxi.mapHint": "You can pan and zoom the map while planning. Right-click, or touch and hold on a touchscreen, to quickly add a starting point or taxi destination.",
     "settings.autoUpdates": "Automatically check for updates",
+    "settings.vatsimTraffic": "Show VATSIM Traffic",
     "settings.vmasPresence": "Allow vMAS to check whether TaxiNow is online",
     "settings.theme": "Appearance",
     "settings.dark": "Dark",
@@ -32,11 +33,17 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.addDestination": "Add as Taxi Destination",
     "taxi.clearPoints": "Clear Manual Points",
     "taxi.manualStart": "Manual start",
-    "taxi.manualDestination": "Manual destination"
+    "taxi.manualDestination": "Manual destination",
+    "taxi.customHelp": "Enter taxiways separated by commas or spaces and finish with a runway or gate. Example: D E H T1 RWY01L. Gate example: A B GATE B19. Names must match this airport map.",
+    "taxi.customPlaceholder": "D E H T1 RWY01L",
+    "taxi.customNeedFormat": "Enter at least one taxiway followed by a destination, separated by commas or spaces.",
+    "faq.vatsimRefresh.q": "Why is VATSIM traffic only refreshed once in a while?",
+    "faq.vatsimRefresh.a": "The official VATSIM network-data feed is regenerated about every 15 seconds. TaxiNow follows that cadence and shares one PC-side cache across the desktop and iPad views to avoid redundant requests. Network latency can make a refresh appear slightly later; this is normal."
   },
   "zh-Hans": {
     "taxi.mapHint": "规划滑行时仍可平移和缩放地图。右键点击地图；使用触摸屏时长按地图，可快速添加起点或滑行目的地。",
     "settings.autoUpdates": "自动检查更新",
+    "settings.vatsimTraffic": "显示VATSIM交通",
     "settings.vmasPresence": "允许vMAS检查TaxiNow是否在线",
     "settings.theme": "外观",
     "settings.dark": "深色",
@@ -65,11 +72,17 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.addDestination": "添加为滑行目的地",
     "taxi.clearPoints": "清除手动点位",
     "taxi.manualStart": "手动起点",
-    "taxi.manualDestination": "手动目的地"
+    "taxi.manualDestination": "手动目的地",
+    "taxi.customHelp": "用逗号或空格分隔滑行道，并以跑道或登机口结束。例如：D E H T1 RWY01L。登机口示例：A B GATE B19。名称必须与当前机场地图一致。",
+    "taxi.customPlaceholder": "D E H T1 RWY01L",
+    "taxi.customNeedFormat": "请输入至少一条滑行道及其后的目的地，可使用逗号或空格分隔。",
+    "faq.vatsimRefresh.q": "为什么VATSIM交通不是持续刷新，而是隔一段时间才更新？",
+    "faq.vatsimRefresh.a": "VATSIM官方网络数据源大约每15秒生成一次。TaxiNow遵循这一更新频率，并让桌面端和iPad共用PC端缓存，避免重复请求。网络延迟有时会让刷新稍晚一些，这是正常现象。"
   },
   "zh-Hant": {
     "taxi.mapHint": "規劃滑行時仍可平移及縮放地圖。在地圖上按右鍵；使用觸控螢幕時長按地圖，可快速新增起點或滑行目的地。",
     "settings.autoUpdates": "自動檢查更新",
+    "settings.vatsimTraffic": "顯示VATSIM交通",
     "settings.vmasPresence": "允許vMAS檢查TaxiNow是否在線",
     "settings.theme": "外觀",
     "settings.dark": "深色",
@@ -98,11 +111,17 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.addDestination": "新增為滑行目的地",
     "taxi.clearPoints": "清除手動點位",
     "taxi.manualStart": "手動起點",
-    "taxi.manualDestination": "手動目的地"
+    "taxi.manualDestination": "手動目的地",
+    "taxi.customHelp": "用逗號或空格分隔滑行道，並以跑道或登機口結束。例如：D E H T1 RWY01L。登機口示例：A B GATE B19。名稱必須與目前機場地圖一致。",
+    "taxi.customPlaceholder": "D E H T1 RWY01L",
+    "taxi.customNeedFormat": "請輸入至少一條滑行道及其後的目的地，可使用逗號或空格分隔。",
+    "faq.vatsimRefresh.q": "為什麼VATSIM交通不是持續重新整理，而是隔一段時間才更新？",
+    "faq.vatsimRefresh.a": "VATSIM官方網路資料來源大約每15秒產生一次。TaxiNow遵循此更新頻率，並讓桌面端與iPad共用PC端快取，避免重複要求。網路延遲有時會讓更新稍晚一些，這是正常現象。"
   },
   ja: {
     "taxi.mapHint": "計画中も地図を移動・拡大縮小できます。地図を右クリックするか、タッチ画面で長押しすると、出発地点またはタキシング目的地をすばやく追加できます。",
     "settings.autoUpdates": "更新を自動的に確認",
+    "settings.vatsimTraffic": "VATSIMトラフィックを表示",
     "settings.vmasPresence": "vMASによるTaxiNowのオンライン確認を許可",
     "settings.theme": "外観",
     "settings.dark": "ダーク",
@@ -131,11 +150,17 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.addDestination": "タクシー目的地として追加",
     "taxi.clearPoints": "手動地点を消去",
     "taxi.manualStart": "手動出発地点",
-    "taxi.manualDestination": "手動目的地"
+    "taxi.manualDestination": "手動目的地",
+    "taxi.customHelp": "誘導路をカンマまたは空白で区切り、最後に滑走路またはゲートを入力します。例：D E H T1 RWY01L。ゲート例：A B GATE B19。名称は現在の空港マップと一致させてください。",
+    "taxi.customPlaceholder": "D E H T1 RWY01L",
+    "taxi.customNeedFormat": "少なくとも1本の誘導路と目的地を、カンマまたは空白で区切って入力してください。",
+    "faq.vatsimRefresh.q": "VATSIMトラフィックが時々しか更新されないのはなぜですか？",
+    "faq.vatsimRefresh.a": "VATSIM公式ネットワークデータは約15秒ごとに生成されます。TaxiNowもこの周期に合わせ、デスクトップとiPadでPC側キャッシュを共有して重複リクエストを避けます。通信遅延で少し遅れて見えることがありますが正常です。"
   },
   fr: {
     "taxi.mapHint": "Vous pouvez déplacer et zoomer la carte pendant la planification. Faites un clic droit, ou appuyez longuement sur un écran tactile, pour ajouter rapidement un point de départ ou une destination de roulage.",
     "settings.autoUpdates": "Rechercher automatiquement les mises à jour",
+    "settings.vatsimTraffic": "Afficher le trafic VATSIM",
     "settings.vmasPresence": "Autoriser vMAS à vérifier si TaxiNow est en ligne",
     "settings.theme": "Apparence",
     "settings.dark": "Sombre",
@@ -164,11 +189,17 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.addDestination": "Ajouter comme destination de roulage",
     "taxi.clearPoints": "Effacer les points manuels",
     "taxi.manualStart": "Départ manuel",
-    "taxi.manualDestination": "Destination manuelle"
+    "taxi.manualDestination": "Destination manuelle",
+    "taxi.customHelp": "Saisissez les voies de circulation séparées par des virgules ou des espaces et terminez par une piste ou une porte. Exemple : D E H T1 RWY01L. Exemple vers une porte : A B GATE B19. Les noms doivent correspondre à la carte de cet aéroport.",
+    "taxi.customPlaceholder": "D E H T1 RWY01L",
+    "taxi.customNeedFormat": "Saisissez au moins une voie de circulation suivie d’une destination, séparées par des virgules ou des espaces.",
+    "faq.vatsimRefresh.q": "Pourquoi le trafic VATSIM n’est-il actualisé que de temps en temps ?",
+    "faq.vatsimRefresh.a": "Le flux réseau officiel de VATSIM est régénéré environ toutes les 15 secondes. TaxiNow suit ce rythme et partage un cache sur le PC entre les vues ordinateur et iPad afin d’éviter les requêtes en double. La latence réseau peut parfois retarder légèrement l’affichage ; c’est normal."
   },
   de: {
     "taxi.mapHint": "Sie können die Karte während der Planung verschieben und zoomen. Mit einem Rechtsklick oder durch längeres Berühren auf einem Touchscreen fügen Sie schnell einen Startpunkt oder ein Rollziel hinzu.",
     "settings.autoUpdates": "Automatisch nach Updates suchen",
+    "settings.vatsimTraffic": "VATSIM-Verkehr anzeigen",
     "settings.vmasPresence": "vMAS erlauben, den Online-Status von TaxiNow zu prüfen",
     "settings.theme": "Darstellung",
     "settings.dark": "Dunkel",
@@ -197,11 +228,17 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.addDestination": "Als Rollziel hinzufügen",
     "taxi.clearPoints": "Manuelle Punkte löschen",
     "taxi.manualStart": "Manueller Start",
-    "taxi.manualDestination": "Manuelles Ziel"
+    "taxi.manualDestination": "Manuelles Ziel",
+    "taxi.customHelp": "Geben Sie Rollwege durch Kommas oder Leerzeichen getrennt ein und schließen Sie mit einer Bahn oder einem Gate ab. Beispiel: D E H T1 RWY01L. Gate-Beispiel: A B GATE B19. Die Namen müssen der aktuellen Flughafenkarte entsprechen.",
+    "taxi.customPlaceholder": "D E H T1 RWY01L",
+    "taxi.customNeedFormat": "Geben Sie mindestens einen Rollweg und danach ein Ziel ein, getrennt durch Kommas oder Leerzeichen.",
+    "faq.vatsimRefresh.q": "Warum wird der VATSIM-Verkehr nur gelegentlich aktualisiert?",
+    "faq.vatsimRefresh.a": "Der offizielle VATSIM-Netzwerkdatenfeed wird ungefähr alle 15 Sekunden neu erzeugt. TaxiNow folgt diesem Intervall und verwendet für Desktop- und iPad-Ansicht einen gemeinsamen PC-Cache, um doppelte Anfragen zu vermeiden. Durch Netzwerklatenz kann die Anzeige etwas später aktualisiert werden; das ist normal."
   },
   ko: {
     "taxi.mapHint": "계획 중에도 지도를 이동하고 확대·축소할 수 있습니다. 지도를 우클릭하거나 터치스크린에서 길게 누르면 시작 지점이나 택시 목적지를 빠르게 추가할 수 있습니다.",
     "settings.autoUpdates": "업데이트 자동 확인",
+    "settings.vatsimTraffic": "VATSIM 트래픽 표시",
     "settings.vmasPresence": "vMAS가 TaxiNow 온라인 상태를 확인하도록 허용",
     "settings.theme": "화면 모드",
     "settings.dark": "다크",
@@ -230,6 +267,11 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.addDestination": "택시 목적지로 추가",
     "taxi.clearPoints": "수동 지점 지우기",
     "taxi.manualStart": "수동 시작",
-    "taxi.manualDestination": "수동 목적지"
+    "taxi.manualDestination": "수동 목적지",
+    "taxi.customHelp": "쉼표 또는 공백으로 유도로를 구분하고 활주로나 게이트로 끝내세요. 예: D E H T1 RWY01L. 게이트 예: A B GATE B19. 이름은 현재 공항 지도와 일치해야 합니다.",
+    "taxi.customPlaceholder": "D E H T1 RWY01L",
+    "taxi.customNeedFormat": "쉼표 또는 공백으로 구분한 유도로 하나 이상과 목적지를 입력하세요.",
+    "faq.vatsimRefresh.q": "VATSIM 트래픽이 가끔만 새로 고쳐지는 이유는 무엇인가요?",
+    "faq.vatsimRefresh.a": "VATSIM 공식 네트워크 데이터 피드는 약 15초마다 생성됩니다. TaxiNow도 이 주기를 따르며 데스크톱과 iPad 화면이 PC 캐시를 공유해 중복 요청을 피합니다. 네트워크 지연으로 표시가 조금 늦게 갱신될 수 있으며 이는 정상입니다."
   }
 };
