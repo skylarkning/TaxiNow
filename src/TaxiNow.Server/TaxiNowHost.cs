@@ -22,10 +22,10 @@ public static class TaxiNowHost
     public const string VatsimTrafficPath =
         "/api/v1/integrations/vatsim/traffic";
     private const string VmasPresenceCorsPolicy = "VmasPresence";
-    public const string ProductVersion = "1.5.0";
-    public const string DisplayVersion = "V1.5";
-    public const int InternalBuildId = 126;
-    public const string BuildDate = "August 30, 2026";
+    public const string ProductVersion = "1.5.1";
+    public const string DisplayVersion = "V1.5.1";
+    public const int InternalBuildId = 127;
+    public const string BuildDate = "September 5, 2026";
 
     public static string MapShellUrl =>
         $"http://127.0.0.1:{DefaultPort}/?build={InternalBuildId}";
@@ -86,6 +86,7 @@ public static class TaxiNowHost
         builder.Services.AddSingleton<TaxiNowDatabase>();
         builder.Services.AddSingleton<MapAssetStore>();
         builder.Services.AddSingleton<AirportFixtureService>();
+        builder.Services.AddSingleton<AirportCatalogService>();
         builder.Services.AddSingleton<TelemetryState>();
         builder.Services.AddSingleton<TelemetryRefreshSignal>();
         builder.Services.AddSingleton<DownloadJobService>();
@@ -302,6 +303,48 @@ public static class TaxiNowHost
             "/api/v1/airports",
             (string? query, AirportFixtureService airports) =>
                 Results.Ok(airports.Search(query)));
+        app.MapGet(
+            "/api/v1/airports/nearest",
+            async (
+                double? latitude,
+                double? longitude,
+                AirportCatalogService catalog,
+                MapAssetStore store,
+                CancellationToken token) =>
+            {
+                if (latitude is null || longitude is null ||
+                    !double.IsFinite(latitude.Value) ||
+                    latitude.Value is < -90 or > 90 ||
+                    !double.IsFinite(longitude.Value) ||
+                    longitude.Value is < -180 or > 180)
+                {
+                    return Results.BadRequest(new
+                    {
+                        error = "Provide valid latitude and longitude coordinates."
+                    });
+                }
+
+                var airport = await catalog.FindNearestAsync(
+                    latitude.Value,
+                    longitude.Value,
+                    cancellationToken: token).ConfigureAwait(false);
+                if (airport is null)
+                {
+                    return Results.Ok(new
+                    {
+                        airport = (AirportCatalogMatch?)null,
+                        installed = false
+                    });
+                }
+
+                return Results.Ok(new
+                    {
+                        airport,
+                        installed = await store.ContainsAsync(
+                            airport.Icao,
+                            token).ConfigureAwait(false)
+                    });
+            });
         app.MapGet(
             "/api/v1/airports/{icao}",
             (string icao, AirportFixtureService airports) =>

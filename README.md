@@ -23,8 +23,8 @@ the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release)
 The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
 third-party notices.
 
-Current development build: **V1.5**, internal build **126**
-(build date: August 30, 2026). The About dialog
+Current development build: **V1.5.1**, internal build **127**
+(build date: September 5, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is a free-of-charge application for personal
 flight-simulator use only.
@@ -49,7 +49,7 @@ their surrounding white canvas and create the required output sizes.
 
 ## Current vertical slice
 
-- V1.5 can optionally display nearby live VATSIM traffic. TaxiNow retrieves the
+- V1.5.1 can optionally display nearby live VATSIM traffic. TaxiNow retrieves the
   official public network-data feed through its local PC service, refreshes a
   shared cache at the feed's 15-second cadence, and sends only anonymous
   aircraft fields within the selected airport area to desktop and iPad maps.
@@ -61,6 +61,12 @@ their surrounding white canvas and create the required output sizes.
   cadence in the FAQ. Customized taxi routes now accept commas, spaces, or a
   mixture of both as separators, while preserving destinations such as
   `GATE B19`.
+- Build 127 restores aircraft tracking automatically after a legitimate
+  long-distance telemetry gap, so a destination-airport position no longer
+  requires restarting TaxiNow. When the aircraft is on the ground outside the
+  selected map, TaxiNow identifies the nearest airport and switches to its
+  downloaded map. If that map is missing, the airport picker opens with a clear
+  download prompt; a completed download opens automatically.
 - ASP.NET Core host with status, airport-map, storage, download-job, and
   telemetry endpoints.
 - Shared MapLibre SPA with a full-detail CYYZ regression asset: 5 physical

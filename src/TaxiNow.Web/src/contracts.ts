@@ -88,6 +88,22 @@ export interface AppStatus {
   lanEnabled: boolean;
 }
 
+export interface AirportCatalogMatch {
+  icao: string;
+  name: string;
+  countryCode: string;
+  regionCode: string | null;
+  municipality: string | null;
+  latitude: number;
+  longitude: number;
+  distanceMeters: number;
+}
+
+export interface NearestAirportResponse {
+  airport: AirportCatalogMatch | null;
+  installed: boolean;
+}
+
 export interface VatsimTrafficAircraft {
   callsign: string;
   latitude: number;

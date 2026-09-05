@@ -22,6 +22,7 @@ import type {
   AirportFeature,
   AirportMap,
   DownloadJob,
+  NearestAirportResponse,
   StorageSummary,
   StoredMapAsset,
   TelemetrySnapshot,
@@ -53,6 +54,7 @@ import {
   featureCounts,
   filterAirportFeatures
 } from "./airportGeometry";
+import { shouldIdentifyCurrentAirport } from "./airportAutoSelection";
 import {
   getLocale,
   initializeLocalization,
@@ -95,6 +97,7 @@ const autoUpdateStorageKey = "taxinow.updates.autoCheck";
 const updateCheckedAtStorageKey = "taxinow.updates.lastCheckedAt";
 const vatsimTrafficStorageKey = "taxinow.map.vatsimTraffic";
 const vatsimTrafficRefreshMilliseconds = 15_000;
+const airportDetectionIntervalMilliseconds = 15_000;
 const aircraftPathData =
   "M0 -18 L4 -5 L16 2 L16 6 L4 4 L3 14 L8 18 L0 16 L-8 18 L-3 14 L-4 4 L-16 6 L-16 2 L-4 -5 Z";
 let lastOwnshipFrameAt = 0;
@@ -125,6 +128,10 @@ let mapInitialized = false;
 let assetRefreshInFlight = false;
 let activeDownloads = false;
 let currentAirportMap: AirportMap | null = null;
+let airportDetectionInFlight = false;
+let lastAirportDetectionAt = Number.NEGATIVE_INFINITY;
+let lastPromptedAirportIcao: string | null = null;
+let automaticAirportSelectionSuspended = false;
 let taxiGraph: TaxiGraph | null = null;
 let taxiRunways: TaxiDestination[] = [];
 let taxiGates: TaxiDestination[] = [];
@@ -1644,17 +1651,7 @@ function setupAirportPicker(): void {
   const quickDownload =
     document.querySelector<HTMLButtonElement>("#quick-download")!;
 
-  const setOpen = (open: boolean): void => {
-    panel.hidden = !open;
-    toggle.setAttribute("aria-expanded", String(open));
-    if (open) {
-      search.focus();
-      search.select();
-      renderAirportPicker(search.value);
-    }
-  };
-
-  toggle.addEventListener("click", () => setOpen(panel.hidden));
+  toggle.addEventListener("click", () => setAirportPickerOpen(panel.hidden));
   search.addEventListener("input", () => {
     search.value = search.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
     renderAirportPicker(search.value);
@@ -1670,14 +1667,30 @@ function setupAirportPicker(): void {
     if (!panel.hidden &&
         event.target instanceof Node &&
         !document.querySelector(".airport-switcher")!.contains(event.target)) {
-      setOpen(false);
+      setAirportPickerOpen(false);
     }
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !panel.hidden) {
-      setOpen(false);
+      setAirportPickerOpen(false);
     }
   });
+}
+
+function setAirportPickerOpen(open: boolean): void {
+  const toggle =
+    document.querySelector<HTMLButtonElement>("#airport-picker-toggle")!;
+  const panel =
+    document.querySelector<HTMLElement>("#airport-picker-panel")!;
+  const search =
+    document.querySelector<HTMLInputElement>("#airport-search")!;
+  panel.hidden = !open;
+  toggle.setAttribute("aria-expanded", String(open));
+  if (open) {
+    search.focus();
+    search.select();
+    renderAirportPicker(search.value);
+  }
 }
 
 function renderAirportPicker(query: string): void {
@@ -1721,6 +1734,7 @@ function renderAirportPicker(query: string): void {
         .join(" · ");
     button.append(code, name, location);
     button.addEventListener("click", async () => {
+      automaticAirportSelectionSuspended = true;
       feedback.textContent = t("airport.loading");
       feedback.className = "feedback";
       try {
@@ -2068,11 +2082,7 @@ async function refreshAssetManager(): Promise<void> {
     );
 
     if (pendingAirportIcao &&
-        installedAssets.some((asset) => asset.icao === pendingAirportIcao) &&
-        jobs.some((job) =>
-          job.currentIcao === pendingAirportIcao &&
-          job.state === "completed"
-        )) {
+        installedAssets.some((asset) => asset.icao === pendingAirportIcao)) {
       const downloadedIcao = pendingAirportIcao;
       pendingAirportIcao = null;
       await loadAirport(downloadedIcao);
@@ -3560,6 +3570,15 @@ function applyTelemetrySample(sample: TelemetrySnapshot): void {
       telemetrySamples.shift();
     }
     setStatus(t("status.synced"), "connected");
+    if (!sample.onGround) {
+      automaticAirportSelectionSuspended = false;
+    } else if (shouldIdentifyCurrentAirport(
+      sample,
+      airportPerimeter,
+      automaticAirportSelectionSuspended
+    )) {
+      void synchronizeAirportWithPosition(sample);
+    }
   } else {
     telemetrySamples.length = 0;
     lastRenderedOwnship = null;
@@ -3569,6 +3588,68 @@ function applyTelemetrySample(sample: TelemetrySnapshot): void {
         : t("status.flightStopped"),
       sample.state === "disconnected" ? "error" : "waiting"
     );
+  }
+}
+
+async function synchronizeAirportWithPosition(
+  sample: TelemetrySnapshot
+): Promise<void> {
+  if (airportDetectionInFlight ||
+      performance.now() - lastAirportDetectionAt <
+        airportDetectionIntervalMilliseconds) {
+    return;
+  }
+
+  airportDetectionInFlight = true;
+  lastAirportDetectionAt = performance.now();
+  try {
+    const query = new URLSearchParams({
+      latitude: String(sample.latitude),
+      longitude: String(sample.longitude)
+    });
+    const result = await getJson<NearestAirportResponse>(
+      `/api/v1/airports/nearest?${query}`
+    );
+    const latest = telemetrySamples.at(-1);
+    if (!result.airport ||
+        !latest?.connected ||
+        !latest.onGround ||
+        automaticAirportSelectionSuspended) {
+      return;
+    }
+
+    const icao = result.airport.icao.toUpperCase();
+    if (icao === selectedAirportIcao) {
+      lastPromptedAirportIcao = null;
+      return;
+    }
+
+    if (result.installed) {
+      lastPromptedAirportIcao = null;
+      await loadAirport(icao);
+      setStatus(t("airport.autoSwitched", { icao }), "connected");
+      return;
+    }
+
+    if (lastPromptedAirportIcao === icao) {
+      return;
+    }
+    lastPromptedAirportIcao = icao;
+    const search =
+      document.querySelector<HTMLInputElement>("#airport-search")!;
+    search.value = icao;
+    setAirportPickerOpen(true);
+    const feedback =
+      document.querySelector<HTMLElement>("#airport-picker-feedback")!;
+    feedback.textContent = t("airport.currentNotDownloaded", {
+      icao,
+      name: result.airport.name
+    });
+    feedback.className = "feedback error";
+  } catch (error) {
+    console.warn("Unable to identify the current airport.", error);
+  } finally {
+    airportDetectionInFlight = false;
   }
 }
 

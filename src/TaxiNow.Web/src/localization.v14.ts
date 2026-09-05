@@ -37,6 +37,8 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.customHelp": "Enter taxiways separated by commas or spaces and finish with a runway or gate. Example: D E H T1 RWY01L. Gate example: A B GATE B19. Names must match this airport map.",
     "taxi.customPlaceholder": "D E H T1 RWY01L",
     "taxi.customNeedFormat": "Enter at least one taxiway followed by a destination, separated by commas or spaces.",
+    "airport.autoSwitched": "Switched automatically to {icao} based on the aircraft position.",
+    "airport.currentNotDownloaded": "The aircraft is at {icao} ({name}), but its map has not been downloaded. Download it to switch automatically.",
     "faq.vatsimRefresh.q": "Why is VATSIM traffic only refreshed once in a while?",
     "faq.vatsimRefresh.a": "The official VATSIM network-data feed is regenerated about every 15 seconds. TaxiNow follows that cadence and shares one PC-side cache across the desktop and iPad views to avoid redundant requests. Network latency can make a refresh appear slightly later; this is normal."
   },
@@ -76,6 +78,8 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.customHelp": "用逗号或空格分隔滑行道，并以跑道或登机口结束。例如：D E H T1 RWY01L。登机口示例：A B GATE B19。名称必须与当前机场地图一致。",
     "taxi.customPlaceholder": "D E H T1 RWY01L",
     "taxi.customNeedFormat": "请输入至少一条滑行道及其后的目的地，可使用逗号或空格分隔。",
+    "airport.autoSwitched": "已根据飞机当前位置自动切换到{icao}。",
+    "airport.currentNotDownloaded": "飞机当前位于{icao}（{name}），但尚未下载该机场地图。请点击下载，完成后将自动切换。",
     "faq.vatsimRefresh.q": "为什么VATSIM交通不是持续刷新，而是隔一段时间才更新？",
     "faq.vatsimRefresh.a": "VATSIM官方网络数据源大约每15秒生成一次。TaxiNow遵循这一更新频率，并让桌面端和iPad共用PC端缓存，避免重复请求。网络延迟有时会让刷新稍晚一些，这是正常现象。"
   },
@@ -115,6 +119,8 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.customHelp": "用逗號或空格分隔滑行道，並以跑道或登機口結束。例如：D E H T1 RWY01L。登機口示例：A B GATE B19。名稱必須與目前機場地圖一致。",
     "taxi.customPlaceholder": "D E H T1 RWY01L",
     "taxi.customNeedFormat": "請輸入至少一條滑行道及其後的目的地，可使用逗號或空格分隔。",
+    "airport.autoSwitched": "已根據航機目前位置自動切換至{icao}。",
+    "airport.currentNotDownloaded": "航機目前位於{icao}（{name}），但尚未下載該機場地圖。請按一下下載，完成後將自動切換。",
     "faq.vatsimRefresh.q": "為什麼VATSIM交通不是持續重新整理，而是隔一段時間才更新？",
     "faq.vatsimRefresh.a": "VATSIM官方網路資料來源大約每15秒產生一次。TaxiNow遵循此更新頻率，並讓桌面端與iPad共用PC端快取，避免重複要求。網路延遲有時會讓更新稍晚一些，這是正常現象。"
   },
@@ -154,6 +160,8 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.customHelp": "誘導路をカンマまたは空白で区切り、最後に滑走路またはゲートを入力します。例：D E H T1 RWY01L。ゲート例：A B GATE B19。名称は現在の空港マップと一致させてください。",
     "taxi.customPlaceholder": "D E H T1 RWY01L",
     "taxi.customNeedFormat": "少なくとも1本の誘導路と目的地を、カンマまたは空白で区切って入力してください。",
+    "airport.autoSwitched": "機体位置に基づいて{icao}へ自動的に切り替えました。",
+    "airport.currentNotDownloaded": "機体は{icao}（{name}）にいますが、この空港マップは未ダウンロードです。ダウンロードすると自動的に切り替わります。",
     "faq.vatsimRefresh.q": "VATSIMトラフィックが時々しか更新されないのはなぜですか？",
     "faq.vatsimRefresh.a": "VATSIM公式ネットワークデータは約15秒ごとに生成されます。TaxiNowもこの周期に合わせ、デスクトップとiPadでPC側キャッシュを共有して重複リクエストを避けます。通信遅延で少し遅れて見えることがありますが正常です。"
   },
@@ -193,6 +201,8 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.customHelp": "Saisissez les voies de circulation séparées par des virgules ou des espaces et terminez par une piste ou une porte. Exemple : D E H T1 RWY01L. Exemple vers une porte : A B GATE B19. Les noms doivent correspondre à la carte de cet aéroport.",
     "taxi.customPlaceholder": "D E H T1 RWY01L",
     "taxi.customNeedFormat": "Saisissez au moins une voie de circulation suivie d’une destination, séparées par des virgules ou des espaces.",
+    "airport.autoSwitched": "Passage automatique à {icao} selon la position de l’avion.",
+    "airport.currentNotDownloaded": "L’avion se trouve à {icao} ({name}), mais cette carte n’est pas téléchargée. Téléchargez-la pour basculer automatiquement.",
     "faq.vatsimRefresh.q": "Pourquoi le trafic VATSIM n’est-il actualisé que de temps en temps ?",
     "faq.vatsimRefresh.a": "Le flux réseau officiel de VATSIM est régénéré environ toutes les 15 secondes. TaxiNow suit ce rythme et partage un cache sur le PC entre les vues ordinateur et iPad afin d’éviter les requêtes en double. La latence réseau peut parfois retarder légèrement l’affichage ; c’est normal."
   },
@@ -232,6 +242,8 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.customHelp": "Geben Sie Rollwege durch Kommas oder Leerzeichen getrennt ein und schließen Sie mit einer Bahn oder einem Gate ab. Beispiel: D E H T1 RWY01L. Gate-Beispiel: A B GATE B19. Die Namen müssen der aktuellen Flughafenkarte entsprechen.",
     "taxi.customPlaceholder": "D E H T1 RWY01L",
     "taxi.customNeedFormat": "Geben Sie mindestens einen Rollweg und danach ein Ziel ein, getrennt durch Kommas oder Leerzeichen.",
+    "airport.autoSwitched": "Anhand der Flugzeugposition wurde automatisch zu {icao} gewechselt.",
+    "airport.currentNotDownloaded": "Das Flugzeug befindet sich bei {icao} ({name}), die Karte wurde jedoch nicht heruntergeladen. Laden Sie sie herunter, um automatisch zu wechseln.",
     "faq.vatsimRefresh.q": "Warum wird der VATSIM-Verkehr nur gelegentlich aktualisiert?",
     "faq.vatsimRefresh.a": "Der offizielle VATSIM-Netzwerkdatenfeed wird ungefähr alle 15 Sekunden neu erzeugt. TaxiNow folgt diesem Intervall und verwendet für Desktop- und iPad-Ansicht einen gemeinsamen PC-Cache, um doppelte Anfragen zu vermeiden. Durch Netzwerklatenz kann die Anzeige etwas später aktualisiert werden; das ist normal."
   },
@@ -271,6 +283,8 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "taxi.customHelp": "쉼표 또는 공백으로 유도로를 구분하고 활주로나 게이트로 끝내세요. 예: D E H T1 RWY01L. 게이트 예: A B GATE B19. 이름은 현재 공항 지도와 일치해야 합니다.",
     "taxi.customPlaceholder": "D E H T1 RWY01L",
     "taxi.customNeedFormat": "쉼표 또는 공백으로 구분한 유도로 하나 이상과 목적지를 입력하세요.",
+    "airport.autoSwitched": "항공기 위치에 따라 {icao}(으)로 자동 전환했습니다.",
+    "airport.currentNotDownloaded": "항공기가 {icao}({name})에 있지만 해당 공항 지도를 다운로드하지 않았습니다. 다운로드하면 자동으로 전환됩니다.",
     "faq.vatsimRefresh.q": "VATSIM 트래픽이 가끔만 새로 고쳐지는 이유는 무엇인가요?",
     "faq.vatsimRefresh.a": "VATSIM 공식 네트워크 데이터 피드는 약 15초마다 생성됩니다. TaxiNow도 이 주기를 따르며 데스크톱과 iPad 화면이 PC 캐시를 공유해 중복 요청을 피합니다. 네트워크 지연으로 표시가 조금 늦게 갱신될 수 있으며 이는 정상입니다."
   }

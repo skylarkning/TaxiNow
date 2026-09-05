@@ -23,6 +23,8 @@ internal static class OpenApiDocument
             ["/api/v1/telemetry/refresh"] =
                 Post("Request an immediate aircraft position refresh"),
             ["/api/v1/airports"] = Get("Search installed airports"),
+            ["/api/v1/airports/nearest"] = Get(
+                "Find the airport nearest a ground position and report whether its map is installed"),
             ["/api/v1/airports/{icao}"] = Get("Airport metadata"),
             ["/api/v1/airports/{icao}/map"] = Get("Normalized airport map"),
             ["/api/v1/downloads"] = new

@@ -33,6 +33,59 @@ public sealed class TelemetryTests
     }
 
     [Fact]
+    public void ConsistentPositionAfterLargeGap_ReestablishesTracking()
+    {
+        var guard = new TelemetryGuard(
+            onGroundSamplesToResume: 3,
+            maximumJumpMeters: 100,
+            jumpRecoverySamples: 3);
+
+        Assert.NotNull(guard.Accept(Sample(1, false)));
+
+        var destination = Sample(2, true) with { Latitude = 44.6 };
+        Assert.Null(guard.Accept(destination));
+        Assert.Null(guard.Accept(destination with
+        {
+            Sequence = 3,
+            Longitude = destination.Longitude + 0.000001
+        }));
+
+        var recovered = guard.Accept(destination with
+        {
+            Sequence = 4,
+            Longitude = destination.Longitude + 0.000002
+        });
+
+        Assert.NotNull(recovered);
+        Assert.True(recovered!.OnGround);
+        Assert.Equal(TrackingState.Airborne, recovered.State);
+        Assert.Equal(
+            TrackingState.Airborne,
+            guard.Accept(destination with
+            {
+                Sequence = 5,
+                Longitude = destination.Longitude + 0.000003
+            })!.State);
+        Assert.Equal(
+            TrackingState.GroundTracking,
+            guard.Accept(destination with
+            {
+                Sequence = 6,
+                Longitude = destination.Longitude + 0.000004
+            })!.State);
+    }
+
+    [Fact]
+    public void SingleBadJump_DoesNotReplaceLastKnownPosition()
+    {
+        var guard = new TelemetryGuard(maximumJumpMeters: 100);
+
+        Assert.NotNull(guard.Accept(Sample(1, true)));
+        Assert.Null(guard.Accept(Sample(2, true) with { Latitude = 44.6 }));
+        Assert.NotNull(guard.Accept(Sample(3, true)));
+    }
+
+    [Fact]
     public void ConnectionStatus_ResetsPositionJumpHistory()
     {
         var guard = new TelemetryGuard(maximumJumpMeters: 100);
