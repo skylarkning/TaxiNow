@@ -63,6 +63,9 @@ public readonly record struct VatsimTrafficBounds(
     }
 }
 
+public sealed record VatsimController(string Callsign, string Frequency);
+public sealed record VatsimControllersResponse(DateTimeOffset? FeedUpdatedAtUtc, bool IsStale, IReadOnlyList<VatsimController> Controllers);
+
 public sealed class VatsimTrafficService : IDisposable
 {
     public static readonly Uri FeedUri =
@@ -111,6 +114,14 @@ public sealed class VatsimTrafficService : IDisposable
             isStale,
             aircraft.Length,
             aircraft);
+    }
+
+    public async Task<VatsimControllersResponse> GetControllersAsync(CancellationToken token)
+    {
+        var (feed, stale) = await GetFeedAsync(token).ConfigureAwait(false);
+        if (feed.Controllers is null) throw new JsonException("Missing controllers array.");
+        stale |= feed.FeedUpdatedAtUtc is null || _timeProvider.GetUtcNow() - feed.FeedUpdatedAtUtc > TimeSpan.FromMinutes(2);
+        return new VatsimControllersResponse(feed.FeedUpdatedAtUtc, stale, feed.Controllers);
     }
 
     private async Task<(CachedFeed Feed, bool IsStale)> GetFeedAsync(
@@ -198,7 +209,22 @@ public sealed class VatsimTrafficService : IDisposable
             aircraft.Add(item);
         }
 
-        return new CachedFeed(updatedAtUtc, retrievedAtUtc, aircraft);
+        List<VatsimController>? controllers = null;
+        if (root.TryGetProperty("controllers", out var entries) && entries.ValueKind == JsonValueKind.Array)
+        {
+            controllers = [];
+            foreach (var entry in entries.EnumerateArray())
+            {
+                if (!entry.TryGetProperty("callsign", out var call) || call.ValueKind != JsonValueKind.String ||
+                    !entry.TryGetProperty("frequency", out var freq) || freq.ValueKind != JsonValueKind.String) continue;
+                var callsign = call.GetString()!.Trim().ToUpperInvariant();
+                var frequency = freq.GetString();
+                if (!(callsign.EndsWith("_CTR", StringComparison.Ordinal) || callsign.EndsWith("_FSS", StringComparison.Ordinal)) ||
+                    !decimal.TryParse(frequency, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var mhz) || mhz is < 118 or >= 137) continue;
+                controllers.Add(new VatsimController(callsign, mhz.ToString("F3", CultureInfo.InvariantCulture)));
+            }
+        }
+        return new CachedFeed(updatedAtUtc, retrievedAtUtc, aircraft, controllers);
     }
 
     private static bool TryReadAircraft(
@@ -291,5 +317,5 @@ public sealed class VatsimTrafficService : IDisposable
     private sealed record CachedFeed(
         DateTimeOffset? FeedUpdatedAtUtc,
         DateTimeOffset RetrievedAtUtc,
-        IReadOnlyList<VatsimTrafficAircraft> Aircraft);
+        IReadOnlyList<VatsimTrafficAircraft> Aircraft, IReadOnlyList<VatsimController>? Controllers);
 }

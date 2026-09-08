@@ -7,6 +7,7 @@ using TaxiNow.Server.Airports;
 using TaxiNow.Server.Downloads;
 using TaxiNow.Server.Telemetry;
 using TaxiNow.Server.Vatsim;
+using TaxiNow.Server.SimBrief;
 using TaxiNow.SimConnect.Managed;
 using TaxiNow.SimConnect.Replay;
 using TaxiNow.Storage;
@@ -89,6 +90,10 @@ public static class TaxiNowHost
         builder.Services.AddSingleton<TelemetryState>();
         builder.Services.AddSingleton<TelemetryRefreshSignal>();
         builder.Services.AddSingleton<DownloadJobService>();
+        builder.Services.AddHttpClient<SimBriefService>(client =>
+        {
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("TaxiNow/1.5");
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         builder.Services.AddSingleton(
             _ => VatsimTrafficService.CreateDefault(ProductVersion));
         builder.Services.AddSingleton<ITelemetrySource>(services =>
@@ -119,6 +124,7 @@ public static class TaxiNowHost
         builder.Services.AddHostedService<TelemetryPublisher>();
 
         var app = builder.Build();
+        app.MapSimBrief();
         app.Use(async (context, next) =>
         {
             var settings = context.RequestServices
@@ -210,6 +216,13 @@ public static class TaxiNowHost
                 build = InternalBuildId
             });
         }).RequireCors(VmasPresenceCorsPolicy);
+
+        app.MapGet("/api/v1/integrations/vatsim/controllers", async (VatsimTrafficService traffic, CancellationToken token) =>
+        {
+            try { return Results.Ok(await traffic.GetControllersAsync(token)); }
+            catch (Exception error) when (error is HttpRequestException or JsonException or TaskCanceledException)
+            { return Results.Problem(title: "VATSIM controllers unavailable.", statusCode: 502); }
+        });
 
         app.MapGet(VatsimTrafficPath, async (
             double? west,

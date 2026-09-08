@@ -42,6 +42,28 @@ public sealed class VatsimTrafficServiceTests
         """;
 
     [Fact]
+    public async Task Controllers_ExposeOnlyAreaRadioFieldsAndRejectInvalidFrequencies()
+    {
+        const string json = """
+            {"general":{"update_timestamp":"2026-08-30T12:00:00Z"},"pilots":[],"controllers":[
+            {"callsign":"TOR_CTR","frequency":"128.3","name":"Private Name","cid":123},
+            {"callsign":"TOR_N_CTR","frequency":"199.999"},
+            {"callsign":"CYYZ_TWR","frequency":"118.700"}]}
+            """;
+        var handler = new CountingHandler(json);
+        var time = new MutableTimeProvider(new DateTimeOffset(2026, 8, 30, 12, 0, 1, TimeSpan.Zero));
+        using var service = new VatsimTrafficService(new HttpClient(handler), time);
+        var result = await service.GetControllersAsync(CancellationToken.None);
+        Assert.False(result.IsStale);
+        Assert.Equal(new VatsimController("TOR_CTR", "128.300"), Assert.Single(result.Controllers));
+        var serialized = System.Text.Json.JsonSerializer.Serialize(result);
+        Assert.DoesNotContain("Private Name", serialized);
+        Assert.DoesNotContain("cid", serialized);
+        time.Advance(TimeSpan.FromMinutes(3));
+        Assert.True((await service.GetControllersAsync(CancellationToken.None)).IsStale);
+    }
+
+    [Fact]
     public async Task Traffic_IsFilteredAndCachedForTheOfficialFeedInterval()
     {
         var handler = new CountingHandler(FeedJson);
