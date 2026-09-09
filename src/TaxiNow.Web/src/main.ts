@@ -259,9 +259,7 @@ async function start(): Promise<void> {
   const serverLink =
     document.querySelector<HTMLAnchorElement>("#server-url")!;
   serverLink.href = appStatus.localUrl;
-  serverLink.textContent = t("access.at", {
-    address: appStatus.localUrl.replace(/^https?:\/\//, "")
-  });
+  serverLink.textContent = `iPad: ${appStatus.localUrl.replace(/^https?:\/\//, "")}`;
   serverLink.title = t("access.title", {
     addresses: appStatus.localUrls.join(", ")
   });
@@ -292,9 +290,6 @@ function setupThemeSelector(): void {
   applyTheme(initial);
 
   const selector = document.querySelector<HTMLButtonElement>("#theme-selector");
-  const quickToggle = document.querySelector<HTMLButtonElement>(
-    "#quick-theme-toggle"
-  );
   const menu = document.querySelector<HTMLElement>("#theme-menu");
   if (!selector || !menu) {
     return;
@@ -308,14 +303,6 @@ function setupThemeSelector(): void {
         "aria-checked",
         String(option.dataset.themeOption === theme)
       );
-    }
-    if (quickToggle) {
-      quickToggle.dataset.currentTheme = theme;
-      quickToggle.setAttribute(
-        "aria-label",
-        t(theme === "dark" ? "settings.switchLight" : "settings.switchDark")
-      );
-      quickToggle.title = quickToggle.getAttribute("aria-label") ?? "";
     }
   };
   sync(initial);
@@ -340,18 +327,6 @@ function setupThemeSelector(): void {
       selector.setAttribute("aria-expanded", "false");
     });
   }
-  quickToggle?.addEventListener("click", () => {
-    const theme = document.documentElement.dataset.theme === "light"
-      ? "dark"
-      : "light";
-    try {
-      window.localStorage.setItem(themeStorageKey, theme);
-    } catch {
-      // The theme remains active for this session.
-    }
-    applyTheme(theme);
-    sync(theme);
-  });
 }
 
 function applyTheme(theme: "dark" | "light"): void {
@@ -385,6 +360,9 @@ function setupVatsimTrafficSettings(): void {
     vatsimTrafficEnabled = !vatsimTrafficEnabled;
     writeBooleanPreference(vatsimTrafficStorageKey, vatsimTrafficEnabled);
     sync();
+    window.dispatchEvent(new CustomEvent("taxinow:vatsim-traffic-change", {
+      detail: { enabled: vatsimTrafficEnabled }
+    }));
     if (vatsimTrafficEnabled) {
       startVatsimTrafficPolling();
       void refreshVatsimTraffic();

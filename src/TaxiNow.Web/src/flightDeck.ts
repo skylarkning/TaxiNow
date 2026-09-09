@@ -1,9 +1,13 @@
-import { controllersForFir, type FirCallsign, type Controller } from './firControllers';
+import { controllersForFir, onlineFirIds, type FirCallsign, type Controller } from './firControllers';
 import * as ml from 'maplibre-gl';
 import type { FeatureCollection, LineString } from 'geojson';
 import { getLocale } from './localization';
 import { parseSimBrief, routeCoordinates, routeSections, distanceNm, type FlightPlan } from './flightPlan';
 import type { TelemetrySnapshot } from './contracts';
+import type { VatsimTrafficAircraft, VatsimTrafficResponse } from './contracts';
+import { latestRadarFrame } from './weatherRadar';
+import { parseFirLabels, type FirLabel } from './firLabels';
+import { isOnVisibleHemisphere } from './globeVisibility';
 import './flightDeck.css';
 
 const words = {
@@ -27,11 +31,27 @@ type Word = keyof typeof words;
 function tr(key: Word): string { return words[key][getLocale().startsWith('zh') ? 0 : 1]!; }
 const key = 'taxinow.simbrief';
 const usernameKey = key + '.username';
+const vatsimTrafficKey = 'taxinow.map.vatsimTraffic';
+const weatherRadarKey = 'taxinow.globe.weatherRadar';
 let terrainEnabled = true;
 try { terrainEnabled = localStorage.getItem('taxinow.terrain') !== 'false'; } catch { /* Use default. */ }
+let globeTrafficEnabled = false, weatherRadarEnabled = false;
+try {
+  globeTrafficEnabled = localStorage.getItem(vatsimTrafficKey) === 'true';
+  weatherRadarEnabled = localStorage.getItem(weatherRadarKey) === 'true';
+} catch { /* Use defaults. */ }
 let routeMap: ml.Map | undefined, plan: FlightPlan | undefined;
 let ownship: ml.Marker | undefined, lastPosition: TelemetrySnapshot | undefined;
 let markers: ml.Marker[] = [], currentTab: 'flight' | 'route' | 'log' = 'flight', globeMode = true;
+const globeTrafficMarkers = new Map<string, ml.Marker>();
+let latestGlobeTraffic: VatsimTrafficAircraft[] = [];
+let globeTrafficUpdatedAt = '';
+let globeTrafficTimer: number | undefined, globeTrafficLoading = false;
+let weatherRadarTimer: number | undefined, weatherRadarLoading = false;
+let onlineFirLoading = false;
+let firLabels: FirLabel[] = [], firLabelsLoading = false;
+const firLabelMarkers = new Map<string, ml.Marker>();
+const onlineFirFrequencies = new Map<string, string>();
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 function store(value: unknown): void { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* Session remains usable. */ } }
 function feedback(text: string, error = false): void { $('fd-feedback').textContent = text; $('fd-feedback').classList.toggle('error', error); }
@@ -50,18 +70,24 @@ export function setupFlightDeck(): void {
   const title = document.createElement('div'); title.id = 'fd-title'; title.textContent = 'TaxiNow · ' + tr('view'); nav.append(title);
   document.querySelector('header')!.append(nav);
   const rail = document.createElement('nav'); rail.className = 'fd-rail'; rail.setAttribute('aria-label', 'Map views');
-  rail.append(button('◎\n' + tr('globe'), () => setMode(true)), button('↗\n' + tr('ground'), () => { setMode(false); $('open-taxi-plan').click(); }));
+  rail.append(button(tr('globe'), () => setMode(true)), button(tr('ground'), () => setMode(false)));
   rail.children[0]!.id = 'fd-globe-mode'; rail.children[1]!.id = 'fd-ground-mode';
+  const plannerControl = $('open-taxi-plan');
+  plannerControl.hidden = false;
+  plannerControl.removeAttribute('data-i18n');
+  plannerControl.textContent = tr('planner');
+  plannerControl.setAttribute('aria-label', tr('planner'));
+  plannerControl.title = tr('planner');
+  rail.append(plannerControl);
   // Move existing controls so their established handlers and dialogs are retained.
-  for (const [id, icon, label] of [['open-assets', '▤', tr('maps')]] as const) {
+  for (const [id, label] of [['open-assets', tr('maps')]] as const) {
     const control = $(id);
     control.removeAttribute('data-i18n');
-    control.textContent = `${icon}\n${label}`;
+    control.textContent = label;
     control.setAttribute('aria-label', label);
     control.title = label;
     rail.append(control);
   }
-  $('open-taxi-plan').hidden = true;
   const about = $('open-about'), settingsMenu = $('settings-menu');
   about.classList.add('settings-check-row');
   about.setAttribute('role', 'menuitem');
@@ -72,7 +98,7 @@ export function setupFlightDeck(): void {
   });
   document.getElementById('app')!.append(rail);
   const root = document.createElement('section'); root.id = 'fd-root'; root.setAttribute('aria-label', tr('view'));
-  root.innerHTML = `<div id="fd-map"></div><aside id="fd-panel"><div class="fd-panel-head"><strong id="fd-panel-title"></strong><button id="fd-close" type="button" aria-label="${tr('close')}">×</button></div><div id="fd-form"><div class="fd-service">SimBrief <span>FLIGHT PLANNING</span></div><button id="fd-import" type="button" class="fd-primary">↓ &nbsp;${tr('import')}</button><p id="fd-feedback" role="status"></p></div><div id="fd-content"></div></aside><div class="fd-map-top"><button id="fd-north" type="button">↑ &nbsp;${tr('north')}</button><button id="fd-projection" type="button">3D</button></div><div class="fd-map-tools"><button id="fd-fit" type="button" title="${tr('fit')}" aria-label="${tr('fit')}">⛶</button><button id="fd-locate" type="button" title="${tr('locate')}" aria-label="${tr('locate')}">⌖</button><button id="fd-grid" type="button" title="${tr('grid')}" aria-label="${tr('grid')}" aria-pressed="true">⊞</button><button id="fd-fir" type="button" title="FIR / ATC boundaries" aria-label="FIR / ATC boundaries" aria-pressed="true">FIR</button><button id="fd-terrain" type="button" title="${tr('terrain')}" aria-label="${tr('terrain')}" aria-pressed="${terrainEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 19 11 3l6 10 3-5 6 11H2Z"/><path d="m8 8 3 3 3-3"/></svg><span>${tr('terrain')}</span></button><button id="fd-plus" type="button" aria-label="Zoom in">+</button><button id="fd-minus" type="button" aria-label="Zoom out">−</button></div><div class="fd-map-bottom"><span>${tr('local')} · <a href="https://github.com/vatsimnetwork/vatspy-data-project" target="_blank" rel="noopener">FIR/ATC: VAT-Spy · CC BY-SA 4.0</a></span><span id="fd-terrain-credit"><a href="https://goto.arcgisonline.com/maps/World_Physical_Map" target="_blank" rel="noopener">Terrain: Esri · U.S. National Park Service</a></span><span id="fd-position">${tr('noPosition')}</span></div><p id="fd-map-error" role="alert" hidden></p></section>`;
+  root.innerHTML = `<div id="fd-map"></div><aside id="fd-panel"><div class="fd-panel-head"><strong id="fd-panel-title"></strong><button id="fd-close" type="button" aria-label="${tr('close')}">×</button></div><div id="fd-form"><div class="fd-service">SimBrief <span>FLIGHT PLANNING</span></div><button id="fd-import" type="button" class="fd-primary">↓ &nbsp;${tr('import')}</button><p id="fd-feedback" role="status"></p></div><div id="fd-content"></div></aside><div class="fd-map-top"><button id="fd-north" type="button">↑ &nbsp;${tr('north')}</button><button id="fd-projection" type="button">3D</button></div><div class="fd-map-tools"><button id="fd-fit" type="button" title="${tr('fit')}" aria-label="${tr('fit')}">⛶</button><button id="fd-locate" type="button" title="${tr('locate')}" aria-label="${tr('locate')}">⌖</button><button id="fd-grid" type="button" title="${tr('grid')}" aria-label="${tr('grid')}" aria-pressed="true">⊞</button><button id="fd-fir" type="button" title="FIR / ATC boundaries" aria-label="FIR / ATC boundaries" aria-pressed="true">FIR</button><button id="fd-traffic" type="button" title="VATSIM traffic" aria-label="VATSIM traffic" aria-pressed="${globeTrafficEnabled}"><span class="fd-tool-icon">✈</span><span>VATSIM</span></button><button id="fd-weather" type="button" title="Weather radar" aria-label="Weather radar" aria-pressed="${weatherRadarEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 14h14a4 4 0 0 0 0-8 7 7 0 0 0-13-1 4.5 4.5 0 0 0-1 9Z"/><path d="m10 17-2 3m7-3-2 3m7-3-2 3"/></svg><span>Radar</span></button><button id="fd-terrain" type="button" title="${tr('terrain')}" aria-label="${tr('terrain')}" aria-pressed="${terrainEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 19 11 3l6 10 3-5 6 11H2Z"/><path d="m8 8 3 3 3-3"/></svg><span>${tr('terrain')}</span></button><button id="fd-plus" type="button" aria-label="Zoom in">+</button><button id="fd-minus" type="button" aria-label="Zoom out">−</button></div><div class="fd-map-bottom"><span>${tr('local')} · <a href="https://github.com/vatsimnetwork/vatspy-data-project" target="_blank" rel="noopener">FIR/ATC: VAT-Spy · CC BY-SA 4.0</a></span><span id="fd-radar-credit" hidden><a href="https://www.rainviewer.com/" target="_blank" rel="noopener">Radar: RainViewer</a></span><span id="fd-terrain-credit"><a href="https://goto.arcgisonline.com/maps/World_Physical_Map" target="_blank" rel="noopener">Terrain: Esri · U.S. National Park Service</a></span><span id="fd-position">${tr('noPosition')}</span></div><p id="fd-map-error" role="alert" hidden></p></section>`;
   document.getElementById('app')!.append(root);
   $('fd-close').onclick = () => { $('fd-panel').hidden = true; $(`fd-tab-${currentTab}`).focus(); };
   $('fd-import').onclick = () => void importPlan();
@@ -84,7 +110,23 @@ export function setupFlightDeck(): void {
   $('fd-north').onclick = () => routeMap?.easeTo({ bearing: 0, pitch: 0 });
   $('fd-plus').onclick = () => routeMap?.zoomIn(); $('fd-minus').onclick = () => routeMap?.zoomOut();
   $('fd-fit').onclick = fitRoute;
+  $('fd-traffic').onclick = () => $('show-vatsim-traffic').click();
+  window.addEventListener('taxinow:vatsim-traffic-change', event => {
+    globeTrafficEnabled = !!(event as CustomEvent<{ enabled: boolean }>).detail?.enabled;
+    $('fd-traffic').setAttribute('aria-pressed', String(globeTrafficEnabled));
+    if (globeTrafficEnabled) { startGlobeTraffic(); void refreshGlobeTraffic(); }
+    else { stopGlobeTraffic(); clearGlobeTraffic(); }
+  });
+  $('fd-weather').onclick = () => {
+    weatherRadarEnabled = !weatherRadarEnabled;
+    $('fd-weather').setAttribute('aria-pressed', String(weatherRadarEnabled));
+    $('fd-radar-credit').hidden = !weatherRadarEnabled;
+    try { localStorage.setItem(weatherRadarKey, String(weatherRadarEnabled)); } catch { /* Keep usable. */ }
+    if (weatherRadarEnabled) { startWeatherRadar(); void refreshWeatherRadar(); }
+    else { stopWeatherRadar(); setRadarVisibility(false); }
+  };
   $('fd-terrain-credit').hidden = !terrainEnabled;
+  $('fd-radar-credit').hidden = !weatherRadarEnabled;
   $('fd-terrain').onclick = () => {
     terrainEnabled = !terrainEnabled;
     $('fd-terrain').setAttribute('aria-pressed', String(terrainEnabled));
@@ -93,10 +135,10 @@ export function setupFlightDeck(): void {
     try { localStorage.setItem('taxinow.terrain', String(terrainEnabled)); } catch { /* Keep usable. */ }
     $('fd-map-error').hidden = true;
   };
-  $('fd-fir').onclick = () => { if (!routeMap?.getLayer('fir-boundary')) return; const on = $('fd-fir').getAttribute('aria-pressed') !== 'true'; $('fd-fir').setAttribute('aria-pressed', String(on)); for (const layer of ['fir-boundary', 'fir-hit']) routeMap.setLayoutProperty(layer, 'visibility', on ? 'visible' : 'none'); };
+  $('fd-fir').onclick = () => { if (!routeMap?.getLayer('fir-boundary')) return; const on = $('fd-fir').getAttribute('aria-pressed') !== 'true'; $('fd-fir').setAttribute('aria-pressed', String(on)); for (const layer of ['fir-online', 'fir-boundary', 'fir-hit']) routeMap.setLayoutProperty(layer, 'visibility', on ? 'visible' : 'none'); updateFirLabelMarkers(); };
   $('fd-locate').onclick = () => { if (validPosition(lastPosition)) routeMap?.easeTo({ center: [lastPosition!.longitude, lastPosition!.latitude], zoom: 5 }); else feedback(tr('noPosition')); };
   $('fd-grid').onclick = () => { if (!routeMap?.getLayer('grid')) return; const on = $('fd-grid').getAttribute('aria-pressed') !== 'true'; $('fd-grid').setAttribute('aria-pressed', String(on)); routeMap.setLayoutProperty('grid', 'visibility', on ? 'visible' : 'none'); };
-  $('fd-projection').onclick = () => { globeMode = !globeMode; routeMap?.setProjection({ type: globeMode ? 'globe' : 'mercator' }); $('fd-projection').textContent = globeMode ? '3D' : '2D'; };
+  $('fd-projection').onclick = () => { globeMode = !globeMode; routeMap?.setProjection({ type: globeMode ? 'globe' : 'mercator' }); $('fd-projection').textContent = globeMode ? '3D' : '2D'; requestAnimationFrame(updateVisibleGlobeTraffic); };
   try {
     const saved = JSON.parse(localStorage.getItem(key) || '{}');
     if (saved.kind !== 'userid' && typeof saved.identifier === 'string') $<HTMLInputElement>('fd-identifier').value = saved.identifier;
@@ -107,6 +149,9 @@ export function setupFlightDeck(): void {
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('fd-root').hidden) $('fd-close').click(); });
   new MutationObserver(() => applyGlobeTheme()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   setMode(true); renderPanel();
+  window.setInterval(() => void refreshOnlineFirHighlights(), 15_000);
+  if (globeTrafficEnabled) startGlobeTraffic();
+  if (weatherRadarEnabled) startWeatherRadar();
   window.setInterval(() => { if (!validPosition(lastPosition)) { ownship?.remove(); ownship = undefined; $('fd-position').textContent = tr('noPosition'); } }, 2000);
 }
 function setMode(globe: boolean): void {
@@ -114,7 +159,9 @@ function setMode(globe: boolean): void {
   $('fd-globe-mode').setAttribute('aria-current', String(globe)); $('fd-ground-mode').setAttribute('aria-current', String(!globe));
   if (globe) {
     const taxiPanel = $('taxi-plan-panel'); if (taxiPanel) { taxiPanel.classList.remove('open'); taxiPanel.setAttribute('aria-hidden', 'true'); }
-    if (!routeMap) createGlobe(); else routeMap.resize();
+    if (!routeMap) createGlobe(); else { routeMap.resize(); updateFirLabelMarkers(); }
+    if (globeTrafficEnabled) void refreshGlobeTraffic();
+    if (weatherRadarEnabled) void refreshWeatherRadar();
   } else { const existing = (window as unknown as { taxiNowMap?: ml.Map }).taxiNowMap; requestAnimationFrame(() => existing?.resize()); }
 }
 async function importPlan(): Promise<void> {
@@ -182,17 +229,28 @@ function createGlobe(): void {
         { id: 'coast', type: 'line', source: 'land', paint: { 'line-color': '#a7b5a3', 'line-width': 0.7 } },
         { id: 'terrain', type: 'raster', source: 'terrain', layout: { visibility: terrainEnabled ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.88, 'raster-saturation': -0.3, 'raster-fade-duration': 200 } },
         { id: 'grid', type: 'line', source: 'grid', paint: { 'line-color': '#83b394', 'line-width': 0.65, 'line-opacity': 0.65 } },
+        { id: 'fir-online', type: 'fill', source: 'fir', filter: ['==', ['get', 'id'], ''], paint: { 'fill-color': '#56b4e9', 'fill-opacity': 0.24, 'fill-outline-color': '#2f9fd9' } },
         { id: 'fir-hit', type: 'fill', source: 'fir', paint: { 'fill-opacity': 0 } },
         { id: 'fir-boundary', type: 'line', source: 'fir', paint: { 'line-color': '#516577', 'line-width': 1, 'line-opacity': 0.8 } },
-        { id: 'route-casing', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], false], paint: { 'line-color': '#ffffff', 'line-width': 5.5, 'line-opacity': 0.65 } },
-        { id: 'route-line', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], false], paint: { 'line-color': '#1163d9', 'line-width': 3.5 } },
-        { id: 'procedure-casing', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], true], paint: { 'line-color': '#ffffff', 'line-width': 5.5, 'line-opacity': 0.65, 'line-dasharray': [1.91, 1.27] } },
-        { id: 'procedure-line', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], true], paint: { 'line-color': '#1163d9', 'line-width': 3.5, 'line-dasharray': [3, 2] } }
+        { id: 'route-casing', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], false], paint: { 'line-color': '#ffffff', 'line-width': 6.5, 'line-opacity': 0.65 } },
+        { id: 'route-line', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], false], paint: { 'line-color': '#1163d9', 'line-width': 4.5 } },
+        { id: 'procedure-casing', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], true], paint: { 'line-color': '#ffffff', 'line-width': 6.5, 'line-opacity': 0.65, 'line-dasharray': [1.91, 1.27] } },
+        { id: 'procedure-line', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], true], paint: { 'line-color': '#1163d9', 'line-width': 4.5, 'line-dasharray': [3, 2] } }
       ] }
     });
-    routeMap.on('click', 'fir-hit', e => { void showFirFrequencies(e); });
-    routeMap.on('error', e => { $('fd-map-error').hidden = false; $('fd-map-error').textContent = ('sourceId' in e && e.sourceId === 'terrain') ? (getLocale().startsWith('zh') ? '部分地形未能加载，请检查网络，或关闭地形使用基础地图。' : 'Some terrain tiles could not load. Check your connection or turn off Terrain.') : tr('mapError'); });
-    routeMap.once('style.load', () => { applyGlobeTheme(); drawRoute(); if (plan) fitRoute(); });
+    routeMap.on('error', e => {
+      $('fd-map-error').hidden = false;
+      const sourceId = 'sourceId' in e ? e.sourceId : '';
+      $('fd-map-error').textContent = sourceId === 'terrain'
+        ? (getLocale().startsWith('zh') ? '部分地形未能加载，请检查网络，或关闭地形使用基础地图。' : 'Some terrain tiles could not load. Check your connection or turn off Terrain.')
+        : sourceId === 'weather-radar'
+          ? (getLocale().startsWith('zh') ? '气象雷达图层暂时无法加载，请稍后重试。' : 'Weather radar is temporarily unavailable. Please try again.')
+          : tr('mapError');
+    });
+    routeMap.once('style.load', () => { applyGlobeTheme(); drawRoute(); if (plan) fitRoute(); void loadFirLabels(); void refreshOnlineFirHighlights(); if (globeTrafficEnabled) void refreshGlobeTraffic(); if (weatherRadarEnabled) void refreshWeatherRadar(); });
+    routeMap.on('zoom', updateGlobeTrafficLabelVisibility);
+    routeMap.on('rotate', updateGlobeTrafficHeadings);
+    routeMap.on('moveend', () => { updateFirLabelMarkers(); updateVisibleGlobeTraffic(); });
   } catch { $('fd-map-error').hidden = false; $('fd-map-error').textContent = tr('mapError'); }
 }
 function applyGlobeTheme(): void {
@@ -202,6 +260,10 @@ function applyGlobeTheme(): void {
   routeMap.setPaintProperty('ocean', 'background-color', dark ? '#293e53' : '#b9cbe2');
   routeMap.setPaintProperty('land', 'fill-color', dark ? '#566364' : '#e6e9d6');
   routeMap.setPaintProperty('coast', 'line-color', dark ? '#849995' : '#a7b5a3');
+  if (routeMap.getLayer('fir-online')) {
+    routeMap.setPaintProperty('fir-online', 'fill-color', dark ? '#4fb9e9' : '#56b4e9');
+    routeMap.setPaintProperty('fir-online', 'fill-opacity', dark ? 0.2 : 0.24);
+  }
 }
 function drawRoute(): void {
   if (!routeMap?.getSource('route')) return;
@@ -216,6 +278,200 @@ function drawRoute(): void {
     const popup = document.createElement('div'); popup.textContent = `${p.ident} · ${p.position[1].toFixed(3)}, ${p.position[0].toFixed(3)}`;
     markers.push(new ml.Marker({ element: el }).setLngLat(p.position).setPopup(new ml.Popup({ offset: 12 }).setDOMContent(popup)).addTo(routeMap!));
   });
+}
+
+async function loadFirLabels(): Promise<void> {
+  if (firLabelsLoading || firLabels.length) return;
+  firLabelsLoading = true;
+  try {
+    const response = await fetch('/fir-boundaries.json');
+    if (!response.ok) throw new Error();
+    firLabels = parseFirLabels(await response.json());
+    updateFirLabelMarkers();
+  } catch { /* FIR boundaries remain usable without labels. */ }
+  finally { firLabelsLoading = false; }
+}
+function updateFirLabelMarkers(): void {
+  if (!routeMap) return;
+  const enabled = $('fd-fir').getAttribute('aria-pressed') === 'true';
+  const selected = new Map<string, FirLabel>();
+  if (enabled) {
+    const zoom = routeMap.getZoom(), showSectors = zoom >= 2.6;
+    const center = routeMap.getCenter();
+    const cellWidth = zoom < 2.2 ? 150 : zoom < 4 ? 120 : 92;
+    const cellHeight = zoom < 2.2 ? 58 : 48;
+    const occupied = new Set<string>();
+    for (const label of [...firLabels].sort((a, b) =>
+      Number(!onlineFirFrequencies.has(a.id)) - Number(!onlineFirFrequencies.has(b.id)) ||
+      Number(a.id.includes('-')) - Number(b.id.includes('-')))) {
+      if (!showSectors && label.id.includes('-')) continue;
+      if (globeMode && !isOnVisibleHemisphere([center.lng, center.lat], [label.longitude, label.latitude])) continue;
+      const point = routeMap.project([label.longitude, label.latitude]);
+      if (point.x < -80 || point.y < -40 || point.x > routeMap.getContainer().clientWidth + 80 || point.y > routeMap.getContainer().clientHeight + 40) continue;
+      const cell = `${Math.floor(point.x / cellWidth)}:${Math.floor(point.y / cellHeight)}`;
+      if (occupied.has(cell)) continue;
+      occupied.add(cell); selected.set(label.id, label);
+      if (selected.size >= 140) break;
+    }
+  }
+  for (const [id, marker] of firLabelMarkers) if (!selected.has(id)) { marker.remove(); firLabelMarkers.delete(id); }
+  for (const label of selected.values()) {
+    let marker = firLabelMarkers.get(label.id);
+    if (!marker) {
+      const element = document.createElement('div'); element.className = 'fd-fir-label';
+      const code = document.createElement('strong'); code.textContent = label.id;
+      const name = document.createElement('span'); name.textContent = label.name;
+      const frequency = document.createElement('em'); frequency.className = 'fd-fir-frequency';
+      element.append(code, name, frequency);
+      marker = new ml.Marker({ element, anchor: 'center' }).setLngLat([label.longitude, label.latitude]).addTo(routeMap);
+      firLabelMarkers.set(label.id, marker);
+    }
+    const frequency = marker.getElement().querySelector<HTMLElement>('.fd-fir-frequency')!;
+    frequency.textContent = onlineFirFrequencies.get(label.id) || '';
+    frequency.hidden = !frequency.textContent;
+  }
+}
+
+function startGlobeTraffic(): void {
+  if (globeTrafficTimer === undefined) globeTrafficTimer = window.setInterval(() => void refreshGlobeTraffic(), 15_000);
+}
+function stopGlobeTraffic(): void {
+  if (globeTrafficTimer !== undefined) window.clearInterval(globeTrafficTimer);
+  globeTrafficTimer = undefined;
+}
+function clearGlobeTraffic(): void {
+  globeTrafficMarkers.forEach(marker => marker.remove());
+  globeTrafficMarkers.clear();
+  latestGlobeTraffic = [];
+}
+async function refreshGlobeTraffic(): Promise<void> {
+  if (!globeTrafficEnabled || globeTrafficLoading || !routeMap || $('fd-root').hidden) return;
+  globeTrafficLoading = true;
+  try {
+    const response = await fetch('/api/v1/integrations/vatsim/traffic/global', { signal: AbortSignal.timeout(15_000) });
+    if (!response.ok) throw new Error();
+    const feed = await response.json() as VatsimTrafficResponse;
+    if (!globeTrafficEnabled || !routeMap) return;
+    latestGlobeTraffic = feed.aircraft;
+    globeTrafficUpdatedAt = new Date(feed.feedUpdatedAtUtc || feed.retrievedAtUtc).toLocaleTimeString();
+    updateVisibleGlobeTraffic();
+    $('fd-map-error').hidden = true;
+  } catch {
+    $('fd-map-error').hidden = false;
+    $('fd-map-error').textContent = getLocale().startsWith('zh') ? 'VATSIM 在线飞机获取失败，请稍后重试。' : 'Could not load VATSIM aircraft. Please try again.';
+  } finally { globeTrafficLoading = false; }
+}
+function updateVisibleGlobeTraffic(): void {
+  if (!routeMap || !globeTrafficEnabled) return;
+  const container = routeMap.getContainer(), center = routeMap.getCenter();
+  const visible = latestGlobeTraffic.filter(item => {
+    if (globeMode && !isOnVisibleHemisphere([center.lng, center.lat], [item.longitude, item.latitude])) return false;
+    const point = routeMap!.project([item.longitude, item.latitude]);
+    return point.x >= -24 && point.y >= -24 && point.x <= container.clientWidth + 24 && point.y <= container.clientHeight + 24;
+  });
+  reconcileGlobeTraffic(visible);
+  $('fd-traffic').title = `${visible.length.toLocaleString()} / ${latestGlobeTraffic.length.toLocaleString()} VATSIM aircraft in view · ${globeTrafficUpdatedAt}`;
+}
+function reconcileGlobeTraffic(aircraft: VatsimTrafficAircraft[]): void {
+  if (!routeMap) return;
+  const active = new Set<string>();
+  for (const item of aircraft) {
+    active.add(item.callsign);
+    let marker = globeTrafficMarkers.get(item.callsign);
+    if (!marker) {
+      const element = document.createElement('button'); element.type = 'button'; element.className = 'fd-vatsim-aircraft';
+      element.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c.8 0 1.4.6 1.4 1.4v5.1l7.1 4.2v1.7l-7.1-2.1v4.8l2.3 1.7v1.4L12 19l-3.7 1.2v-1.4l2.3-1.7v-4.8l-7.1 2.1v-1.7l7.1-4.2V3.4C10.6 2.6 11.2 2 12 2Z"/></svg><span class="fd-vatsim-label"></span>';
+      const popup = new ml.Popup({ offset: 15 });
+      marker = new ml.Marker({ element, anchor: 'center', rotationAlignment: 'viewport', pitchAlignment: 'viewport' })
+        .setLngLat([item.longitude, item.latitude]).setPopup(popup).addTo(routeMap);
+      globeTrafficMarkers.set(item.callsign, marker);
+    }
+    marker.setLngLat([item.longitude, item.latitude]);
+    const element = marker.getElement();
+    element.dataset.heading = String(item.headingDegrees);
+    element.setAttribute('aria-label', `${item.callsign}, ${item.aircraftType || 'aircraft'}, ${item.altitudeFeet} feet`);
+    element.title = `${item.callsign} · ${item.aircraftType || '—'} · ${item.altitudeFeet.toLocaleString()} FT · ${item.groundSpeedKnots} KT`;
+    element.querySelector<HTMLElement>('.fd-vatsim-label')!.textContent = item.callsign;
+    element.style.setProperty('--fd-aircraft-heading', `${item.headingDegrees - routeMap.getBearing()}deg`);
+    marker.getPopup()?.setHTML(`<strong>${escapeHtml(item.callsign)}</strong><br>${escapeHtml(item.aircraftType || '—')} · ${item.altitudeFeet.toLocaleString()} FT · ${item.groundSpeedKnots} KT`);
+  }
+  for (const [callsign, marker] of globeTrafficMarkers) if (!active.has(callsign)) { marker.remove(); globeTrafficMarkers.delete(callsign); }
+  updateGlobeTrafficLabelVisibility();
+}
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
+}
+function updateGlobeTrafficHeadings(): void {
+  if (!routeMap) return;
+  const bearing = routeMap.getBearing();
+  globeTrafficMarkers.forEach(marker => {
+    const heading = Number(marker.getElement().dataset.heading || 0);
+    marker.getElement().style.setProperty('--fd-aircraft-heading', `${heading - bearing}deg`);
+  });
+}
+function updateGlobeTrafficLabelVisibility(): void {
+  if (routeMap) $('fd-map').classList.toggle('fd-show-traffic-labels', routeMap.getZoom() >= 3.2);
+}
+
+function startWeatherRadar(): void {
+  if (weatherRadarTimer === undefined) weatherRadarTimer = window.setInterval(() => void refreshWeatherRadar(), 10 * 60_000);
+}
+function stopWeatherRadar(): void {
+  if (weatherRadarTimer !== undefined) window.clearInterval(weatherRadarTimer);
+  weatherRadarTimer = undefined;
+}
+function setRadarVisibility(visible: boolean): void {
+  if (routeMap?.getLayer('weather-radar')) routeMap.setLayoutProperty('weather-radar', 'visibility', visible ? 'visible' : 'none');
+}
+async function refreshWeatherRadar(): Promise<void> {
+  if (!weatherRadarEnabled || weatherRadarLoading || !routeMap || $('fd-root').hidden || !routeMap.getLayer('fir-hit')) return;
+  weatherRadarLoading = true;
+  try {
+    const response = await fetch('https://api.rainviewer.com/public/weather-maps.json', { signal: AbortSignal.timeout(15_000) });
+    if (!response.ok) throw new Error();
+    const frame = latestRadarFrame(await response.json());
+    if (!frame || !weatherRadarEnabled || !routeMap) throw new Error();
+    if (routeMap.getLayer('weather-radar')) routeMap.removeLayer('weather-radar');
+    if (routeMap.getSource('weather-radar')) routeMap.removeSource('weather-radar');
+    routeMap.addSource('weather-radar', { type: 'raster', tiles: [frame.tileUrl], tileSize: 256, minzoom: 0, maxzoom: 7, attribution: 'RainViewer' });
+    routeMap.addLayer({ id: 'weather-radar', type: 'raster', source: 'weather-radar', paint: { 'raster-opacity': 0.68, 'raster-fade-duration': 200 } }, 'fir-online');
+    $('fd-weather').title = `${getLocale().startsWith('zh') ? '气象雷达' : 'Weather radar'} · ${new Date(frame.observedAtUnix * 1000).toLocaleTimeString()}`;
+    $('fd-map-error').hidden = true;
+  } catch {
+    $('fd-map-error').hidden = false;
+    $('fd-map-error').textContent = getLocale().startsWith('zh') ? '气象雷达获取失败，请检查网络后重试。' : 'Could not load weather radar. Check your connection and try again.';
+  } finally { weatherRadarLoading = false; }
+}
+
+async function refreshOnlineFirHighlights(): Promise<void> {
+  if (onlineFirLoading || !routeMap || $('fd-root').hidden || !routeMap.getLayer('fir-online')) return;
+  onlineFirLoading = true;
+  try {
+    firMappings ??= fetch('/fir-callsigns.json').then(response => {
+      if (!response.ok) throw new Error();
+      return response.json() as Promise<FirCallsign[]>;
+    }).catch(error => { firMappings = undefined; throw error; });
+    const [mappings, response] = await Promise.all([
+      firMappings,
+      fetch('/api/v1/integrations/vatsim/controllers', { signal: AbortSignal.timeout(15_000) })
+    ]);
+    if (!response.ok) throw new Error();
+    const feed = await response.json() as { controllers: Controller[]; isStale: boolean; feedUpdatedAtUtc: string | null };
+    if (!routeMap?.getLayer('fir-online')) return;
+    const ids = feed.isStale ? [] : onlineFirIds(feed.controllers, mappings);
+    onlineFirFrequencies.clear();
+    for (const id of ids) {
+      const stations = controllersForFir(id, feed.controllers, mappings);
+      if (stations.length) onlineFirFrequencies.set(id, stations.map(station => `${station.callsign} ${station.frequency}`).join(' · '));
+    }
+    routeMap.setFilter('fir-online', ['in', ['get', 'id'], ['literal', ids]]);
+    updateFirLabelMarkers();
+    $('fd-fir').title = getLocale().startsWith('zh') ? `FIR / ATC 边界 · ${ids.length} 个区域在线` : `FIR / ATC boundaries · ${ids.length} regions online`;
+  } catch {
+    onlineFirFrequencies.clear();
+    updateFirLabelMarkers();
+    if (routeMap?.getLayer('fir-online')) routeMap.setFilter('fir-online', ['==', ['get', 'id'], '']);
+  } finally { onlineFirLoading = false; }
 }
 function fitRoute(): void {
   if (!routeMap) return;

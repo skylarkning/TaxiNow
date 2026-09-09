@@ -22,6 +22,8 @@ public static class TaxiNowHost
         "/api/v1/integrations/vmas/presence";
     public const string VatsimTrafficPath =
         "/api/v1/integrations/vatsim/traffic";
+    public const string VatsimGlobalTrafficPath =
+        "/api/v1/integrations/vatsim/traffic/global";
     private const string VmasPresenceCorsPolicy = "VmasPresence";
     public const string ProductVersion = "1.5.0";
     public const string DisplayVersion = "V1.5";
@@ -249,6 +251,29 @@ public static class TaxiNowHost
             {
                 return Results.Ok(await traffic
                     .GetTrafficAsync(bounds, token)
+                    .ConfigureAwait(false));
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception error) when (
+                error is HttpRequestException or JsonException or TaskCanceledException)
+            {
+                return Results.Problem(
+                    title: "VATSIM traffic is temporarily unavailable.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
+        app.MapGet(VatsimGlobalTrafficPath, async (
+            VatsimTrafficService traffic,
+            CancellationToken token) =>
+        {
+            try
+            {
+                return Results.Ok(await traffic
+                    .GetAllTrafficAsync(token)
                     .ConfigureAwait(false));
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)

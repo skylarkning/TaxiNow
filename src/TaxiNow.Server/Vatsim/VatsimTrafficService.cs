@@ -116,6 +116,19 @@ public sealed class VatsimTrafficService : IDisposable
             aircraft);
     }
 
+    public async Task<VatsimTrafficResponse> GetAllTrafficAsync(
+        CancellationToken cancellationToken)
+    {
+        var (feed, isStale) = await GetFeedAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return new VatsimTrafficResponse(
+            feed.FeedUpdatedAtUtc,
+            feed.RetrievedAtUtc,
+            isStale,
+            feed.Aircraft.Count,
+            feed.Aircraft);
+    }
+
     public async Task<VatsimControllersResponse> GetControllersAsync(CancellationToken token)
     {
         var (feed, stale) = await GetFeedAsync(token).ConfigureAwait(false);
