@@ -32,7 +32,8 @@ body.flightdeck header #open-taxi-plan,body.flightdeck header #open-assets { bac
 .fd-account { display:flex; gap:6px; }
 .fd-account select,.fd-account input { min-width:0; height:39px; border:1px solid var(--fd-line); background:var(--fd-field); color:var(--fd-text); border-radius:4px; padding:0 9px; font:inherit; font-size:12px; }
 .fd-account select { width:100px; } .fd-account input { flex:1; width:150px; }
-#fd-import { width:100%; background:#087fbd; color:white; font-size:13px; font-weight:600; border:0; border-radius:4px; padding:11px; margin:10px 0; }
+#fd-import { width:auto; background:transparent; color:#087fbd; font-size:13px; font-weight:650; border:1px solid #57a9d4; border-radius:4px; padding:8px 16px; margin:8px 0 10px; }
+#fd-import:hover { background:rgba(8,127,189,.08); }
 #fd-import:disabled { opacity:.55; cursor:wait; }
 #fd-form small { font-size:11px; color:var(--fd-muted); }
 #fd-feedback { font-size:12px; line-height:1.6; margin:8px 0 12px; color:#178459; }
@@ -80,7 +81,8 @@ body.flightdeck button { cursor:pointer; }body.flightdeck button:focus-visible,b
 html[data-theme] body.flightdeck .fd-tabs button { background:#414854; color:#eef3f8; border:0; }
 html[data-theme] body.flightdeck .fd-tabs button[aria-pressed="true"],html[data-theme] body.flightdeck .fd-rail button[aria-current="true"] { background:#087fbd; color:#fff; }
 html[data-theme] body.flightdeck .fd-rail button { background:#3c4550; color:#eaf0f4; }
-html[data-theme] body.flightdeck #fd-import { background:#087fbd; color:#fff; }
+html[data-theme] body.flightdeck #fd-import { background:transparent; color:#34a8e5; border-color:#238fc8; }
+html[data-theme] body.flightdeck #fd-import:hover { background:rgba(52,168,229,.12); }
 html[data-theme] body.flightdeck .fd-map-tools button { background:#3c4550; color:#eef3f8; }
 html[data-theme] body.flightdeck .fd-map-tools button[aria-pressed="true"] { background:#087fbd; }
 html[data-theme] body.flightdeck header #status { color:#dce6ed; background:transparent; }

@@ -85,3 +85,19 @@ export function routeSections(points: FlightPoint[]): { procedure: boolean; coor
   }
   return sections.map(section => ({ procedure: section.procedure, coordinates: routeCoordinates(section.points) }));
 }
+
+export function activeRouteLeg(points: FlightPoint[], aircraft: Position): { nextIndex: number; coordinates: Position[] } | undefined {
+  if (points.length < 2) return undefined;
+  let bestIndex = 1, bestDistance = Number.POSITIVE_INFINITY;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!.position, b = points[i]!.position;
+    const meanLat = (aircraft[1] + a[1] + b[1]) / 3 * rad;
+    const scale = Math.cos(meanLat);
+    const ax = a[0] * scale, ay = a[1], bx = b[0] * scale, by = b[1], px = aircraft[0] * scale, py = aircraft[1];
+    const dx = bx - ax, dy = by - ay;
+    const fraction = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+    const distance = Math.hypot(px - (ax + fraction * dx), py - (ay + fraction * dy));
+    if (distance < bestDistance) { bestDistance = distance; bestIndex = i; }
+  }
+  return { nextIndex: bestIndex, coordinates: routeCoordinates([aircraft, points[bestIndex]!.position]) };
+}

@@ -8,6 +8,7 @@ using TaxiNow.Server.Downloads;
 using TaxiNow.Server.Telemetry;
 using TaxiNow.Server.Vatsim;
 using TaxiNow.Server.SimBrief;
+using TaxiNow.Server.XPlane;
 using TaxiNow.SimConnect.Managed;
 using TaxiNow.SimConnect.Replay;
 using TaxiNow.Storage;
@@ -98,31 +99,26 @@ public static class TaxiNowHost
         }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         builder.Services.AddSingleton(
             _ => VatsimTrafficService.CreateDefault(ProductVersion));
-        builder.Services.AddSingleton<ITelemetrySource>(services =>
+        if (ResolveTelemetryMode(builder.Configuration) == "replay")
         {
-            var configuration = services.GetRequiredService<IConfiguration>();
-            var replayPath = configuration["TaxiNow:ReplayPath"];
-            var mode = ResolveTelemetryMode(configuration);
-            if (mode != "replay")
+            builder.Services.AddSingleton<ITelemetrySource>(services =>
             {
-                return new ManagedSimConnectTelemetrySource(
-                    services.GetRequiredService<TelemetryRefreshSignal>());
-            }
-
-            if (string.IsNullOrWhiteSpace(replayPath))
-            {
-                replayPath = Path.Combine(
-                    AppContext.BaseDirectory,
-                    "fixtures",
-                    "telemetry",
-                    "cyyz-taxi.jsonl");
-            }
-
-            return new ReplayTelemetrySource(
-                Path.GetFullPath(replayPath),
-                configuration.GetValue("TaxiNow:ReplaySpeed", 1d),
-                configuration.GetValue("TaxiNow:ReplayLoop", true));
-        });
+                var configuration = services.GetRequiredService<IConfiguration>();
+                var replayPath = configuration["TaxiNow:ReplayPath"];
+                if (string.IsNullOrWhiteSpace(replayPath))
+                    replayPath = Path.Combine(AppContext.BaseDirectory, "fixtures", "telemetry", "cyyz-taxi.jsonl");
+                return new ReplayTelemetrySource(
+                    Path.GetFullPath(replayPath),
+                    configuration.GetValue("TaxiNow:ReplaySpeed", 1d),
+                    configuration.GetValue("TaxiNow:ReplayLoop", true));
+            });
+        }
+        else
+        {
+            builder.Services.AddSingleton<ITelemetrySource>(services =>
+                new ManagedSimConnectTelemetrySource(services.GetRequiredService<TelemetryRefreshSignal>()));
+            builder.Services.AddSingleton<ITelemetrySource, XPlaneTelemetrySource>();
+        }
         builder.Services.AddHostedService<TelemetryPublisher>();
 
         var app = builder.Build();
@@ -423,11 +419,11 @@ public static class TaxiNowHost
                 "replay",
                 StringComparison.OrdinalIgnoreCase)
                 ? "replay"
-                : "msfs";
+                : "auto";
         }
 
         return string.IsNullOrWhiteSpace(configuration["TaxiNow:ReplayPath"])
-            ? "msfs"
+            ? "auto"
             : "replay";
     }
 

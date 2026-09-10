@@ -2,7 +2,7 @@ import { controllersForFir, onlineFirIds, type FirCallsign, type Controller } fr
 import * as ml from 'maplibre-gl';
 import type { FeatureCollection, LineString } from 'geojson';
 import { getLocale } from './localization';
-import { parseSimBrief, routeCoordinates, routeSections, distanceNm, type FlightPlan } from './flightPlan';
+import { activeRouteLeg, parseSimBrief, routeCoordinates, routeSections, distanceNm, type FlightPlan } from './flightPlan';
 import type { TelemetrySnapshot } from './contracts';
 import type { VatsimTrafficAircraft, VatsimTrafficResponse } from './contracts';
 import { latestRadarFrame } from './weatherRadar';
@@ -12,9 +12,9 @@ import './flightDeck.css';
 
 const words = {
   flight: ['飞行计划', 'Flight'], route: ['航路信息', 'Route Info'], log: ['航路日志', 'NavLog'],
-  ground: ['地面', 'Taxi'], globe: ['地球', 'Globe'], maps: ['地图管理', 'Maps'],
+  ground: ['地面', 'Taxi'], globe: ['航图', 'Map'], maps: ['地图管理', 'Maps'],
   planner: ['滑行规划', 'Plan Taxi'], terrain: ['地形', 'Terrain'],
-  import: ['导入最新计划', 'Import latest plan'], alias: ['用户名', 'Username'], pilot: ['Pilot ID', 'Pilot ID'],
+  import: ['导入', 'Import'], alias: ['用户名', 'Username'], pilot: ['Pilot ID', 'Pilot ID'],
   help: ['先在 SimBrief 生成计划，再在这里导入。', 'Generate a plan in SimBrief, then import it here.'],
   empty: ['准备下一段飞行', 'Your next flight starts here'], emptyText: ['从 SimBrief 导入航路，在地球上查看完整旅程。', 'Import from SimBrief to explore your route on the globe.'],
   fit: ['完整航路', 'Fit route'], clear: ['清除计划', 'Clear plan'], north: ['正北向上', 'North Up'],
@@ -98,7 +98,7 @@ export function setupFlightDeck(): void {
   });
   document.getElementById('app')!.append(rail);
   const root = document.createElement('section'); root.id = 'fd-root'; root.setAttribute('aria-label', tr('view'));
-  root.innerHTML = `<div id="fd-map"></div><aside id="fd-panel"><div class="fd-panel-head"><strong id="fd-panel-title"></strong><button id="fd-close" type="button" aria-label="${tr('close')}">×</button></div><div id="fd-form"><div class="fd-service">SimBrief <span>FLIGHT PLANNING</span></div><button id="fd-import" type="button" class="fd-primary">↓ &nbsp;${tr('import')}</button><p id="fd-feedback" role="status"></p></div><div id="fd-content"></div></aside><div class="fd-map-top"><button id="fd-north" type="button">↑ &nbsp;${tr('north')}</button><button id="fd-projection" type="button">3D</button></div><div class="fd-map-tools"><button id="fd-fit" type="button" title="${tr('fit')}" aria-label="${tr('fit')}">⛶</button><button id="fd-locate" type="button" title="${tr('locate')}" aria-label="${tr('locate')}">⌖</button><button id="fd-grid" type="button" title="${tr('grid')}" aria-label="${tr('grid')}" aria-pressed="true">⊞</button><button id="fd-fir" type="button" title="FIR / ATC boundaries" aria-label="FIR / ATC boundaries" aria-pressed="true">FIR</button><button id="fd-traffic" type="button" title="VATSIM traffic" aria-label="VATSIM traffic" aria-pressed="${globeTrafficEnabled}"><span class="fd-tool-icon">✈</span><span>VATSIM</span></button><button id="fd-weather" type="button" title="Weather radar" aria-label="Weather radar" aria-pressed="${weatherRadarEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 14h14a4 4 0 0 0 0-8 7 7 0 0 0-13-1 4.5 4.5 0 0 0-1 9Z"/><path d="m10 17-2 3m7-3-2 3m7-3-2 3"/></svg><span>Radar</span></button><button id="fd-terrain" type="button" title="${tr('terrain')}" aria-label="${tr('terrain')}" aria-pressed="${terrainEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 19 11 3l6 10 3-5 6 11H2Z"/><path d="m8 8 3 3 3-3"/></svg><span>${tr('terrain')}</span></button><button id="fd-plus" type="button" aria-label="Zoom in">+</button><button id="fd-minus" type="button" aria-label="Zoom out">−</button></div><div class="fd-map-bottom"><span>${tr('local')} · <a href="https://github.com/vatsimnetwork/vatspy-data-project" target="_blank" rel="noopener">FIR/ATC: VAT-Spy · CC BY-SA 4.0</a></span><span id="fd-radar-credit" hidden><a href="https://www.rainviewer.com/" target="_blank" rel="noopener">Radar: RainViewer</a></span><span id="fd-terrain-credit"><a href="https://goto.arcgisonline.com/maps/World_Physical_Map" target="_blank" rel="noopener">Terrain: Esri · U.S. National Park Service</a></span><span id="fd-position">${tr('noPosition')}</span></div><p id="fd-map-error" role="alert" hidden></p></section>`;
+  root.innerHTML = `<div id="fd-map"></div><aside id="fd-panel"><div class="fd-panel-head"><strong id="fd-panel-title"></strong><button id="fd-close" type="button" aria-label="${tr('close')}">×</button></div><div id="fd-form"><div class="fd-service">SimBrief <span>FLIGHT PLANNING</span></div><button id="fd-import" type="button" class="fd-primary">${tr('import')}</button><p id="fd-feedback" role="status"></p></div><div id="fd-content"></div></aside><div class="fd-map-top"><button id="fd-north" type="button">↑ &nbsp;${tr('north')}</button><button id="fd-projection" type="button">3D</button></div><div class="fd-map-tools"><button id="fd-fit" type="button" title="${tr('fit')}" aria-label="${tr('fit')}">⛶</button><button id="fd-locate" type="button" title="${tr('locate')}" aria-label="${tr('locate')}">⌖</button><button id="fd-grid" type="button" title="${tr('grid')}" aria-label="${tr('grid')}" aria-pressed="true">⊞</button><button id="fd-fir" type="button" title="FIR / ATC boundaries" aria-label="FIR / ATC boundaries" aria-pressed="true">FIR</button><button id="fd-traffic" type="button" title="VATSIM traffic" aria-label="VATSIM traffic" aria-pressed="${globeTrafficEnabled}"><span class="fd-tool-icon">✈</span><span>VATSIM</span></button><button id="fd-weather" type="button" title="Weather radar" aria-label="Weather radar" aria-pressed="${weatherRadarEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 14h14a4 4 0 0 0 0-8 7 7 0 0 0-13-1 4.5 4.5 0 0 0-1 9Z"/><path d="m10 17-2 3m7-3-2 3m7-3-2 3"/></svg><span>Radar</span></button><button id="fd-terrain" type="button" title="${tr('terrain')}" aria-label="${tr('terrain')}" aria-pressed="${terrainEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 19 11 3l6 10 3-5 6 11H2Z"/><path d="m8 8 3 3 3-3"/></svg><span>${tr('terrain')}</span></button><button id="fd-plus" type="button" aria-label="Zoom in">+</button><button id="fd-minus" type="button" aria-label="Zoom out">−</button></div><div class="fd-map-bottom"><span>${tr('local')} · <a href="https://github.com/vatsimnetwork/vatspy-data-project" target="_blank" rel="noopener">FIR/ATC: VAT-Spy · CC BY-SA 4.0</a></span><span id="fd-radar-credit" hidden><a href="https://www.rainviewer.com/" target="_blank" rel="noopener">Radar: RainViewer</a></span><span id="fd-terrain-credit"><a href="https://goto.arcgisonline.com/maps/World_Physical_Map" target="_blank" rel="noopener">Terrain: Esri · U.S. National Park Service</a></span><span id="fd-position">${tr('noPosition')}</span></div><p id="fd-map-error" role="alert" hidden></p></section>`;
   document.getElementById('app')!.append(root);
   $('fd-close').onclick = () => { $('fd-panel').hidden = true; $(`fd-tab-${currentTab}`).focus(); };
   $('fd-import').onclick = () => void importPlan();
@@ -222,7 +222,8 @@ function createGlobe(): void {
         terrain: { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, minzoom: 0, maxzoom: 8, attribution: 'Esri · U.S. National Park Service' },
         fir: { type: 'geojson', data: '/fir-boundaries.json', attribution: 'VATSIM VAT-Spy · CC BY-SA 4.0' },
         land: { type: 'geojson', data: '/world-land.json' }, grid: { type: 'geojson', data: gridData() },
-        route: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }
+        route: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+        'active-route': { type: 'geojson', data: { type: 'FeatureCollection', features: [] } }
       }, layers: [
         { id: 'ocean', type: 'background', paint: { 'background-color': '#b9cbe2' } },
         { id: 'land', type: 'fill', source: 'land', paint: { 'fill-color': '#e6e9d6' } },
@@ -235,7 +236,9 @@ function createGlobe(): void {
         { id: 'route-casing', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], false], paint: { 'line-color': '#ffffff', 'line-width': 6.5, 'line-opacity': 0.65 } },
         { id: 'route-line', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], false], paint: { 'line-color': '#1163d9', 'line-width': 4.5 } },
         { id: 'procedure-casing', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], true], paint: { 'line-color': '#ffffff', 'line-width': 6.5, 'line-opacity': 0.65, 'line-dasharray': [1.91, 1.27] } },
-        { id: 'procedure-line', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], true], paint: { 'line-color': '#1163d9', 'line-width': 4.5, 'line-dasharray': [3, 2] } }
+        { id: 'procedure-line', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], true], paint: { 'line-color': '#1163d9', 'line-width': 4.5, 'line-dasharray': [3, 2] } },
+        { id: 'active-route-casing', type: 'line', source: 'active-route', paint: { 'line-color': '#ffffff', 'line-width': 7.5, 'line-opacity': 0.72 } },
+        { id: 'active-route-line', type: 'line', source: 'active-route', paint: { 'line-color': '#d72cc7', 'line-width': 5.5 } }
       ] }
     });
     routeMap.on('error', e => {
@@ -277,6 +280,18 @@ function drawRoute(): void {
     el.append(order, label);
     const popup = document.createElement('div'); popup.textContent = `${p.ident} · ${p.position[1].toFixed(3)}, ${p.position[0].toFixed(3)}`;
     markers.push(new ml.Marker({ element: el }).setLngLat(p.position).setPopup(new ml.Popup({ offset: 12 }).setDOMContent(popup)).addTo(routeMap!));
+  });
+  updateActiveRouteLeg();
+}
+
+function updateActiveRouteLeg(): void {
+  if (!routeMap?.getSource('active-route')) return;
+  const active = plan && validPosition(lastPosition)
+    ? activeRouteLeg(plan.points, [lastPosition!.longitude, lastPosition!.latitude])
+    : undefined;
+  (routeMap.getSource('active-route') as ml.GeoJSONSource).setData({
+    type: 'FeatureCollection',
+    features: active ? [{ type: 'Feature', properties: { nextIndex: active.nextIndex }, geometry: { type: 'LineString', coordinates: active.coordinates } }] : []
   });
 }
 
@@ -485,9 +500,10 @@ function validPosition(value?: TelemetrySnapshot): boolean {
 }
 export function updateFlightDeckPosition(sample: TelemetrySnapshot): void {
   lastPosition = sample;
-  if (!routeMap || !validPosition(sample)) { ownship?.remove(); ownship = undefined; if ($('fd-position')) $('fd-position').textContent = tr('noPosition'); return; }
+  if (!routeMap || !validPosition(sample)) { ownship?.remove(); ownship = undefined; updateActiveRouteLeg(); if ($('fd-position')) $('fd-position').textContent = tr('noPosition'); return; }
   if (!ownship) { const el = document.createElement('div'); el.className = 'fd-ownship'; el.textContent = '▲'; ownship = new ml.Marker({ element: el, rotationAlignment: 'map' }).setLngLat([sample.longitude, sample.latitude]).addTo(routeMap); }
   ownship.setLngLat([sample.longitude, sample.latitude]).setRotation(sample.trueHeadingDegrees);
+  updateActiveRouteLeg();
   $('fd-position').textContent = `${Math.round(sample.trueHeadingDegrees)}°  ·  ${Math.round(sample.groundSpeedKnots)} KT`;
 }
 

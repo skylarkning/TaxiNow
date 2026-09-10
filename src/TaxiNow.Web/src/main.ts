@@ -259,7 +259,7 @@ async function start(): Promise<void> {
   const serverLink =
     document.querySelector<HTMLAnchorElement>("#server-url")!;
   serverLink.href = appStatus.localUrl;
-  serverLink.textContent = `iPad: ${appStatus.localUrl.replace(/^https?:\/\//, "")}`;
+  serverLink.textContent = `${getLocale().startsWith("zh") ? "移动设备" : "Mobile device"}: ${appStatus.localUrl}`;
   serverLink.title = t("access.title", {
     addresses: appStatus.localUrls.join(", ")
   });
@@ -3539,7 +3539,12 @@ function applyTelemetrySample(sample: TelemetrySnapshot): void {
     while (telemetrySamples.length > 2) {
       telemetrySamples.shift();
     }
-    setStatus(t("status.synced"), "connected");
+    setStatus(
+      sample.simulator === "xPlane12"
+        ? (getLocale().startsWith("zh") ? "位置已与 X-Plane 12 同步。" : "Position in sync with X-Plane 12.")
+        : t("status.synced"),
+      "connected"
+    );
   } else {
     telemetrySamples.length = 0;
     lastRenderedOwnship = null;
