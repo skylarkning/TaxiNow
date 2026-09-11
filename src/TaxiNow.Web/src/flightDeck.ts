@@ -3,11 +3,13 @@ import * as ml from 'maplibre-gl';
 import type { FeatureCollection, LineString } from 'geojson';
 import { getLocale } from './localization';
 import { activeRouteLeg, parseSimBrief, routeCoordinates, routeSections, distanceNm, type FlightPlan } from './flightPlan';
+import { fetchLatestSimBriefPlan, filterSimBriefNavigation } from './simBriefClient';
 import type { TelemetrySnapshot } from './contracts';
 import type { VatsimTrafficAircraft, VatsimTrafficResponse } from './contracts';
-import { latestRadarFrame } from './weatherRadar';
+import { hasRadarEcho, latestRadarFrame, parseWeatherMotion, radarTilePoint, type WeatherMotion } from './weatherRadar';
 import { parseFirLabels, type FirLabel } from './firLabels';
 import { isOnVisibleHemisphere } from './globeVisibility';
+import { loadGnssInterference, type GnssInterferenceRegion } from './gnssInterference';
 import './flightDeck.css';
 
 const words = {
@@ -33,12 +35,14 @@ const key = 'taxinow.simbrief';
 const usernameKey = key + '.username';
 const vatsimTrafficKey = 'taxinow.map.vatsimTraffic';
 const weatherRadarKey = 'taxinow.globe.weatherRadar';
+const gnssInterferenceKey = 'taxinow.globe.gnssInterference';
 let terrainEnabled = true;
 try { terrainEnabled = localStorage.getItem('taxinow.terrain') !== 'false'; } catch { /* Use default. */ }
-let globeTrafficEnabled = false, weatherRadarEnabled = false;
+let globeTrafficEnabled = false, weatherRadarEnabled = false, gnssInterferenceEnabled = false;
 try {
   globeTrafficEnabled = localStorage.getItem(vatsimTrafficKey) === 'true';
   weatherRadarEnabled = localStorage.getItem(weatherRadarKey) === 'true';
+  gnssInterferenceEnabled = localStorage.getItem(gnssInterferenceKey) === 'true';
 } catch { /* Use defaults. */ }
 let routeMap: ml.Map | undefined, plan: FlightPlan | undefined;
 let ownship: ml.Marker | undefined, lastPosition: TelemetrySnapshot | undefined;
@@ -47,11 +51,15 @@ const globeTrafficMarkers = new Map<string, ml.Marker>();
 let latestGlobeTraffic: VatsimTrafficAircraft[] = [];
 let globeTrafficUpdatedAt = '';
 let globeTrafficTimer: number | undefined, globeTrafficLoading = false;
-let weatherRadarTimer: number | undefined, weatherRadarLoading = false;
+let weatherRadarTimer: number | undefined, weatherMotionRefreshTimer: number | undefined, weatherRadarLoading = false, weatherMotionLoading = false, weatherMotionGeneration = 0;
+let latestRadarTileUrl = '';
 let onlineFirLoading = false;
-let firLabels: FirLabel[] = [], firLabelsLoading = false;
+let gnssInterferenceLoading = false;
+const gnssRegions = new Map<string, GnssInterferenceRegion>();
+let firLabels: FirLabel[] = [], firLabelsPromise: Promise<void> | undefined;
 const firLabelMarkers = new Map<string, ml.Marker>();
 const onlineFirFrequencies = new Map<string, string>();
+let weatherMotionMarkers: ml.Marker[] = [];
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 function store(value: unknown): void { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* Session remains usable. */ } }
 function feedback(text: string, error = false): void { $('fd-feedback').textContent = text; $('fd-feedback').classList.toggle('error', error); }
@@ -98,7 +106,7 @@ export function setupFlightDeck(): void {
   });
   document.getElementById('app')!.append(rail);
   const root = document.createElement('section'); root.id = 'fd-root'; root.setAttribute('aria-label', tr('view'));
-  root.innerHTML = `<div id="fd-map"></div><aside id="fd-panel"><div class="fd-panel-head"><strong id="fd-panel-title"></strong><button id="fd-close" type="button" aria-label="${tr('close')}">×</button></div><div id="fd-form"><div class="fd-service">SimBrief <span>FLIGHT PLANNING</span></div><button id="fd-import" type="button" class="fd-primary">${tr('import')}</button><p id="fd-feedback" role="status"></p></div><div id="fd-content"></div></aside><div class="fd-map-top"><button id="fd-north" type="button">↑ &nbsp;${tr('north')}</button><button id="fd-projection" type="button">3D</button></div><div class="fd-map-tools"><button id="fd-fit" type="button" title="${tr('fit')}" aria-label="${tr('fit')}">⛶</button><button id="fd-locate" type="button" title="${tr('locate')}" aria-label="${tr('locate')}">⌖</button><button id="fd-grid" type="button" title="${tr('grid')}" aria-label="${tr('grid')}" aria-pressed="true">⊞</button><button id="fd-fir" type="button" title="FIR / ATC boundaries" aria-label="FIR / ATC boundaries" aria-pressed="true">FIR</button><button id="fd-traffic" type="button" title="VATSIM traffic" aria-label="VATSIM traffic" aria-pressed="${globeTrafficEnabled}"><span class="fd-tool-icon">✈</span><span>VATSIM</span></button><button id="fd-weather" type="button" title="Weather radar" aria-label="Weather radar" aria-pressed="${weatherRadarEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 14h14a4 4 0 0 0 0-8 7 7 0 0 0-13-1 4.5 4.5 0 0 0-1 9Z"/><path d="m10 17-2 3m7-3-2 3m7-3-2 3"/></svg><span>Radar</span></button><button id="fd-terrain" type="button" title="${tr('terrain')}" aria-label="${tr('terrain')}" aria-pressed="${terrainEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 19 11 3l6 10 3-5 6 11H2Z"/><path d="m8 8 3 3 3-3"/></svg><span>${tr('terrain')}</span></button><button id="fd-plus" type="button" aria-label="Zoom in">+</button><button id="fd-minus" type="button" aria-label="Zoom out">−</button></div><div class="fd-map-bottom"><span>${tr('local')} · <a href="https://github.com/vatsimnetwork/vatspy-data-project" target="_blank" rel="noopener">FIR/ATC: VAT-Spy · CC BY-SA 4.0</a></span><span id="fd-radar-credit" hidden><a href="https://www.rainviewer.com/" target="_blank" rel="noopener">Radar: RainViewer</a></span><span id="fd-terrain-credit"><a href="https://goto.arcgisonline.com/maps/World_Physical_Map" target="_blank" rel="noopener">Terrain: Esri · U.S. National Park Service</a></span><span id="fd-position">${tr('noPosition')}</span></div><p id="fd-map-error" role="alert" hidden></p></section>`;
+  root.innerHTML = `<div id="fd-map"></div><aside id="fd-panel"><div class="fd-panel-head"><strong id="fd-panel-title"></strong><button id="fd-close" type="button" aria-label="${tr('close')}">×</button></div><div id="fd-form"><div class="fd-service">SimBrief <span>FLIGHT PLANNING</span></div><button id="fd-import" type="button" class="fd-primary">${tr('import')}</button><p id="fd-feedback" role="status"></p></div><div id="fd-content"></div></aside><div class="fd-map-top"><button id="fd-north" type="button">↑ &nbsp;${tr('north')}</button><button id="fd-projection" type="button">3D</button></div><div class="fd-map-tools"><button id="fd-fit" type="button" title="${tr('fit')}" aria-label="${tr('fit')}">⛶</button><button id="fd-locate" type="button" title="${tr('locate')}" aria-label="${tr('locate')}">⌖</button><button id="fd-grid" type="button" title="${tr('grid')}" aria-label="${tr('grid')}" aria-pressed="true">⊞</button><button id="fd-fir" type="button" title="FIR / ATC boundaries" aria-label="FIR / ATC boundaries" aria-pressed="true">FIR</button><button id="fd-gnss" type="button" title="GNSS interference" aria-label="GNSS interference" aria-pressed="${gnssInterferenceEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="14" cy="11" r="3"/><path d="M14 3v3m0 10v3M6 11h3m10 0h3M8.3 5.3l2.1 2.1m7.2 7.2 2.1 2.1m0-11.4-2.1 2.1m-7.2 7.2-2.1 2.1"/></svg><span>GNSS</span></button><button id="fd-traffic" type="button" title="VATSIM traffic" aria-label="VATSIM traffic" aria-pressed="${globeTrafficEnabled}"><span class="fd-tool-icon">✈</span><span>VATSIM</span></button><button id="fd-weather" type="button" title="Weather radar" aria-label="Weather radar" aria-pressed="${weatherRadarEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 14h14a4 4 0 0 0 0-8 7 7 0 0 0-13-1 4.5 4.5 0 0 0-1 9Z"/><path d="m10 17-2 3m7-3-2 3m7-3-2 3"/></svg><span>Radar</span></button><button id="fd-terrain" type="button" title="${tr('terrain')}" aria-label="${tr('terrain')}" aria-pressed="${terrainEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 19 11 3l6 10 3-5 6 11H2Z"/><path d="m8 8 3 3 3-3"/></svg><span>${tr('terrain')}</span></button><button id="fd-plus" type="button" aria-label="Zoom in">+</button><button id="fd-minus" type="button" aria-label="Zoom out">−</button></div><div class="fd-map-bottom"><span>${tr('local')} · <a href="https://github.com/vatsimnetwork/vatspy-data-project" target="_blank" rel="noopener">FIR/ATC: VAT-Spy · CC BY-SA 4.0</a></span><span id="fd-gnss-credit" hidden><span class="fd-gnss-legend"><i class="interference"></i>Interference <i class="spoofing"></i>Spoofing</span> · <a href="https://www.easa.europa.eu/en/domains/air-operations/global-navigation-satellite-system-outages-and-alterations" target="_blank" rel="noopener">EASA Data4Safety</a></span><span id="fd-radar-credit" hidden><a href="https://www.rainviewer.com/" target="_blank" rel="noopener">Radar: RainViewer</a> · <a href="https://open-meteo.com/" target="_blank" rel="noopener">Motion: Open-Meteo 700 hPa</a></span><span id="fd-terrain-credit"><a href="https://goto.arcgisonline.com/maps/World_Physical_Map" target="_blank" rel="noopener">Terrain: Esri · U.S. National Park Service</a></span><span id="fd-position">${tr('noPosition')}</span></div><p id="fd-map-error" role="alert" hidden></p></section>`;
   document.getElementById('app')!.append(root);
   $('fd-close').onclick = () => { $('fd-panel').hidden = true; $(`fd-tab-${currentTab}`).focus(); };
   $('fd-import').onclick = () => void importPlan();
@@ -123,10 +131,20 @@ export function setupFlightDeck(): void {
     $('fd-radar-credit').hidden = !weatherRadarEnabled;
     try { localStorage.setItem(weatherRadarKey, String(weatherRadarEnabled)); } catch { /* Keep usable. */ }
     if (weatherRadarEnabled) { startWeatherRadar(); void refreshWeatherRadar(); }
-    else { stopWeatherRadar(); setRadarVisibility(false); }
+    else { stopWeatherRadar(); setRadarVisibility(false); clearWeatherMotion(); }
+  };
+  $('fd-gnss').onclick = () => {
+    gnssInterferenceEnabled = !gnssInterferenceEnabled;
+    $('fd-gnss').setAttribute('aria-pressed', String(gnssInterferenceEnabled));
+    $('fd-gnss-credit').hidden = !gnssInterferenceEnabled;
+    try { localStorage.setItem(gnssInterferenceKey, String(gnssInterferenceEnabled)); } catch { /* Keep usable. */ }
+    setGnssVisibility(gnssInterferenceEnabled);
+    updateFirLabelMarkers();
+    if (gnssInterferenceEnabled) void refreshGnssInterference();
   };
   $('fd-terrain-credit').hidden = !terrainEnabled;
   $('fd-radar-credit').hidden = !weatherRadarEnabled;
+  $('fd-gnss-credit').hidden = !gnssInterferenceEnabled;
   $('fd-terrain').onclick = () => {
     terrainEnabled = !terrainEnabled;
     $('fd-terrain').setAttribute('aria-pressed', String(terrainEnabled));
@@ -166,14 +184,14 @@ function setMode(globe: boolean): void {
 }
 async function importPlan(): Promise<void> {
   const control = $<HTMLButtonElement>('fd-import'); if (control.disabled) return;
-  const identifier = $<HTMLInputElement>('fd-identifier').value.trim(), kind = 'username';
+  const identifier = $<HTMLInputElement>('fd-identifier').value.trim();
   if (!identifier) { feedback(getLocale().startsWith('zh') ? '请先在右上角设置中填写 SimBrief Username。' : 'Enter your SimBrief Username in Settings first.', true); $('settings-menu').hidden = false; $('settings-selector').setAttribute('aria-expanded', 'true'); $('fd-identifier').focus(); return; }
   control.disabled = true; control.textContent = tr('loading'); feedback('');
   try {
-    const response = await fetch('/api/v1/integrations/simbrief/plan?' + new URLSearchParams({ kind, identifier }), { signal: AbortSignal.timeout(25000) });
+    const response = await fetchLatestSimBriefPlan(identifier, AbortSignal.timeout(25000));
     if (!response.ok) throw new Error(response.status === 400 ? (getLocale().startsWith('zh') ? '未找到计划：请核对 Username，并在 SimBrief 生成计划。' : 'Plan unavailable: check Username and generate a plan in SimBrief.') : response.status === 504 ? (getLocale().startsWith('zh') ? 'SimBrief 请求超时，请重试。' : 'SimBrief timed out. Please retry.') : (getLocale().startsWith('zh') ? '无法连接 SimBrief 服务，请稍后重试。' : 'SimBrief service unavailable. Please retry.'));
-    const data: unknown = await response.json(), parsed = parseSimBrief(data);
-    plan = parsed; store({ identifier, kind, raw: data, importedAt: parsed.importedAt }); renderPanel(); drawRoute(); fitRoute(); feedback(tr('ready'));
+    const data = filterSimBriefNavigation(await response.json()), parsed = parseSimBrief(data);
+    plan = parsed; store({ identifier, kind: 'username', raw: data, importedAt: parsed.importedAt }); renderPanel(); drawRoute(); fitRoute(); feedback(tr('ready'));
   } catch (error) { feedback(error instanceof Error ? (error.name === 'TimeoutError' ? 'SimBrief request timed out.' : error.message === 'Invalid flight plan' || error.message.includes('navlog') ? (getLocale().startsWith('zh') ? '计划缺少详细航路，请启用 Detailed Navlog 后重新生成。' : 'Generate a plan with Detailed Navlog enabled.') : error.message) : tr('failed'), true); }
   finally { control.disabled = false; control.textContent = '↓  ' + tr('import'); }
 }
@@ -231,6 +249,8 @@ function createGlobe(): void {
         { id: 'terrain', type: 'raster', source: 'terrain', layout: { visibility: terrainEnabled ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.88, 'raster-saturation': -0.3, 'raster-fade-duration': 200 } },
         { id: 'grid', type: 'line', source: 'grid', paint: { 'line-color': '#83b394', 'line-width': 0.65, 'line-opacity': 0.65 } },
         { id: 'fir-online', type: 'fill', source: 'fir', filter: ['==', ['get', 'id'], ''], paint: { 'fill-color': '#56b4e9', 'fill-opacity': 0.24, 'fill-outline-color': '#2f9fd9' } },
+        { id: 'gnss-interference', type: 'fill', source: 'fir', filter: ['==', ['get', 'id'], ''], layout: { visibility: gnssInterferenceEnabled ? 'visible' : 'none' }, paint: { 'fill-color': '#f4c542', 'fill-opacity': 0.27, 'fill-outline-color': '#b98500' } },
+        { id: 'gnss-spoofing', type: 'fill', source: 'fir', filter: ['==', ['get', 'id'], ''], layout: { visibility: gnssInterferenceEnabled ? 'visible' : 'none' }, paint: { 'fill-color': '#e5484d', 'fill-opacity': 0.34, 'fill-outline-color': '#a71920' } },
         { id: 'fir-hit', type: 'fill', source: 'fir', paint: { 'fill-opacity': 0 } },
         { id: 'fir-boundary', type: 'line', source: 'fir', paint: { 'line-color': '#516577', 'line-width': 1, 'line-opacity': 0.8 } },
         { id: 'route-casing', type: 'line', source: 'route', filter: ['==', ['get', 'procedure'], false], paint: { 'line-color': '#ffffff', 'line-width': 6.5, 'line-opacity': 0.65 } },
@@ -250,10 +270,10 @@ function createGlobe(): void {
           ? (getLocale().startsWith('zh') ? '气象雷达图层暂时无法加载，请稍后重试。' : 'Weather radar is temporarily unavailable. Please try again.')
           : tr('mapError');
     });
-    routeMap.once('style.load', () => { applyGlobeTheme(); drawRoute(); if (plan) fitRoute(); void loadFirLabels(); void refreshOnlineFirHighlights(); if (globeTrafficEnabled) void refreshGlobeTraffic(); if (weatherRadarEnabled) void refreshWeatherRadar(); });
+    routeMap.once('style.load', () => { applyGlobeTheme(); drawRoute(); if (plan) fitRoute(); void loadFirLabels(); void refreshOnlineFirHighlights(); if (gnssInterferenceEnabled) void refreshGnssInterference(); if (globeTrafficEnabled) void refreshGlobeTraffic(); if (weatherRadarEnabled) void refreshWeatherRadar(); });
     routeMap.on('zoom', updateGlobeTrafficLabelVisibility);
-    routeMap.on('rotate', updateGlobeTrafficHeadings);
-    routeMap.on('moveend', () => { updateFirLabelMarkers(); updateVisibleGlobeTraffic(); });
+    routeMap.on('rotate', () => { updateGlobeTrafficHeadings(); updateWeatherMotionHeadings(); });
+    routeMap.on('moveend', () => { updateFirLabelMarkers(); updateVisibleGlobeTraffic(); scheduleWeatherMotionRefresh(); });
   } catch { $('fd-map-error').hidden = false; $('fd-map-error').textContent = tr('mapError'); }
 }
 function applyGlobeTheme(): void {
@@ -295,20 +315,23 @@ function updateActiveRouteLeg(): void {
   });
 }
 
-async function loadFirLabels(): Promise<void> {
-  if (firLabelsLoading || firLabels.length) return;
-  firLabelsLoading = true;
-  try {
-    const response = await fetch('/fir-boundaries.json');
-    if (!response.ok) throw new Error();
-    firLabels = parseFirLabels(await response.json());
-    updateFirLabelMarkers();
-  } catch { /* FIR boundaries remain usable without labels. */ }
-  finally { firLabelsLoading = false; }
+function loadFirLabels(): Promise<void> {
+  if (firLabels.length) return Promise.resolve();
+  if (firLabelsPromise) return firLabelsPromise;
+  firLabelsPromise = (async () => {
+    try {
+      const response = await fetch('/fir-boundaries.json');
+      if (!response.ok) throw new Error();
+      firLabels = parseFirLabels(await response.json());
+      updateFirLabelMarkers();
+    } catch { /* FIR boundaries remain usable without labels. */ }
+    finally { firLabelsPromise = undefined; }
+  })();
+  return firLabelsPromise;
 }
 function updateFirLabelMarkers(): void {
   if (!routeMap) return;
-  const enabled = $('fd-fir').getAttribute('aria-pressed') === 'true';
+  const enabled = $('fd-fir').getAttribute('aria-pressed') === 'true' || gnssInterferenceEnabled;
   const selected = new Map<string, FirLabel>();
   if (enabled) {
     const zoom = routeMap.getZoom(), showSectors = zoom >= 2.6;
@@ -317,7 +340,7 @@ function updateFirLabelMarkers(): void {
     const cellHeight = zoom < 2.2 ? 58 : 48;
     const occupied = new Set<string>();
     for (const label of [...firLabels].sort((a, b) =>
-      Number(!onlineFirFrequencies.has(a.id)) - Number(!onlineFirFrequencies.has(b.id)) ||
+      Number(!(onlineFirFrequencies.has(a.id) || (gnssInterferenceEnabled && gnssRegions.has(a.id)))) - Number(!(onlineFirFrequencies.has(b.id) || (gnssInterferenceEnabled && gnssRegions.has(b.id)))) ||
       Number(a.id.includes('-')) - Number(b.id.includes('-')))) {
       if (!showSectors && label.id.includes('-')) continue;
       if (globeMode && !isOnVisibleHemisphere([center.lng, center.lat], [label.longitude, label.latitude])) continue;
@@ -337,13 +360,19 @@ function updateFirLabelMarkers(): void {
       const code = document.createElement('strong'); code.textContent = label.id;
       const name = document.createElement('span'); name.textContent = label.name;
       const frequency = document.createElement('em'); frequency.className = 'fd-fir-frequency';
-      element.append(code, name, frequency);
+      const warning = document.createElement('b'); warning.className = 'fd-gnss-label';
+      element.append(code, name, frequency, warning);
       marker = new ml.Marker({ element, anchor: 'center' }).setLngLat([label.longitude, label.latitude]).addTo(routeMap);
       firLabelMarkers.set(label.id, marker);
     }
     const frequency = marker.getElement().querySelector<HTMLElement>('.fd-fir-frequency')!;
     frequency.textContent = onlineFirFrequencies.get(label.id) || '';
     frequency.hidden = !frequency.textContent;
+    const warning = marker.getElement().querySelector<HTMLElement>('.fd-gnss-label')!;
+    const gnss = gnssInterferenceEnabled ? gnssRegions.get(label.id) : undefined;
+    warning.textContent = gnss ? (gnss.spoofing ? 'GNSS SPOOF' : 'GNSS') : '';
+    warning.classList.toggle('spoofing', !!gnss?.spoofing);
+    warning.hidden = !warning.textContent;
   }
 }
 
@@ -437,6 +466,7 @@ function stopWeatherRadar(): void {
 }
 function setRadarVisibility(visible: boolean): void {
   if (routeMap?.getLayer('weather-radar')) routeMap.setLayoutProperty('weather-radar', 'visibility', visible ? 'visible' : 'none');
+  weatherMotionMarkers.forEach(marker => marker.getElement().hidden = !visible);
 }
 async function refreshWeatherRadar(): Promise<void> {
   if (!weatherRadarEnabled || weatherRadarLoading || !routeMap || $('fd-root').hidden || !routeMap.getLayer('fir-hit')) return;
@@ -450,12 +480,143 @@ async function refreshWeatherRadar(): Promise<void> {
     if (routeMap.getSource('weather-radar')) routeMap.removeSource('weather-radar');
     routeMap.addSource('weather-radar', { type: 'raster', tiles: [frame.tileUrl], tileSize: 256, minzoom: 0, maxzoom: 7, attribution: 'RainViewer' });
     routeMap.addLayer({ id: 'weather-radar', type: 'raster', source: 'weather-radar', paint: { 'raster-opacity': 0.68, 'raster-fade-duration': 200 } }, 'fir-online');
+    latestRadarTileUrl = frame.tileUrl;
+    void refreshWeatherMotion(++weatherMotionGeneration);
     $('fd-weather').title = `${getLocale().startsWith('zh') ? '气象雷达' : 'Weather radar'} · ${new Date(frame.observedAtUnix * 1000).toLocaleTimeString()}`;
     $('fd-map-error').hidden = true;
   } catch {
     $('fd-map-error').hidden = false;
     $('fd-map-error').textContent = getLocale().startsWith('zh') ? '气象雷达获取失败，请检查网络后重试。' : 'Could not load weather radar. Check your connection and try again.';
   } finally { weatherRadarLoading = false; }
+}
+
+function scheduleWeatherMotionRefresh(): void {
+  if (!weatherRadarEnabled) return;
+  if (weatherMotionRefreshTimer !== undefined) window.clearTimeout(weatherMotionRefreshTimer);
+  const generation = ++weatherMotionGeneration;
+  weatherMotionRefreshTimer = window.setTimeout(() => void refreshWeatherMotion(generation), 650);
+}
+function clearWeatherMotion(invalidate = true): void {
+  if (invalidate) weatherMotionGeneration += 1;
+  if (weatherMotionRefreshTimer !== undefined) window.clearTimeout(weatherMotionRefreshTimer);
+  weatherMotionRefreshTimer = undefined;
+  weatherMotionMarkers.forEach(marker => marker.remove());
+  weatherMotionMarkers = [];
+}
+function updateWeatherMotionHeadings(): void {
+  if (!routeMap) return;
+  const mapBearing = routeMap.getBearing();
+  weatherMotionMarkers.forEach(marker => {
+    const bearing = Number(marker.getElement().dataset.bearing || 0);
+    marker.getElement().style.setProperty('--fd-weather-bearing', `${bearing - mapBearing - 90}deg`);
+  });
+}
+function drawWeatherMotion(motion: WeatherMotion[]): void {
+  clearWeatherMotion(false);
+  if (!routeMap) return;
+  weatherMotionMarkers = motion.map(item => {
+    const element = document.createElement('div');
+    element.className = 'fd-weather-motion';
+    element.dataset.bearing = String(item.bearingDegrees);
+    element.style.setProperty('--fd-weather-bearing', `${item.bearingDegrees - routeMap!.getBearing() - 90}deg`);
+    element.innerHTML = '<svg viewBox="0 0 54 24" aria-hidden="true"><circle cx="8" cy="12" r="5"/><circle cx="8" cy="12" r="2"/><path d="M13 12h31"/><path d="m37 5 9 7-9 7"/></svg><span>' + Math.round(item.speedKnots) + '</span>';
+    element.title = `${Math.round(item.speedKnots)} KT`;
+    return new ml.Marker({ element, anchor: 'center' }).setLngLat(item.position).addTo(routeMap!);
+  });
+}
+async function filterWeatherMotionByRadar(motion: WeatherMotion[], tileTemplate: string): Promise<WeatherMotion[]> {
+  if (!routeMap || !tileTemplate) return [];
+  const zoom = Math.max(3, Math.min(6, Math.floor(routeMap.getZoom()) + 1));
+  const tiles = new Map<string, Promise<{ pixels: Uint8ClampedArray; width: number; height: number }>>();
+  const readTile = (tileX: number, tileY: number) => {
+    const key = `${zoom}/${tileX}/${tileY}`;
+    let pending = tiles.get(key);
+    if (!pending) {
+      pending = new Promise((resolve, reject) => {
+        const image = new Image();
+        image.crossOrigin = 'anonymous';
+        image.decoding = 'async';
+        image.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+          const context = canvas.getContext('2d', { willReadFrequently: true });
+          if (!context) { reject(new Error('Canvas unavailable')); return; }
+          context.drawImage(image, 0, 0);
+          resolve({ pixels: context.getImageData(0, 0, canvas.width, canvas.height).data, width: canvas.width, height: canvas.height });
+        };
+        image.onerror = () => reject(new Error('Radar tile unavailable'));
+        image.src = tileTemplate.replace('{z}', String(zoom)).replace('{x}', String(tileX)).replace('{y}', String(tileY));
+      });
+      tiles.set(key, pending);
+    }
+    return pending;
+  };
+  const visible = await Promise.all(motion.map(async item => {
+    const point = radarTilePoint(item.position, zoom);
+    try {
+      const tile = await readTile(point.tileX, point.tileY);
+      return hasRadarEcho(tile.pixels, tile.width, tile.height, point.pixelX, point.pixelY) ? item : undefined;
+    } catch { return undefined; }
+  }));
+  return visible.filter((item): item is WeatherMotion => !!item);
+}
+async function refreshWeatherMotion(generation = ++weatherMotionGeneration): Promise<void> {
+  if (!weatherRadarEnabled || !routeMap || $('fd-root').hidden) return;
+  if (weatherMotionLoading) {
+    if (generation === weatherMotionGeneration)
+      weatherMotionRefreshTimer = window.setTimeout(() => void refreshWeatherMotion(generation), 250);
+    return;
+  }
+  weatherMotionLoading = true;
+  try {
+    const container = routeMap.getContainer();
+    const samples = [0.12, 0.38, 0.62, 0.88].flatMap(x => [0.2, 0.5, 0.8].map(y =>
+      routeMap!.unproject([container.clientWidth * x, container.clientHeight * y])));
+    const latitude = samples.map(point => point.lat.toFixed(3)).join(',');
+    const longitude = samples.map(point => point.lng.toFixed(3)).join(',');
+    const url = new URL('https://api.open-meteo.com/v1/forecast');
+    url.searchParams.set('latitude', latitude);
+    url.searchParams.set('longitude', longitude);
+    url.searchParams.set('current', 'wind_speed_700hPa,wind_direction_700hPa');
+    url.searchParams.set('wind_speed_unit', 'kn');
+    url.searchParams.set('forecast_days', '1');
+    const response = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    if (!response.ok) throw new Error();
+    const motion = parseWeatherMotion(await response.json());
+    const visible = await filterWeatherMotionByRadar(motion, latestRadarTileUrl);
+    if (generation === weatherMotionGeneration && weatherRadarEnabled) drawWeatherMotion(visible);
+  } catch { if (generation === weatherMotionGeneration) clearWeatherMotion(); }
+  finally { weatherMotionLoading = false; }
+}
+
+function setGnssVisibility(visible: boolean): void {
+  for (const layer of ['gnss-interference', 'gnss-spoofing']) {
+    if (routeMap?.getLayer(layer)) routeMap.setLayoutProperty(layer, 'visibility', visible ? 'visible' : 'none');
+  }
+}
+async function refreshGnssInterference(): Promise<void> {
+  if (!gnssInterferenceEnabled || gnssInterferenceLoading || !routeMap || $('fd-root').hidden || !routeMap.getLayer('gnss-interference')) return;
+  gnssInterferenceLoading = true;
+  try {
+    const feed = await loadGnssInterference();
+    if (!feed || !routeMap?.getLayer('gnss-interference')) throw new Error();
+    await loadFirLabels();
+    const supportedIds = new Set(firLabels.map(label => label.id));
+    const supportedRegions = feed.regions.filter(region => supportedIds.has(region.icao));
+    gnssRegions.clear();
+    supportedRegions.forEach(region => gnssRegions.set(region.icao, region));
+    routeMap.setFilter('gnss-interference', ['in', ['get', 'id'], ['literal', supportedRegions.filter(region => !region.spoofing).map(region => region.icao)]]);
+    routeMap.setFilter('gnss-spoofing', ['in', ['get', 'id'], ['literal', supportedRegions.filter(region => region.spoofing).map(region => region.icao)]]);
+    updateFirLabelMarkers();
+    const date = new Date(`${feed.observedOn}T00:00:00`).toLocaleDateString();
+    const status = feed.isStale ? (getLocale().startsWith('zh') ? ' · 缓存数据' : ' · cached data') : '';
+    $('fd-gnss').title = `${getLocale().startsWith('zh') ? 'GNSS 干扰' : 'GNSS interference'} · ${supportedRegions.length} FIR · ${date}${status}`;
+    $('fd-gnss-credit').title = `${date}${status}`;
+    $('fd-map-error').hidden = true;
+  } catch {
+    $('fd-map-error').hidden = false;
+    $('fd-map-error').textContent = getLocale().startsWith('zh') ? 'GNSS 干扰数据获取失败，请稍后重试。' : 'Could not load GNSS interference data. Please try again.';
+  } finally { gnssInterferenceLoading = false; }
 }
 
 async function refreshOnlineFirHighlights(): Promise<void> {

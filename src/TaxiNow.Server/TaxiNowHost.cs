@@ -5,6 +5,7 @@ using TaxiNow.Core.Airports;
 using TaxiNow.Core.Telemetry;
 using TaxiNow.Server.Airports;
 using TaxiNow.Server.Downloads;
+using TaxiNow.Server.Gnss;
 using TaxiNow.Server.Telemetry;
 using TaxiNow.Server.Vatsim;
 using TaxiNow.Server.SimBrief;
@@ -25,6 +26,8 @@ public static class TaxiNowHost
         "/api/v1/integrations/vatsim/traffic";
     public const string VatsimGlobalTrafficPath =
         "/api/v1/integrations/vatsim/traffic/global";
+    public const string GnssInterferencePath =
+        "/api/v1/integrations/gnss/interference";
     private const string VmasPresenceCorsPolicy = "VmasPresence";
     public const string ProductVersion = "1.5.0";
     public const string DisplayVersion = "V1.5";
@@ -99,6 +102,8 @@ public static class TaxiNowHost
         }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         builder.Services.AddSingleton(
             _ => VatsimTrafficService.CreateDefault(ProductVersion));
+        builder.Services.AddSingleton(
+            _ => GnssInterferenceService.CreateDefault(ProductVersion));
         if (ResolveTelemetryMode(builder.Configuration) == "replay")
         {
             builder.Services.AddSingleton<ITelemetrySource>(services =>
@@ -220,6 +225,18 @@ public static class TaxiNowHost
             try { return Results.Ok(await traffic.GetControllersAsync(token)); }
             catch (Exception error) when (error is HttpRequestException or JsonException or TaskCanceledException)
             { return Results.Problem(title: "VATSIM controllers unavailable.", statusCode: 502); }
+        });
+
+        app.MapGet(GnssInterferencePath, async (GnssInterferenceService interference, CancellationToken token) =>
+        {
+            try { return Results.Ok(await interference.GetAsync(token).ConfigureAwait(false)); }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+            catch (Exception error) when (error is HttpRequestException or InvalidDataException or TaskCanceledException)
+            {
+                return Results.Problem(
+                    title: "GNSS interference information is temporarily unavailable.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
         });
 
         app.MapGet(VatsimTrafficPath, async (

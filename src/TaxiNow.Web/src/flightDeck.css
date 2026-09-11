@@ -60,10 +60,18 @@ body.flightdeck header #open-taxi-plan,body.flightdeck header #open-assets { bac
 .fd-map-top button { height:40px; background:var(--fd-field); color:var(--fd-text); border:1px solid var(--fd-line); border-radius:5px; padding:0 15px; font-size:13px; }
 .fd-map-tools { position:absolute; right:18px; bottom:53px; display:flex; flex-direction:column; background:#343c47; border:1px solid #5d6976; border-radius:6px; overflow:hidden; }
 .fd-map-tools button { width:44px; height:45px; border:0; border-bottom:1px solid #56616e; border-radius:0; background:transparent; color:#eef4f7; font-size:25px; padding:0; }.fd-map-tools button[aria-pressed="true"] { background:#087fbd; }
-.fd-map-tools #fd-traffic,.fd-map-tools #fd-weather { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; min-height:49px; padding:3px 1px; }
-.fd-map-tools #fd-traffic span,.fd-map-tools #fd-weather span { font-size:8px; font-weight:650; line-height:10px; }
+.fd-map-tools #fd-traffic,.fd-map-tools #fd-weather,.fd-map-tools #fd-gnss { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; min-height:49px; padding:3px 1px; }
+.fd-map-tools #fd-traffic span,.fd-map-tools #fd-weather span,.fd-map-tools #fd-gnss span { font-size:8px; font-weight:650; line-height:10px; }
 .fd-map-tools #fd-traffic .fd-tool-icon { font-size:20px; line-height:21px; transform:rotate(-45deg); }
 .fd-map-tools #fd-weather svg { flex-shrink:0; }
+.fd-weather-motion { position:relative; width:54px; height:34px; pointer-events:none; color:#18e34d; filter:drop-shadow(0 1px 1px #062f16); }
+.fd-weather-motion svg { display:block; width:54px; height:24px; overflow:visible; transform:rotate(var(--fd-weather-bearing)); transform-origin:50% 50%; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+.fd-weather-motion span { position:absolute; top:23px; left:0; width:100%; color:#effff3; font-size:10px; font-weight:750; line-height:11px; text-align:center; text-shadow:0 1px 2px #062f16,0 0 2px #062f16; }
+.fd-gnss-label { display:block; margin-top:2px; padding:1px 4px; border-radius:2px; background:#f4c542; color:#322500; font-size:8px; font-style:normal; font-weight:800; line-height:11px; letter-spacing:.02em; }
+.fd-gnss-label.spoofing { background:#e5484d; color:#fff; }
+.fd-gnss-legend { display:inline-flex; align-items:center; gap:4px; }
+.fd-gnss-legend i { width:8px; height:8px; border-radius:2px; background:#f4c542; box-shadow:inset 0 0 0 1px #b98500; }
+.fd-gnss-legend i.spoofing { margin-left:4px; background:#e5484d; box-shadow:inset 0 0 0 1px #a71920; }
 .fd-map-bottom { position:absolute; bottom:0; left:0; right:0; display:flex; justify-content:space-between; gap:10px; padding:7px 18px; color:#c8d3da; background:#20252d; font-size:10px; }
 .fd-map-point { background:#46535f; color:white; border:1px solid white; border-radius:50%; width:23px; height:23px; padding:0; font-size:10px; }.fd-ownship { color:#bd2abd; font-size:32px; text-shadow:0 0 2px white; }
 #fd-map-error { position:absolute; top:65px; right:18px; max-width:280px; padding:12px; color:#a32c28; background:#fff4ee; font-size:12px; border-radius:4px; }
