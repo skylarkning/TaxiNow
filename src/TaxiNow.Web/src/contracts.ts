@@ -74,6 +74,19 @@ export interface TelemetrySnapshot {
     | "reconnecting";
 }
 
+export interface ElevationProfileResponse {
+  samples: Array<{
+    longitude: number;
+    latitude: number;
+    distanceNm: number;
+    elevationFeet: number;
+  }>;
+  cacheState: "fresh" | "cachedOffline";
+  generatedAt: string;
+  source: string;
+  attribution: string;
+}
+
 export interface AppStatus {
   product: string;
   version: string;
