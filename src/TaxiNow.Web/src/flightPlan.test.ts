@@ -101,6 +101,7 @@ describe('SimBrief flight plans', () => {
       constraintKind: 'atOrAbove',
       minimumAltitudeFeet: 10000
     });
+    expect(points[1]!.maximumAltitudeFeet).toBeUndefined();
   });
 });
 describe('route geometry', () => {

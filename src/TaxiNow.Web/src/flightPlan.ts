@@ -96,7 +96,11 @@ export function parseSimBrief(input: unknown): FlightPlan {
       continue;
     }
     if (current.plannedAltitudeFeet !== undefined) previous.plannedAltitudeFeet = current.plannedAltitudeFeet;
-    if (current.constraintKind !== undefined) previous.constraintKind = current.constraintKind;
+    if (current.constraintKind !== undefined) {
+      previous.constraintKind = current.constraintKind;
+      delete previous.minimumAltitudeFeet;
+      delete previous.maximumAltitudeFeet;
+    }
     if (current.minimumAltitudeFeet !== undefined) previous.minimumAltitudeFeet = current.minimumAltitudeFeet;
     if (current.maximumAltitudeFeet !== undefined) previous.maximumAltitudeFeet = current.maximumAltitudeFeet;
   }
