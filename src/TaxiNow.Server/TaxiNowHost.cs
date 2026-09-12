@@ -5,6 +5,7 @@ using TaxiNow.Core.Airports;
 using TaxiNow.Core.Telemetry;
 using TaxiNow.Server.Airports;
 using TaxiNow.Server.Downloads;
+using TaxiNow.Server.Elevation;
 using TaxiNow.Server.Gnss;
 using TaxiNow.Server.Telemetry;
 using TaxiNow.Server.Vatsim;
@@ -28,6 +29,8 @@ public static class TaxiNowHost
         "/api/v1/integrations/vatsim/traffic/global";
     public const string GnssInterferencePath =
         "/api/v1/integrations/gnss/interference";
+    public const string ElevationProfilePath =
+        "/api/v1/elevation/profile";
     private const string VmasPresenceCorsPolicy = "VmasPresence";
     public const string ProductVersion = "1.5.0";
     public const string DisplayVersion = "V1.5";
@@ -96,6 +99,21 @@ public static class TaxiNowHost
         builder.Services.AddSingleton<TelemetryState>();
         builder.Services.AddSingleton<TelemetryRefreshSignal>();
         builder.Services.AddSingleton<DownloadJobService>();
+        builder.Services.AddHttpClient(
+            ElevationProfileService.HttpClientName,
+            client =>
+            {
+                client.Timeout = ElevationProfileService.RequestTimeout;
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("TaxiNow/1.5");
+            })
+            .ConfigurePrimaryHttpMessageHandler(() =>
+                new HttpClientHandler { AllowAutoRedirect = false });
+        builder.Services.AddSingleton(services =>
+            new ElevationProfileService(
+                services.GetRequiredService<IHttpClientFactory>().CreateClient(
+                    ElevationProfileService.HttpClientName),
+                services.GetRequiredService<StoragePaths>(),
+                services.GetRequiredService<IConfiguration>()));
         builder.Services.AddHttpClient<SimBriefService>(client =>
         {
             client.DefaultRequestHeaders.UserAgent.ParseAdd("TaxiNow/1.5");
@@ -128,6 +146,7 @@ public static class TaxiNowHost
 
         var app = builder.Build();
         app.MapSimBrief();
+        app.MapElevationProfile();
         app.Use(async (context, next) =>
         {
             var settings = context.RequestServices

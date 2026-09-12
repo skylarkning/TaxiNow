@@ -22,6 +22,8 @@ internal static class OpenApiDocument
                 "Global VATSIM aircraft from the official public network feed"),
             ["/api/v1/integrations/gnss/interference"] = Get(
                 "FIRs affected by GNSS interference in EASA's latest seven-day analysis"),
+            ["/api/v1/elevation/profile"] = Post(
+                "Sample and cache terrain elevations along a route"),
             ["/api/v1/status"] = Get("Application and simulator status"),
             ["/api/v1/telemetry"] = Get("Latest telemetry snapshot"),
             ["/api/v1/telemetry/refresh"] =
