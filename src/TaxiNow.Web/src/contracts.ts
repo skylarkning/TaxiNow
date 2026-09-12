@@ -63,6 +63,8 @@ export interface TelemetrySnapshot {
   sourceMonotonicMilliseconds: number;
   hasPosition: boolean;
   isStale: boolean;
+  altitudeMslFeet?: number | null;
+  altitudeAglFeet?: number | null;
   state:
     | "disconnected"
     | "connecting"

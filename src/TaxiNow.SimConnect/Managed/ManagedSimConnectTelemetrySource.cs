@@ -158,6 +158,8 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
         public double TrueHeadingDegrees;
         public double OnGround;
         public double GroundSpeedKnots;
+        public double AltitudeMslFeet;
+        public double AltitudeAglFeet;
     }
 
     private void RunManagedOwner(
@@ -302,7 +304,9 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                         now,
                         clock.ElapsedMilliseconds,
                         HasPosition: true,
-                        State: TrackingState.Connected));
+                        State: TrackingState.Connected,
+                        AltitudeMslFeet: data.AltitudeMslFeet,
+                        AltitudeAglFeet: data.AltitudeAglFeet));
                 };
 
                 AddTelemetryDefinitions(connection);
@@ -474,6 +478,20 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
             SIMCONNECT_DATATYPE.FLOAT64,
             0,
             4);
+        connection.AddToDataDefinition(
+            DataDefinition.UserAircraft,
+            "PLANE ALTITUDE",
+            "feet",
+            SIMCONNECT_DATATYPE.FLOAT64,
+            0,
+            5);
+        connection.AddToDataDefinition(
+            DataDefinition.UserAircraft,
+            "PLANE ALT ABOVE GROUND",
+            "feet",
+            SIMCONNECT_DATATYPE.FLOAT64,
+            0,
+            6);
     }
 
     private static bool HasMeaningfulChange(
@@ -492,6 +510,12 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                Math.Abs(
                    current.GroundSpeedKnots -
                    previous.GroundSpeedKnots) >= 0.05 ||
+               Math.Abs(
+                   current.AltitudeMslFeet -
+                   previous.AltitudeMslFeet) >= 1 ||
+               Math.Abs(
+                   current.AltitudeAglFeet -
+                   previous.AltitudeAglFeet) >= 1 ||
                (current.OnGround != 0) != (previous.OnGround != 0);
     }
 #endif

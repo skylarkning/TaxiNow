@@ -132,6 +132,34 @@ public sealed class ServerContractTests
     }
 
     [Fact]
+    public void TelemetryContract_SerializesAltitude()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var sample = new TelemetrySnapshot(
+            1,
+            SimulatorEdition.Msfs2024,
+            true,
+            false,
+            43.0,
+            -79.0,
+            90,
+            250,
+            now,
+            now,
+            10,
+            AltitudeMslFeet: 12_345,
+            AltitudeAglFeet: 10_900);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+
+        var json = JsonSerializer.Serialize(sample, options);
+
+        Assert.Contains("\"altitudeMslFeet\":12345", json);
+        Assert.Contains("\"altitudeAglFeet\":10900", json);
+    }
+
+    [Fact]
     public void IcaoDownload_IsNormalized()
     {
         var request = DownloadRequestValidator.NormalizeAndValidate(
