@@ -71,8 +71,21 @@ export interface ProfileInspection {
   label: string;
 }
 
+function plannedAltitudeAt(model: VerticalProfileModel, distance: number): number | null {
+  const path = model.altitudePath;
+  if (!path.length) return null;
+  if (distance <= path[0]!.distanceNm) return path[0]!.altitudeFeet;
+  for (let index = 1; index < path.length; index++) {
+    const previous = path[index - 1]!, next = path[index]!;
+    if (distance > next.distanceNm) continue;
+    const span = next.distanceNm - previous.distanceNm;
+    const fraction = span > 0 ? (distance - previous.distanceNm) / span : 0;
+    return previous.altitudeFeet + fraction * (next.altitudeFeet - previous.altitudeFeet);
+  }
+  return path.at(-1)!.altitudeFeet;
+}
+
 export function profileInspection(model: VerticalProfileModel, requestedIndex: number): ProfileInspection | null {
-  // Terrain samples already contain the planned reference altitude calculated by the model.
   const samples = model.terrain.length ? model.terrain : model.altitudePath;
   if (!samples.length) return null;
   const index = clamp(finite(requestedIndex) ? Math.round(requestedIndex) : 0, 0, samples.length - 1);
@@ -81,7 +94,8 @@ export function profileInspection(model: VerticalProfileModel, requestedIndex: n
     !nearest || Math.abs(point.distanceNm - sample.distanceNm) < Math.abs(nearest.distanceNm - sample.distanceNm) ? point : nearest, undefined);
   const restriction = model.constraints.find(item => item.waypointIndex === waypoint?.waypointIndex);
   const terrain = 'elevationFeet' in sample ? `Terrain ${feet(sample.elevationFeet)}` : 'Terrain unavailable';
-  const planned = 'referenceAltitudeFeet' in sample ? sample.referenceAltitudeFeet : sample.altitudeFeet;
+  // Terrain reference altitude may be live MSL for clearance colouring; inspect the plotted path instead.
+  const planned = plannedAltitudeAt(model, sample.distanceNm);
   return {
     index, distanceNm: sample.distanceNm,
     label: `${sample.distanceNm.toFixed(1)} NM · Nearest waypoint ${identifier(waypoint?.ident ?? 'Unavailable')} · ${terrain} · Planned ${feet(planned)} · ${restrictionLabel(restriction)}`

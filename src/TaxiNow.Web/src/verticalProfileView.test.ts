@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { VerticalProfileModel } from './verticalProfile';
+import { buildVerticalProfileModel, type VerticalProfileModel } from './verticalProfile';
+import { distanceNm } from './flightPlan';
 import {
   profilePanelHeight,
   selectWaypointLabelIndexes,
@@ -242,6 +243,45 @@ describe('accessible profile summary', () => {
 });
 
 describe('profile inspection', () => {
+  it('interpolates the planned line while airborne terrain clearance uses live altitude', () => {
+    const routeDistance = distanceNm([0, 0], [1, 0]);
+    const profile = buildVerticalProfileModel({
+      flightPlan: {
+        origin: 'KAAA', destination: 'KBBB', originName: 'Alpha', destinationName: 'Bravo',
+        callsign: 'TEST1', aircraft: 'A320', altitude: '10000', route: 'DCT', distance: routeDistance,
+        importedAt: '2026-09-12T00:00:00Z',
+        points: [
+          { ident: 'KAAA', position: [0, 0], airway: '', plannedAltitudeFeet: 2000 },
+          { ident: 'KBBB', position: [1, 0], airway: '', plannedAltitudeFeet: 10000 }
+        ]
+      },
+      elevationProfile: {
+        samples: [0, 0.25, 0.5, 0.75, 1].map(fraction => ({
+          longitude: fraction, latitude: 0, distanceNm: routeDistance * fraction, elevationFeet: 1000
+        })),
+        cacheState: 'fresh', generatedAt: '2026-09-12T00:00:00Z',
+        source: 'Open-Meteo', attribution: 'Open-Meteo · Copernicus DEM'
+      },
+      telemetry: {
+        sequence: 1, simulator: 'replay', connected: true, onGround: false,
+        latitude: 0, longitude: 0.5, trueHeadingDegrees: 90, groundSpeedKnots: 200,
+        sourceTimestampUtc: '2026-09-12T00:00:00Z', serverTimestampUtc: '2026-09-12T00:00:00Z',
+        sourceMonotonicMilliseconds: 1, hasPosition: true, isStale: false,
+        altitudeMslFeet: 12500, altitudeAglFeet: 11500, state: 'airborne'
+      }
+    });
+    expect(profile.terrain[2]!.referenceAltitudeFeet).toBe(12500);
+    expect(profile.terrain[2]!.clearanceFeet).toBe(11500);
+    for (const [index, expected] of ['2,000', '4,000', '6,000', '8,000', '10,000'].entries()) {
+      expect(profileInspection(profile, index)?.label).toContain(`Planned ${expected} ft`);
+    }
+  });
+
+  it('does not substitute clearance altitude when the planned path is absent', () => {
+    const missing = model(); missing.altitudePath = [];
+    expect(profileInspection(missing, 0)?.label).toContain('Planned Unavailable');
+  });
+
   it('clamps keyboard indexes at both ends and exposes the plotted sample values', () => {
     const first = profileInspection(model(), -100);
     const last = profileInspection(model(), 1000);
