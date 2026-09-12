@@ -3,10 +3,14 @@ export interface PlanAirportPair {
   destination: string;
 }
 
-export function shouldShowPlanAirportShortcuts(
+export function flightDeckAuxiliaryControls(
   mapView: "globe" | "ground"
-): boolean {
-  return mapView === "ground";
+): { profile: boolean; airports: boolean; taxiPlanner: boolean } {
+  return {
+    profile: mapView === "globe",
+    airports: mapView === "ground",
+    taxiPlanner: mapView === "ground"
+  };
 }
 
 export interface AirportDownloadSummary {

@@ -6,13 +6,17 @@ import {
   airportStatusAfterActivation,
   airportsNeedingDownload,
   normalizePlanAirports,
-  shouldShowPlanAirportShortcuts
+  flightDeckAuxiliaryControls
 } from "./flightPlanGround";
 
-describe("shouldShowPlanAirportShortcuts", () => {
-  it("shows FROM and TO only in the Taxi ground view", () => {
-    expect(shouldShowPlanAirportShortcuts("globe")).toBe(false);
-    expect(shouldShowPlanAirportShortcuts("ground")).toBe(true);
+describe("flightDeckAuxiliaryControls", () => {
+  it("reserves MAP for PROFILE and TAXI for airport shortcuts and taxi planning", () => {
+    expect(flightDeckAuxiliaryControls("globe")).toEqual({
+      profile: true, airports: false, taxiPlanner: false
+    });
+    expect(flightDeckAuxiliaryControls("ground")).toEqual({
+      profile: false, airports: true, taxiPlanner: true
+    });
   });
 });
 
