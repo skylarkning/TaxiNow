@@ -95,6 +95,37 @@ public sealed class ElevationProfileServiceTests
     }
 
     [Fact]
+    public async Task GetAsync_ReturnsFreshTerrainWhenCachePersistenceFails()
+    {
+        using var fixture = new ServiceFixture();
+        var request = SimpleRequest();
+        var stale = await fixture.Service.GetAsync(request, CancellationToken.None);
+        fixture.Time.Advance(TimeSpan.FromDays(31));
+        var freshHandler = new RecordingHandler
+        {
+            ElevationValue = 20,
+            BeforeResponse = () =>
+            {
+                Directory.Delete(
+                    fixture.Paths.ElevationProfilesPath,
+                    recursive: true);
+                File.WriteAllText(
+                    fixture.Paths.ElevationProfilesPath,
+                    "blocks cache directory creation");
+            }
+        };
+        using var freshService = fixture.CreateService(freshHandler);
+
+        var result = await freshService.GetAsync(request, CancellationToken.None);
+
+        Assert.Equal("fresh", result.CacheState);
+        Assert.Equal(1, freshHandler.CallCount);
+        Assert.NotEqual(stale.GeneratedAt, result.GeneratedAt);
+        Assert.NotEqual(stale.Samples, result.Samples);
+        Assert.Equal(65.6167979002624, result.Samples[0].ElevationFeet, 10);
+    }
+
+    [Fact]
     public async Task GetAsync_RejectsMismatchedElevationCount()
     {
         using var fixture = new ServiceFixture(
@@ -230,6 +261,7 @@ public sealed class ElevationProfileServiceTests
         public Exception? Failure { get; init; }
         public int ElevationCountAdjustment { get; init; }
         public double? ElevationValue { get; init; }
+        public Action? BeforeResponse { get; init; }
         public int CallCount => Urls.Count;
 
         protected override Task<HttpResponseMessage> SendAsync(
@@ -242,6 +274,7 @@ public sealed class ElevationProfileServiceTests
                 throw Failure;
             }
 
+            BeforeResponse?.Invoke();
             var query = ParseQuery(request.RequestUri!.Query);
             var count = query["latitude"].Split(',').Length;
             BatchSizes.Add(count);

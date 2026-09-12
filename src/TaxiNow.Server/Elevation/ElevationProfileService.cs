@@ -113,6 +113,7 @@ public sealed class ElevationProfileService : IDisposable
             }
 
             var sampledRoute = SampleRoute(request.Route);
+            ElevationCacheEntry entry;
             try
             {
                 var elevations = await FetchElevationsAsync(sampledRoute, token)
@@ -124,16 +125,13 @@ public sealed class ElevationProfileService : IDisposable
                         point.CumulativeNauticalMiles,
                         ConvertMetresToFeet(elevations[index])))
                     .ToArray();
-                var entry = new ElevationCacheEntry(
+                entry = new ElevationCacheEntry(
                     CacheSchemaVersion,
                     ResolutionMetres,
                     now,
                     SourceName,
                     AttributionText,
                     samples);
-                await WriteCacheAsync(cachePath, entry, token)
-                    .ConfigureAwait(false);
-                return ToResponse(entry, "fresh");
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
@@ -150,6 +148,19 @@ public sealed class ElevationProfileService : IDisposable
                     "Terrain elevation is temporarily unavailable.",
                     error);
             }
+
+            try
+            {
+                await WriteCacheAsync(cachePath, entry, token)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception error) when (
+                error is IOException or UnauthorizedAccessException)
+            {
+                // A cache write is best-effort after fresh terrain was acquired.
+            }
+
+            return ToResponse(entry, "fresh");
         }
         finally
         {
