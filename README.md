@@ -72,7 +72,7 @@ their surrounding white canvas and create the required output sizes.
 - Taxiway pavement is layered below runway pavement while yellow centerlines
   remain continuous above it. Long taxiway references repeat at collision-aware
   intervals using the SkyCharts marker-density convention.
-- Live MSFS 2020 and MSFS 2024 ground-position tracking through SimConnect,
+- Live MSFS 2020/2024 tracking through SimConnect and X-Plane 12 tracking through its local UDP DataRef interface,
   with a
   heading-oriented ownship icon and smooth SignalR/WebView animation. The icon
   is hidden when the aircraft leaves the selected airport's map perimeter.

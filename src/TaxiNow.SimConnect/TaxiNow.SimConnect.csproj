@@ -1,20 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <MsfsSdkRoot Condition="'$(MsfsSdkRoot)' == '' and '$(MSFS_SDK_ROOT)' != ''">$(MSFS_SDK_ROOT)</MsfsSdkRoot>
-    <MsfsSdkRoot Condition="'$(MsfsSdkRoot)' == '' and Exists('C:\MSFS 2024 SDK\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">C:\MSFS 2024 SDK</MsfsSdkRoot>
-    <MsfsSdkRoot Condition="'$(MsfsSdkRoot)' == '' and Exists('C:\MSFS SDK\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">C:\MSFS SDK</MsfsSdkRoot>
-    <DefineConstants Condition="Exists('$(MsfsSdkRoot)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">$(DefineConstants);TAXINOW_MANAGED_SIMCONNECT</DefineConstants>
+    <DefineConstants>$(DefineConstants);TAXINOW_MANAGED_SIMCONNECT</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\TaxiNow.Core\TaxiNow.Core.csproj" />
-  </ItemGroup>
-  <ItemGroup Condition="Exists('$(MsfsSdkRoot)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll')">
+    <PackageReference Include="CTrue.FsConnect"
+                      Version="1.4.0"
+                      GeneratePathProperty="true" />
     <Reference Include="Microsoft.FlightSimulator.SimConnect">
-      <HintPath>$(MsfsSdkRoot)\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll</HintPath>
+      <HintPath>$(PkgCTrue_FsConnect)\lib\net461\Microsoft.FlightSimulator.SimConnect.dll</HintPath>
       <Private>true</Private>
     </Reference>
-    <Content Include="$(MsfsSdkRoot)\SimConnect SDK\lib\SimConnect.dll"
+    <Content Include="$(PkgCTrue_FsConnect)\build\simconnect.dll"
              Link="SimConnect.dll"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />

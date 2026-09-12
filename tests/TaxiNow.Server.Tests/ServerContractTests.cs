@@ -97,6 +97,14 @@ public sealed class ServerContractTests
     }
 
     [Fact]
+    public void SimConnectClient_IsIncludedWithoutADeveloperSdkInstallation()
+    {
+        Assert.True(
+            TaxiNow.SimConnect.Managed.ManagedSimConnectTelemetrySource
+                .IsRuntimeAvailable);
+    }
+
+    [Fact]
     public void TelemetryContract_SerializesMsfs2020Edition()
     {
         var now = DateTimeOffset.UtcNow;
