@@ -31,6 +31,77 @@ describe('SimBrief flight plans', () => {
   it('requires a navlog so unavailable route data cannot silently become direct', () => {
     expect(() => parseSimBrief({ ...plan(), navlog: null })).toThrow();
   });
+
+  it('normalizes planned altitudes, restrictions, and airport elevations independently', () => {
+    const value = {
+      ...plan(),
+      origin: { icao_code: 'CYYZ', pos_long: '-79.63', pos_lat: '43.67', elevation: '569' },
+      destination: { icao_code: 'CYQT', pos_long: '-89.32', pos_lat: '48.37', elevation: 653 },
+      navlog: { fix: [
+        { ident: 'CLB', pos_long: '-79', pos_lat: '43', altitude_feet: '12000', altitude_desc: '2', altitude1: '10000' },
+        { ident: 'CRZ', pos_long: '-78', pos_lat: '44', altitude_feet: 35000, altitude_desc: '4', altitude1: '33000', altitude2: '35000' }
+      ] }
+    };
+
+    const result = parseSimBrief(value);
+    expect(result.originElevationFeet).toBe(569);
+    expect(result.destinationElevationFeet).toBe(653);
+    expect(result.points[1]).toMatchObject({
+      plannedAltitudeFeet: 12000,
+      constraintKind: 'atOrAbove',
+      minimumAltitudeFeet: 10000
+    });
+    expect(result.points[1]!.maximumAltitudeFeet).toBeUndefined();
+    expect(result.points[2]).toMatchObject({
+      plannedAltitudeFeet: 35000,
+      constraintKind: 'between',
+      minimumAltitudeFeet: 33000,
+      maximumAltitudeFeet: 35000
+    });
+  });
+
+  it('supports every SimBrief constraint descriptor and omits invalid required bounds', () => {
+    const value = {
+      ...plan(),
+      navlog: { fix: [
+        { ident: 'AT', pos_long: '115', pos_lat: '30', altitude_desc: '1', altitude1: '12000' },
+        { ident: 'ABV', pos_long: '114', pos_lat: '29', altitude_desc: 'AT_OR_ABOVE', altitude1: '10000' },
+        { ident: 'BLW', pos_long: '113', pos_lat: '28', altitude_desc: 3, altitude1: '8000' },
+        { ident: 'BAD-BELOW', pos_long: '112', pos_lat: '27', altitude_feet: '-2001', altitude_desc: '3', altitude1: '-2001' },
+        { ident: 'BAD-HIGH', pos_long: '111', pos_lat: '26', altitude_feet: '100001', altitude_desc: '1', altitude1: '100001' },
+        { ident: 'BAD-NAN', pos_long: '110', pos_lat: '25', altitude_feet: 'NaN', altitude_desc: '4', altitude1: 'NaN', altitude2: '35000' }
+      ] }
+    };
+
+    const points = parseSimBrief(value).points;
+    expect(points[1]).toMatchObject({ constraintKind: 'at', minimumAltitudeFeet: 12000, maximumAltitudeFeet: 12000 });
+    expect(points[2]).toMatchObject({ constraintKind: 'atOrAbove', minimumAltitudeFeet: 10000 });
+    expect(points[3]).toMatchObject({ constraintKind: 'atOrBelow', maximumAltitudeFeet: 8000 });
+    expect(points[4]).not.toHaveProperty('constraintKind');
+    expect(points[4]).not.toHaveProperty('plannedAltitudeFeet');
+    expect(points[5]).not.toHaveProperty('constraintKind');
+    expect(points[5]).not.toHaveProperty('plannedAltitudeFeet');
+    expect(points[6]).not.toHaveProperty('constraintKind');
+    expect(points[6]).not.toHaveProperty('plannedAltitudeFeet');
+  });
+
+  it('keeps later vertical fields when adjacent duplicate coordinates collapse', () => {
+    const value = {
+      ...plan(),
+      navlog: { fix: [
+        { ident: 'FIRST', pos_long: '115', pos_lat: '30', altitude_feet: '11000', altitude_desc: '1', altitude1: '11000' },
+        { ident: 'SECOND', pos_long: '115.00001', pos_lat: '30', altitude_feet: '12000', altitude_desc: '2', altitude1: '10000' }
+      ] }
+    };
+
+    const points = parseSimBrief(value).points;
+    expect(points.map(point => point.ident)).toEqual(['ZBAA', 'FIRST', 'VHHH']);
+    expect(points[1]).toMatchObject({
+      plannedAltitudeFeet: 12000,
+      constraintKind: 'atOrAbove',
+      minimumAltitudeFeet: 10000
+    });
+  });
 });
 describe('route geometry', () => {
   it('measures one degree on the equator as about 60 NM', () => {
