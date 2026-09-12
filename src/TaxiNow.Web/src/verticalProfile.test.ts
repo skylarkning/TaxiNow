@@ -219,7 +219,9 @@ describe('live marker and advisory metrics', () => {
     ['disconnected', { connected: false }],
     ['missing position', { hasPosition: false }],
     ['stale', { isStale: true }],
-    ['invalid altitude', { altitudeMslFeet: Number.NaN }]
+    ['invalid altitude', { altitudeMslFeet: Number.NaN }],
+    ['invalid latitude', { latitude: 91 }],
+    ['invalid longitude', { longitude: 181 }]
   ])('omits the live aircraft marker for %s telemetry', (_name, override) => {
     const model = buildVerticalProfileModel({
       flightPlan,

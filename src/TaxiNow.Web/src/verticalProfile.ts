@@ -102,7 +102,8 @@ function normalizedLongitude(longitude: number): number {
 }
 
 function finitePosition(position: Position): boolean {
-  return Number.isFinite(position[0]) && Number.isFinite(position[1]);
+  return Number.isFinite(position[0]) && Number.isFinite(position[1]) &&
+    Math.abs(position[0]) <= 180 && Math.abs(position[1]) <= 90;
 }
 
 function cumulativeRoute(points: ReadonlyArray<Pick<FlightPoint, 'position'>>): number[] {
