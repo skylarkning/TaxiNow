@@ -62,6 +62,7 @@ body.flightdeck header #open-taxi-plan,body.flightdeck header #open-assets { bac
 .fd-section-label { padding:14px 18px 10px; font-size:11px; color:var(--fd-muted); }
 .fd-waypoint { width:100%; display:flex; align-items:center; gap:12px; border:0; border-bottom:1px solid var(--fd-line); background:var(--fd-field); color:var(--fd-text); min-height:45px; text-align:left; padding:8px 18px; border-radius:0; }
 .fd-waypoint:hover,.fd-waypoint.selected { background:#c8e4f2; color:#213948; }.fd-waypoint strong { font-size:13px; font-weight:600; }.fd-waypoint small { margin-left:auto; font-size:11px; color:var(--fd-muted); }
+.fd-waypoint .fd-waypoint-coordinates { white-space:nowrap; font-variant-numeric:tabular-nums; }
 .fd-number { width:21px; height:21px; border:1px solid #aab7bf; border-radius:50%; display:grid; place-items:center; font-size:10px; }
 .fd-plan-actions { padding:16px 18px; display:flex; flex-wrap:wrap; gap:10px; }.fd-plan-actions button { background:var(--fd-field); border:1px solid var(--fd-line); border-radius:4px; padding:8px 11px; color:#1783bd; font-size:12px; }.fd-plan-actions small { display:block; width:100%; color:var(--fd-muted); font-size:10px; }
 .fd-route-text { margin:16px 18px; font-family:monospace; font-size:13px; line-height:1.9; overflow-wrap:anywhere; }
@@ -187,6 +188,33 @@ html[data-theme] body.flightdeck .fd-map-point { display:flex; flex-direction:co
 .fd-vatsim-aircraft svg { position:absolute; left:7px; top:7px; width:20px; height:20px; fill:currentColor; stroke:#351b08; stroke-width:1px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.8)); transform:rotate(var(--fd-aircraft-heading,0deg)); }
 .fd-vatsim-label { display:none; position:absolute; top:28px; left:50%; padding:2px 4px; border:1px solid rgba(255,255,255,.7); border-radius:3px; background:rgba(24,31,39,.88); color:#fff; font-size:9px; font-weight:700; line-height:11px; white-space:nowrap; transform:translateX(-50%); }
 .fd-show-traffic-labels .fd-vatsim-label { display:block; }
+.fd-traffic-map-popup .maplibregl-popup-content { width:270px; overflow:hidden; border-color:rgba(88,173,216,.45); border-radius:12px; background:linear-gradient(160deg,rgba(18,34,47,.99),rgba(8,20,30,.99)); box-shadow:0 18px 42px rgba(0,0,0,.5); }
+.fd-traffic-map-popup .maplibregl-popup-close-button { z-index:1; width:30px; height:30px; border:0; border-radius:50%; color:#8fa8b6; background:transparent; font-size:20px; line-height:30px; }
+.fd-traffic-map-popup .maplibregl-popup-close-button:hover { color:#fff; background:rgba(255,255,255,.09); }
+.fd-traffic-popup { color:#edf6fa; }
+.fd-traffic-popup-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:15px 42px 12px 16px; border-bottom:1px solid rgba(135,180,201,.18); }
+.fd-traffic-popup-header div { display:grid; gap:2px; }
+.fd-traffic-popup-header strong { color:#fff; font-size:18px; line-height:22px; letter-spacing:.045em; }
+.fd-traffic-popup-header small { color:#91a9b6; font-size:11px; }
+.fd-traffic-popup-header > span { margin-top:2px; padding:3px 6px; border:1px solid rgba(255,159,67,.48); border-radius:4px; color:#ffb36b; font-size:8px; font-weight:800; letter-spacing:.08em; }
+.fd-traffic-popup-route { display:grid; gap:5px; padding:13px 16px 14px; background:rgba(26,111,153,.18); }
+.fd-traffic-popup-route small { color:#7ebddd; font-size:9px; font-weight:700; letter-spacing:.12em; }
+.fd-traffic-popup-route strong { color:#f4fbff; font-size:17px; line-height:21px; letter-spacing:.055em; }
+.fd-traffic-popup-route.unavailable strong { color:#9cafb9; font-size:12px; letter-spacing:0; }
+.fd-traffic-popup-metrics { display:grid; grid-template-columns:repeat(3,1fr); margin:0; padding:13px 16px 15px; gap:8px; }
+.fd-traffic-popup-metrics div { min-width:0; }
+.fd-traffic-popup-metrics dt { margin:0 0 4px; color:#819aa8; font-size:9px; font-weight:700; letter-spacing:.08em; }
+.fd-traffic-popup-metrics dd { margin:0; color:#e8f2f6; font-size:12px; font-weight:650; white-space:nowrap; font-variant-numeric:tabular-nums; }
+html[data-theme="light"] .fd-traffic-map-popup .maplibregl-popup-content { border-color:rgba(41,119,156,.28); background:linear-gradient(160deg,#fff,#eef5f8); box-shadow:0 18px 42px rgba(33,55,66,.22); }
+html[data-theme="light"] .fd-traffic-map-popup .maplibregl-popup-close-button { color:#607b89; }
+html[data-theme="light"] .fd-traffic-map-popup .maplibregl-popup-close-button:hover { color:#183747; background:rgba(27,87,116,.08); }
+html[data-theme="light"] .fd-traffic-popup { color:#223d4b; }
+html[data-theme="light"] .fd-traffic-popup-header { border-bottom-color:rgba(49,99,122,.14); }
+html[data-theme="light"] .fd-traffic-popup-header strong,html[data-theme="light"] .fd-traffic-popup-route strong { color:#163747; }
+html[data-theme="light"] .fd-traffic-popup-header small { color:#607b89; }
+html[data-theme="light"] .fd-traffic-popup-route { background:rgba(36,137,186,.1); }
+html[data-theme="light"] .fd-traffic-popup-metrics dt { color:#6c8490; }
+html[data-theme="light"] .fd-traffic-popup-metrics dd { color:#244554; }
 .fd-fir-label { max-width:150px; color:#263947; text-align:center; line-height:1.12; pointer-events:none; text-shadow:0 0 3px #fff,1px 0 #fff,-1px 0 #fff,0 1px #fff,0 -1px #fff; }
 .fd-fir-label strong,.fd-fir-label span { display:block; }
 .fd-fir-label strong { font-size:11px; font-weight:800; letter-spacing:.04em; }

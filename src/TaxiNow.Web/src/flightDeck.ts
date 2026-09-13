@@ -2,7 +2,8 @@ import { controllersForFir, onlineFirIds, type FirCallsign, type Controller } fr
 import * as ml from 'maplibre-gl';
 import type { FeatureCollection, LineString } from 'geojson';
 import { getLocale } from './localization';
-import { activeRouteLeg, parseSimBrief, routeCoordinates, routeSections, distanceNm, type FlightPlan } from './flightPlan';
+import { activeRouteLeg, parseSimBrief, routeCoordinates, routeSections, type FlightPlan } from './flightPlan';
+import { flightDeckTabs, formatWaypointCoordinates, type FlightDeckTab } from './flightDeckPresentation';
 import { fetchLatestSimBriefPlan, filterSimBriefNavigation } from './simBriefClient';
 import type { TelemetrySnapshot } from './contracts';
 import type { VatsimTrafficAircraft, VatsimTrafficResponse } from './contracts';
@@ -13,10 +14,14 @@ import { loadGnssInterference, type GnssInterferenceRegion } from './gnssInterfe
 import { TouchdownAirportSelector, airportStatusAfterActivation, clearFlightPlanState, handleFlightDeckEscape, normalizeIcao, flightDeckAuxiliaryControls, type FlightPlanAirportStatus, type PlanAirportPair } from './flightPlanGround';
 import { VerticalProfileController, createSessionProfileOpenPreference } from './verticalProfileController';
 import { createVerticalProfileView } from './verticalProfileView';
+import {
+  vatsimTrafficPopupHeaderElement,
+  vatsimTrafficPopupModel
+} from './vatsimTrafficPresentation';
 import './flightDeck.css';
 
 const words = {
-  flight: ['飞行计划', 'Flight'], route: ['航路信息', 'Route Info'], log: ['航路日志', 'NavLog'],
+  flight: ['飞行计划', 'Flight'], route: ['航路信息', 'Route Info'],
   ground: ['地面', 'Taxi'], globe: ['航图', 'Map'], maps: ['地图管理', 'Maps'],
   planner: ['滑行规划', 'Plan Taxi'], terrain: ['地形', 'Terrain'], profile: ['垂直', 'PROFILE'],
   import: ['导入', 'Import'], alias: ['用户名', 'Username'], pilot: ['Pilot ID', 'Pilot ID'],
@@ -50,7 +55,7 @@ try {
 let routeMap: ml.Map | undefined, plan: FlightPlan | undefined;
 let profileController: VerticalProfileController | undefined;
 let ownship: ml.Marker | undefined, lastPosition: TelemetrySnapshot | undefined;
-let markers: ml.Marker[] = [], currentTab: 'flight' | 'route' | 'log' = 'flight', globeMode = true;
+let markers: ml.Marker[] = [], currentTab: FlightDeckTab = 'flight', globeMode = true;
 const globeTrafficMarkers = new Map<string, ml.Marker>();
 let latestGlobeTraffic: VatsimTrafficAircraft[] = [];
 let globeTrafficUpdatedAt = '';
@@ -86,7 +91,7 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   const flightNumber = document.createElement('strong'); flightNumber.id = 'fd-flight-number';
   $('airport-picker-toggle').prepend(flightNumber);
   const nav = document.createElement('nav'); nav.className = 'fd-tabs'; nav.setAttribute('aria-label', 'Flight navigation');
-  for (const tab of ['flight', 'route', 'log'] as const) {
+  for (const tab of flightDeckTabs) {
     const b = button(tr(tab), () => { setMode(true); currentTab = tab; $('fd-panel').hidden = false; renderPanel(); });
     b.id = `fd-tab-${tab}`; nav.append(b);
   }
@@ -267,7 +272,7 @@ function renderPanel(): void {
   $('fd-flight-number').textContent = flightLabel;
   $('airport-picker-toggle').setAttribute('aria-label', flightLabel + (getLocale().startsWith('zh') ? '，选择机场' : ', select airport'));
   $('airport-picker-toggle').title = getLocale().startsWith('zh') ? '选择地面地图机场' : 'Select ground map airport';
-  for (const tab of ['flight', 'route', 'log']) $(`fd-tab-${tab}`).setAttribute('aria-pressed', String(tab === currentTab));
+  for (const tab of flightDeckTabs) $(`fd-tab-${tab}`).setAttribute('aria-pressed', String(tab === currentTab));
   $('fd-panel').dataset.tab = currentTab;
   $('fd-panel-title').textContent = tr(currentTab); $('fd-form').hidden = currentTab !== 'flight';
   renderAirportShortcuts();
@@ -288,7 +293,7 @@ function renderPanel(): void {
     const row = button('', () => { routeMap?.easeTo({ center: p.position, zoom: 5 }); list.querySelectorAll('.selected').forEach(e => e.classList.remove('selected')); row.classList.add('selected'); });
     row.className = 'fd-waypoint'; const number = document.createElement('span'); number.className = 'fd-number'; number.textContent = String(i + 1);
     const name = document.createElement('strong'); name.textContent = p.ident;
-    const meta = document.createElement('small'); meta.textContent = currentTab === 'log' ? `${i ? Math.round(distanceNm(plan!.points[i - 1]!.position, p.position)) : 0} NM` : p.airway || (i === 0 ? plan!.origin : i === plan!.points.length - 1 ? plan!.destination : 'DCT');
+    const meta = document.createElement('small'); meta.className = 'fd-waypoint-coordinates'; meta.textContent = formatWaypointCoordinates(p.position);
     row.title = `${p.position[1].toFixed(4)}, ${p.position[0].toFixed(4)}`; row.append(number, name, meta); list.append(row);
   }); content.append(list);
   const actions = document.createElement('div'); actions.className = 'fd-plan-actions';
@@ -501,7 +506,7 @@ function reconcileGlobeTraffic(aircraft: VatsimTrafficAircraft[]): void {
     if (!marker) {
       const element = document.createElement('button'); element.type = 'button'; element.className = 'fd-vatsim-aircraft';
       element.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c.8 0 1.4.6 1.4 1.4v5.1l7.1 4.2v1.7l-7.1-2.1v4.8l2.3 1.7v1.4L12 19l-3.7 1.2v-1.4l2.3-1.7v-4.8l-7.1 2.1v-1.7l7.1-4.2V3.4C10.6 2.6 11.2 2 12 2Z"/></svg><span class="fd-vatsim-label"></span>';
-      const popup = new ml.Popup({ offset: 15 });
+      const popup = new ml.Popup({ offset: 15, className: 'fd-traffic-map-popup', maxWidth: '290px' });
       marker = new ml.Marker({ element, anchor: 'center', rotationAlignment: 'viewport', pitchAlignment: 'viewport' })
         .setLngLat([item.longitude, item.latitude]).setPopup(popup).addTo(routeMap);
       globeTrafficMarkers.set(item.callsign, marker);
@@ -513,13 +518,28 @@ function reconcileGlobeTraffic(aircraft: VatsimTrafficAircraft[]): void {
     element.title = `${item.callsign} · ${item.aircraftType || '—'} · ${item.altitudeFeet.toLocaleString()} FT · ${item.groundSpeedKnots} KT`;
     element.querySelector<HTMLElement>('.fd-vatsim-label')!.textContent = item.callsign;
     element.style.setProperty('--fd-aircraft-heading', `${item.headingDegrees - routeMap.getBearing()}deg`);
-    marker.getPopup()?.setHTML(`<strong>${escapeHtml(item.callsign)}</strong><br>${escapeHtml(item.aircraftType || '—')} · ${item.altitudeFeet.toLocaleString()} FT · ${item.groundSpeedKnots} KT`);
+    marker.getPopup()?.setDOMContent(createTrafficPopupContent(item));
   }
   for (const [callsign, marker] of globeTrafficMarkers) if (!active.has(callsign)) { marker.remove(); globeTrafficMarkers.delete(callsign); }
   updateGlobeTrafficLabelVisibility();
 }
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
+function createTrafficPopupContent(item: VatsimTrafficAircraft): HTMLElement {
+  const zh = getLocale().startsWith('zh');
+  const model = vatsimTrafficPopupModel(item, zh);
+  const card = document.createElement('article'); card.className = 'fd-traffic-popup';
+  const header = document.createElement(vatsimTrafficPopupHeaderElement); header.className = 'fd-traffic-popup-header';
+  const identity = document.createElement('div'); const callsign = document.createElement('strong'); callsign.textContent = model.callsign;
+  const type = document.createElement('small'); type.textContent = model.aircraftType; identity.append(callsign, type);
+  const source = document.createElement('span'); source.textContent = 'VATSIM'; header.append(identity, source);
+  const route = document.createElement('section'); route.className = 'fd-traffic-popup-route'; route.classList.toggle('unavailable', model.routeUnavailable);
+  const routeLabel = document.createElement('small'); routeLabel.textContent = zh ? '航线' : 'ROUTE';
+  const routeValue = document.createElement('strong'); routeValue.textContent = model.route; route.append(routeLabel, routeValue);
+  const metrics = document.createElement('dl'); metrics.className = 'fd-traffic-popup-metrics';
+  for (const [label, value] of [[zh ? '高度' : 'ALT', model.altitude], [zh ? '地速' : 'GS', model.groundSpeed], [zh ? '航向' : 'HDG', model.heading]]) {
+    const group = document.createElement('div'); const term = document.createElement('dt'); term.textContent = label!;
+    const description = document.createElement('dd'); description.textContent = value!; group.append(term, description); metrics.append(group);
+  }
+  card.append(header, route, metrics); return card;
 }
 function updateGlobeTrafficHeadings(): void {
   if (!routeMap) return;

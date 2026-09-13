@@ -22,7 +22,11 @@ public sealed class VatsimTrafficServiceTests
               "altitude": 572,
               "groundspeed": 14,
               "heading": 367,
-              "flight_plan": { "aircraft_short": "A320" },
+              "flight_plan": {
+                "aircraft_short": "A320",
+                "departure": "cyyz",
+                "arrival": "cyvr"
+              },
               "last_updated": "2026-08-30T12:00:00Z"
             },
             {
@@ -62,6 +66,8 @@ public sealed class VatsimTrafficServiceTests
         Assert.Equal("ACA123", aircraft.Callsign);
         Assert.Equal(7, aircraft.HeadingDegrees);
         Assert.Equal("A320", aircraft.AircraftType);
+        Assert.Equal("CYYZ", aircraft.DepartureAirport);
+        Assert.Equal("CYVR", aircraft.ArrivalAirport);
         Assert.Equal(first.FeedUpdatedAtUtc, cached.FeedUpdatedAtUtc);
         Assert.Equal(first.RetrievedAtUtc, cached.RetrievedAtUtc);
         Assert.Equal(first.IsStale, cached.IsStale);

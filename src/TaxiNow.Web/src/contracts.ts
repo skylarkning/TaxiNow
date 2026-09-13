@@ -111,6 +111,8 @@ export interface VatsimTrafficAircraft {
   altitudeFeet: number;
   groundSpeedKnots: number;
   aircraftType: string | null;
+  departureAirport: string | null;
+  arrivalAirport: string | null;
   lastUpdatedUtc: string | null;
 }
 
