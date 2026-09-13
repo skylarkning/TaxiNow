@@ -18,9 +18,8 @@ const finite = (value: number | null | undefined): value is number => typeof val
 const identifier = (value: string) => value.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 24);
 const feet = (value: number | null | undefined) => finite(value) ? `${Math.round(value).toLocaleString('en-US')} ft` : 'Unavailable';
 
-export function profilePanelHeight(hostHeight: number, mobile: boolean): number {
-  const height = finite(hostHeight) ? Math.max(0, hostHeight) : 0;
-  return mobile ? height * 0.46 : clamp(height * 0.28, 220, 360);
+export function profilePanelHeight(hostHeight: number, _mobile: boolean): number {
+  return finite(hostHeight) ? Math.max(0, hostHeight) : 0;
 }
 
 export function selectWaypointLabelIndexes(count: number, maximum: number): number[] {
@@ -274,7 +273,7 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
   function resize() {
     if (destroyed) return;
     const mobile = window?.matchMedia?.('(max-width: 620px)').matches ?? false;
-    const panelHeight = profilePanelHeight(host.getBoundingClientRect().height, mobile);
+    const panelHeight = open ? profilePanelHeight(host.getBoundingClientRect().height, mobile) : 0;
     host.style.setProperty('--fd-profile-height', `${panelHeight}px`);
     if (!open || !context) return;
     const bounds = canvas.getBoundingClientRect();

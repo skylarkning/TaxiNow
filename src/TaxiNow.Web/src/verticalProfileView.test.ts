@@ -33,11 +33,11 @@ function model(): VerticalProfileModel {
 }
 
 describe('vertical profile layout without a browser', () => {
-  it('fits the desktop envelope and allocates a taller mobile plot', () => {
-    expect(profilePanelHeight(1200, false)).toBeCloseTo(0.28 * 1200);
-    expect(profilePanelHeight(600, true)).toBeGreaterThan(0.4 * 600);
-    expect(profilePanelHeight(300, false)).toBe(220);
-    expect(profilePanelHeight(2000, false)).toBe(360);
+  it('uses the complete available main region on desktop and mobile', () => {
+    expect(profilePanelHeight(1200, false)).toBe(1200);
+    expect(profilePanelHeight(600, true)).toBe(600);
+    expect(profilePanelHeight(300, false)).toBe(300);
+    expect(profilePanelHeight(2000, false)).toBe(2000);
   });
 
   it('keeps both route ends visible and selects a bounded unique label set', () => {
@@ -118,6 +118,21 @@ function browserFixture(mobile = false, paint = false) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('panel lifecycle', () => {
+  it.each([false, true])('fills the host while open and releases its entire height while closed (mobile=%s)', mobile => {
+    const { host } = browserFixture(mobile);
+    const view = createVerticalProfileView(host as unknown as HTMLElement);
+    view.setOpen(true);
+    expect(host.find('fd-vertical-profile')!.hidden).toBe(false);
+    expect(host.style.setProperty).toHaveBeenLastCalledWith('--fd-profile-height', '800px');
+    host.clientHeight = 620;
+    view.resize();
+    expect(host.style.setProperty).toHaveBeenLastCalledWith('--fd-profile-height', '620px');
+    view.setOpen(false);
+    expect(host.find('fd-vertical-profile')!.hidden).toBe(true);
+    expect(host.style.setProperty).toHaveBeenLastCalledWith('--fd-profile-height', '0px');
+    view.destroy();
+  });
+
   it('fully collapses through setOpen and Escape, and publishes state for the map', () => {
     const { host } = browserFixture();
     const view = createVerticalProfileView(host as unknown as HTMLElement);
