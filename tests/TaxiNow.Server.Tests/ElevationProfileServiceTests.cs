@@ -76,6 +76,48 @@ public sealed class ElevationProfileServiceTests
     }
 
     [Fact]
+    public async Task GetAsync_IgnoresLegacyV1CacheAndWritesFreshV2Cache()
+    {
+        using var fixture = new ServiceFixture();
+        var legacyPath = Path.Combine(
+            fixture.Paths.ElevationProfilesPath,
+            "12707ce3f41aebfb76397e9a7579da893d4835b97cdc1b5e071264b4eae51d9c.json");
+        await File.WriteAllTextAsync(
+            legacyPath,
+            """
+            {
+              "schemaVersion": "elevation-profile-v1",
+              "resolutionMetres": 90,
+              "generatedAt": "2026-09-12T12:00:00+00:00",
+              "source": "Open-Meteo / Copernicus DEM",
+              "attribution": "Elevation: Open-Meteo · Copernicus DEM",
+              "samples": [
+                { "longitude": -79, "latitude": 43, "cumulativeNauticalMiles": 0, "elevationFeet": 100 },
+                { "longitude": -78.98, "latitude": 43.02, "cumulativeNauticalMiles": 1.5, "elevationFeet": 110 }
+              ]
+            }
+            """,
+            TestContext.Current.CancellationToken);
+
+        var result = await fixture.Service.GetAsync(
+            SimpleRequest(),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, fixture.Handler.CallCount);
+        Assert.Equal("fresh", result.CacheState);
+        Assert.True(result.Samples[^1].CumulativeNauticalMiles > 0);
+        var cacheFiles = Directory.EnumerateFiles(
+            fixture.Paths.ElevationProfilesPath,
+            "*.json").ToArray();
+        Assert.Equal(2, cacheFiles.Length);
+        var v2Json = await File.ReadAllTextAsync(
+            Assert.Single(cacheFiles, path => path != legacyPath),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("\"schemaVersion\":\"elevation-profile-v2\"", v2Json);
+        Assert.Contains("\"distanceNm\":", v2Json);
+    }
+
+    [Fact]
     public async Task GetAsync_ReturnsStaleCacheWhenNetworkFails()
     {
         using var fixture = new ServiceFixture();

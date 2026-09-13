@@ -43,7 +43,7 @@ public sealed class ElevationProfileService : IDisposable
 
     private const string DefaultBaseUrl =
         "https://api.open-meteo.com/v1/elevation";
-    private const string CacheSchemaVersion = "elevation-profile-v1";
+    private const string CacheSchemaVersion = "elevation-profile-v2";
     private const string SourceName = "Open-Meteo / Copernicus DEM";
     private const string AttributionText =
         "Elevation: Open-Meteo · Copernicus DEM";
