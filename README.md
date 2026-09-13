@@ -277,6 +277,32 @@ dotnet run --project .\src\TaxiNow.App
 Set `TaxiNow__ReplayPath` to select another JSONL recording. Supplying a replay
 path without an explicit telemetry mode also selects replay for compatibility.
 
+## MAP vertical profile
+
+In **MAP**, select **PROFILE** below TAXI to open the route's vertical profile.
+Import or restore a SimBrief plan to see terrain, the planned altitude path,
+available waypoint restrictions, and departure/arrival elevations. Paths inferred
+from cruise altitude are labelled **Estimated**. The profile fills the MAP main
+region on desktop and mobile, hiding the map and its overlays while keeping the
+top bar and MAP/TAXI/PROFILE rail available. Closing it restores the map. It
+remembers its open state for the browser session; TAXI keeps the existing FROM,
+TO, and Plan Taxi controls. On screens up to 620 px wide it starts collapsed.
+
+Terrain is acquired online from Open-Meteo and cached locally for 30 days.
+If a refresh fails, an existing profile remains visible as **Cached / offline**;
+without a cache, the planned path remains available with a terrain-unavailable
+message and Retry. Attribution: **Elevation: Open-Meteo · Copernicus DEM**
+(90-metre DEM). The service endpoint and optional API key can be configured with
+`TaxiNow__Elevation__BaseUrl` and `TaxiNow__Elevation__ApiKey`; commercial use
+requires an appropriately licensed endpoint or a compatible self-hosted service.
+
+MSFS 2020/2024 supplies MSL and AGL altitude through SimConnect; X-Plane 12
+supplies the corresponding altitude data through UDP, converted from metres to
+feet. A disconnected, stale, or invalid simulator position hides the aircraft
+marker while retaining the route and terrain. Terrain colours and clearance
+values are **simulation advisories only**, not certified terrain avoidance or
+real-world navigation guidance.
+
 ## Repository layout
 
 The implementation follows the boundaries and milestones in

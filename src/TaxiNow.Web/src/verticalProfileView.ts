@@ -103,7 +103,7 @@ export function profileInspection(model: VerticalProfileModel, requestedIndex: n
 
 interface Palette {
   background: string; text: string; muted: string; grid: string;
-  terrain: string; route: string; amber: string; red: string; aircraft: string; font: string;
+  terrain: string; terrainStroke: string; route: string; amber: string; red: string; aircraft: string; font: string;
 }
 
 function drawProfile(context: CanvasRenderingContext2D, model: VerticalProfileModel, width: number, height: number, palette: Palette): void {
@@ -159,6 +159,12 @@ function drawProfile(context: CanvasRenderingContext2D, model: VerticalProfileMo
       context.lineTo(x(point.distanceNm), y(point.elevationFeet)); context.lineTo(x(point.distanceNm), bottom); context.closePath();
       context.fillStyle = point.clearanceBand === 'red' ? palette.red : palette.amber; context.fill();
     }
+    context.beginPath();
+    context.moveTo(x(model.terrain[0]!.distanceNm), y(model.terrain[0]!.elevationFeet));
+    for (const point of model.terrain.slice(1)) context.lineTo(x(point.distanceNm), y(point.elevationFeet));
+    context.strokeStyle = palette.terrainStroke;
+    context.lineWidth = 2;
+    context.stroke();
   }
   context.strokeStyle = palette.route; context.lineWidth = 1.5;
   for (let index = 1; index < model.altitudePath.length; index++) {
@@ -283,11 +289,12 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
     const style = window?.getComputedStyle(panel);
     const color = (name: string, fallback: string) => style?.getPropertyValue(name).trim() || fallback;
     const palette: Palette = {
-      background: color('--fd-field', '#222a33'), text: color('--fd-text', '#edf2f5'),
-      muted: color('--fd-muted', '#a9bac5'), grid: color('--fd-line', '#45515e'),
-      terrain: color('--fd-profile-terrain', '#647784'), route: color('--fd-profile-route', '#34a8e5'),
-      amber: color('--fd-profile-amber', '#bd862f'), red: color('--fd-profile-red', '#bd514b'),
-      aircraft: color('--fd-profile-aircraft', '#77d5a8'), font: style?.fontFamily || 'sans-serif'
+      background: color('--fd-profile-background', '#071826'), text: color('--fd-profile-text', '#e9f6ff'),
+      muted: color('--fd-profile-muted', '#9bb7c8'), grid: color('--fd-profile-grid', '#28495c'),
+      terrain: color('--fd-profile-terrain', '#335966'), terrainStroke: color('--fd-profile-terrain-stroke', '#6f9ca8'),
+      route: color('--fd-profile-route', '#42c7ff'), amber: color('--fd-profile-amber', '#ffc857'),
+      red: color('--fd-profile-red', '#ff6961'), aircraft: color('--fd-profile-aircraft', '#7ef0b8'),
+      font: style?.fontFamily || 'sans-serif'
     };
     const paletteKey = JSON.stringify(palette);
     if (!dirty && width === lastWidth && height === lastHeight && dpr === lastDpr && paletteKey === lastPalette) return;

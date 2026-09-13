@@ -14,7 +14,7 @@
 
 - PROFILE appears immediately below TAXI only while MAP is active.
 - FROM, TO, and Plan Taxi appear only while TAXI is active.
-- The expanded panel uses about 28 percent of MAP height and resizes rather than covers the map.
+- The expanded profile fills the complete MAP main region at desktop and mobile sizes, hides the map and its overlays, and preserves the top bar and left rail. Closing restores the map.
 - Terrain comes from a configurable Open-Meteo-compatible endpoint, is sampled at about 2 NM with no more than 600 points, and is requested upstream in batches of no more than 100 coordinates.
 - Terrain cache entries are fresh for 30 days; stale entries may be used only as an offline fallback.
 - MSFS uses `PLANE ALTITUDE` and `PLANE ALT ABOVE GROUND`; X-Plane uses `sim/flightmodel/position/elevation` and `sim/flightmodel/position/y_agl`.
@@ -418,7 +418,7 @@ git commit -m "feat: model vertical route profiles"
 Test DOM-independent helpers exported from the view module:
 
 ```ts
-expect(profilePanelHeight(1200, false)).toBeCloseTo(0.28 * 1200);
+expect(profilePanelHeight(1200, false)).toBe(1200);
 expect(profilePanelHeight(600, true)).toBeGreaterThan(0.4 * 600);
 expect(selectWaypointLabelIndexes(80, 8)).toHaveLength(8);
 ```
@@ -447,7 +447,7 @@ Pointer hover/focus exposes distance, waypoint, terrain, planned altitude, and r
 
 - [ ] **Step 5: Add responsive styling**
 
-Add CSS so desktop uses 28 percent height with a 220 px minimum and 360 px maximum. At `max-width: 620px`, default closed and use 46 percent height when opened. Set `#fd-root[data-profile-open="true"] #fd-map` and related map overlays above the panel bottom, with transitions disabled under `prefers-reduced-motion`.
+Add CSS so desktop and mobile use the entire available root height. At `max-width: 620px`, default closed. While open, hide every direct MAP-root child except the profile, including map canvas, controls, credits, and the flight-plan overlay. Preserve the top application bar and left rail; closing restores all map overlays without changing their preferences. Assert full host height while open and zero height with a hidden section while closed.
 
 - [ ] **Step 6: Run view and full frontend tests**
 
@@ -593,7 +593,7 @@ In the user's in-app browser, verify:
 3. TAXI hides PROFILE and shows FROM/TO/Plan Taxi.
 4. Returning to MAP restores the panel preference.
 5. Import/restore renders terrain and planned path; disconnected simulator hides only the aircraft marker.
-6. Desktop and 620 px layouts remain usable and map controls are not covered.
+6. Desktop and 620 px layouts fill the MAP main region; top bar and left rail remain usable. Map controls/credits/flight-plan overlays are hidden while PROFILE is open and restored when closed.
 7. Browser console contains no new errors.
 
 - [ ] **Step 6: Run Product Design visual QA**

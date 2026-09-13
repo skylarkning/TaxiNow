@@ -77,12 +77,20 @@ class TestElement extends EventTarget {
   getContext() { return this.context; }
 }
 
-function browserFixture(mobile = false, paint = false) {
+function browserFixture(mobile = false, paint = false, styleValues: Record<string, string> = {}) {
   const operations = new Map<string, ReturnType<typeof vi.fn>>();
-  const context = new Proxy({}, { get: (_, name: string) => {
-    if (!operations.has(name)) operations.set(name, vi.fn(name === 'measureText' ? (text: string) => ({ width: text.length * 6 }) : () => undefined));
-    return operations.get(name);
-  } });
+  const context = new Proxy({}, {
+    get: (_, name: string) => {
+      if (!operations.has(name)) operations.set(name, vi.fn(name === 'measureText' ? (text: string) => ({ width: text.length * 6 }) : () => undefined));
+      return operations.get(name);
+    },
+    set: (_, name: string, value: unknown) => {
+      const operation = `set:${name}`;
+      if (!operations.has(operation)) operations.set(operation, vi.fn());
+      (operations.get(operation)! as unknown as (next: unknown) => void)(value);
+      return true;
+    }
+  });
   const observers: Array<{ callback: () => void; disconnected: boolean }> = [];
   class Observer {
     disconnected = false;
@@ -93,7 +101,7 @@ function browserFixture(mobile = false, paint = false) {
   const window = Object.assign(new EventTarget(), {
     innerWidth: mobile ? 500 : 1200, devicePixelRatio: 2,
     matchMedia: () => ({ matches: mobile }),
-    getComputedStyle: () => ({ getPropertyValue: (): string => '', fontFamily: 'sans-serif' }),
+    getComputedStyle: () => ({ getPropertyValue: (name: string): string => styleValues[name] ?? '', fontFamily: 'sans-serif' }),
     CustomEvent,
     ResizeObserver: Observer,
     MutationObserver: Observer
@@ -225,6 +233,22 @@ describe('panel lifecycle', () => {
     window.dispatchEvent(new Event('resize'));
     observers.forEach(observer => observer.callback());
     expect(operations.get('clearRect')).toHaveBeenCalledTimes(paints + 2);
+  });
+
+  it('keeps the avionics plot dark in a light shell and outlines low terrain', () => {
+    const { host, operations } = browserFixture(false, true, {
+      '--fd-field': '#ffffff',
+      '--fd-text': '#111111',
+      '--fd-muted': '#777777',
+      '--fd-line': '#dddddd'
+    });
+    const view = createVerticalProfileView(host as unknown as HTMLElement);
+    view.render(model());
+
+    expect(operations.get('set:fillStyle')?.mock.calls[0]?.[0]).toBe('#071826');
+    expect(operations.get('set:strokeStyle')?.mock.calls.map(call => call[0])).toContain('#6f9ca8');
+    expect(operations.get('set:lineWidth')?.mock.calls.map(call => call[0])).toContain(2);
+    view.destroy();
   });
 });
 

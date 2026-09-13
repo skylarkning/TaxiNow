@@ -15,16 +15,18 @@ not certified terrain-avoidance or real-world navigation equipment.
   below TAXI. FROM, TO, and Plan Taxi remain hidden.
 - While TAXI is active, PROFILE is hidden and the existing FROM, TO, and Plan
   Taxi controls appear.
-- Clicking PROFILE toggles a bottom-docked profile panel. Its selected state is
+- Clicking PROFILE toggles a profile filling the MAP main region. Its selected state is
   visually highlighted in the existing blue rail style.
-- The panel occupies approximately 28 percent of the usable MAP height and
-  causes the map to resize rather than covering the route. When closed, it is
+- The panel occupies the complete usable MAP main region on desktop and mobile.
+  It hides the map canvas, map controls, credits, and map-overlaid flight-plan
+  panel. The top application bar and left MAP/TAXI/PROFILE rail stay available.
+  Closing it restores the map and its overlays. When closed, it is
   completely absent and PROFILE is the only remaining control for reopening it.
 - The open/closed preference is retained for the browser session. Switching to
   TAXI closes the visible panel without discarding the preference; returning to
   MAP restores it.
-- On narrow screens the panel starts collapsed and expands to a larger,
-  touch-friendly bottom sheet.
+- On narrow screens the panel starts collapsed and expands to fill the same
+  complete main region with a touch-friendly responsive header.
 
 ## Visual Content
 
@@ -33,7 +35,8 @@ existing dark-blue visual language:
 
 - horizontal axis: cumulative route distance with selected waypoint labels;
 - vertical axis: feet MSL with automatically chosen tick intervals;
-- filled terrain silhouette using green, amber, and red advisory bands;
+- filled blue-grey terrain silhouette with an accurate high-contrast ridge
+  outline, plus amber and red advisory bands;
 - planned vertical path for climb, cruise, step climbs, and descent;
 - waypoint restriction markers for at, at-or-above, at-or-below, and window
   constraints;
@@ -116,9 +119,13 @@ into rendering code.
 
 ## Advisory Colour Rules
 
-Colours are advisory and intentionally conservative:
+The profile uses a dedicated dark-navy avionics palette in both TaxiNow themes
+so the plot, header, footer, labels, grid, and cyan planned path remain visually
+cohesive with the supplied cockpit reference. Colours are advisory and
+intentionally conservative:
 
-- normal terrain: green/blue-grey according to the active theme;
+- normal terrain: blue-grey fill with a two-pixel lighter ridge outline drawn
+  at the true altitude scale so low terrain remains visible without exaggeration;
 - amber: terrain is within 2,000 feet of the displayed aircraft or planned path;
 - red: terrain is within 1,000 feet or above it.
 
