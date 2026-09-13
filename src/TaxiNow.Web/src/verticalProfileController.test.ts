@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ElevationProfileResponse, TelemetrySnapshot } from './contracts';
 import type { FlightPlan } from './flightPlan';
 import type { VerticalProfileModel } from './verticalProfile';
 import type { VerticalProfileView, VerticalProfileViewState } from './verticalProfileView';
 import { VerticalProfileController } from './verticalProfileController';
+import * as verticalProfileControllerModule from './verticalProfileController';
+import * as flightPlanGround from './flightPlanGround';
 
 function plan(longitude = 1): FlightPlan {
   return {
@@ -30,7 +32,7 @@ function telemetry(overrides: Partial<TelemetrySnapshot> = {}): TelemetrySnapsho
     ...overrides
   };
 }
-function harness(initialOpen = true) {
+function harness(initialOpen = true, preferenceStore?: unknown) {
   let model: VerticalProfileModel | null = null;
   let state: VerticalProfileViewState | undefined;
   let open = initialOpen;
@@ -44,8 +46,10 @@ function harness(initialOpen = true) {
   const controller = new VerticalProfileController(view, {
     initialOpen,
     fetch: (url, init) => new Promise<Response>(resolve => requests.push({ url: String(url), init: init!, resolve })),
-    onOpenChange: next => openings.push(next)
-  });
+    onOpenChange: next => openings.push(next),
+    ...(preferenceStore ? { preferenceStore } : {})
+  } as ConstructorParameters<typeof VerticalProfileController>[1]);
+  controller.setMapView('globe');
   return { controller, requests, openings, get model() { return model; }, get state() { return state; }, get open() { return open; } };
 }
 
@@ -105,6 +109,28 @@ describe('VerticalProfileController', () => {
     expect(h.state?.status).toBe('empty');
   });
 
+  it('clears through the shared flight-deck action before callers refresh their UI', async () => {
+    const h = harness();
+    const pending = h.controller.setPlan(plan());
+    const clearFlightPlanState = (flightPlanGround as unknown as {
+      clearFlightPlanState?: (
+        target: Pick<VerticalProfileController, 'setPlan'>
+      ) => undefined;
+    }).clearFlightPlanState;
+
+    expect(clearFlightPlanState).toBeTypeOf('function');
+    const cleared = clearFlightPlanState!(h.controller);
+    expect(cleared).toBeUndefined();
+    expect((h.requests[0]!.init.signal as AbortSignal).aborted).toBe(true);
+    expect(h.model).toBeNull();
+    expect(h.state?.status).toBe('empty');
+
+    h.requests[0]!.resolve(Response.json(terrain()));
+    await pending;
+    expect(h.model).toBeNull();
+    expect(h.state?.status).toBe('empty');
+  });
+
   it('retains plan-only data on failure and retries the same route', async () => {
     const h = harness();
     const pending = h.controller.setPlan(plan());
@@ -151,5 +177,31 @@ describe('VerticalProfileController', () => {
     h.controller.setMapView('ground'); h.controller.setMapView('globe');
     expect(h.open).toBe(false);
     h.controller.setOpen(true); expect(h.open).toBe(true);
+  });
+
+  it('restores and persists only explicit session choices while storage failures use memory', () => {
+    const createPreference = (verticalProfileControllerModule as unknown as {
+      createSessionProfileOpenPreference?: (storage?: Pick<Storage, 'getItem' | 'setItem'>) => unknown;
+    }).createSessionProfileOpenPreference;
+    expect(createPreference).toBeTypeOf('function');
+
+    const storage = { getItem: vi.fn(() => 'false'), setItem: vi.fn() };
+    const restored = harness(true, createPreference!(storage));
+    expect(restored.open).toBe(false);
+    restored.controller.setMapView('ground');
+    restored.controller.setMapView('globe');
+    expect(storage.setItem).not.toHaveBeenCalled();
+    restored.controller.setOpen(true);
+    expect(restored.open).toBe(true);
+    expect(storage.setItem).toHaveBeenCalledWith('taxinow.map.profileOpen', 'true');
+
+    const brokenStorage = {
+      getItem: vi.fn(() => { throw new Error('blocked'); }),
+      setItem: vi.fn(() => { throw new Error('blocked'); })
+    };
+    const fallback = harness(false, createPreference!(brokenStorage));
+    expect(fallback.open).toBe(false);
+    expect(() => fallback.controller.setOpen(true)).not.toThrow();
+    expect(fallback.open).toBe(true);
   });
 });

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import * as flightPlanGround from "./flightPlanGround";
 import {
   AirportDownloadStartGate,
   LatestAirportActivation,
@@ -17,6 +18,28 @@ describe("flightDeckAuxiliaryControls", () => {
     expect(flightDeckAuxiliaryControls("ground")).toEqual({
       profile: false, airports: true, taxiPlanner: true
     });
+  });
+});
+
+describe("flight-deck Escape handling", () => {
+  it("closes an open profile before the ordinary flight-plan panel", () => {
+    const handleEscape = (flightPlanGround as unknown as {
+      handleFlightDeckEscape?: (
+        profileOpen: boolean,
+        closeProfile: () => void,
+        closePanel: () => void
+      ) => void;
+    }).handleFlightDeckEscape;
+    expect(handleEscape).toBeTypeOf("function");
+    const closeProfile = vi.fn();
+    const closePanel = vi.fn();
+
+    handleEscape!(true, closeProfile, closePanel);
+    expect(closeProfile).toHaveBeenCalledOnce();
+    expect(closePanel).not.toHaveBeenCalled();
+
+    handleEscape!(false, closeProfile, closePanel);
+    expect(closePanel).toHaveBeenCalledOnce();
   });
 });
 

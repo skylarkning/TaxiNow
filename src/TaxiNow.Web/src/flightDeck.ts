@@ -10,8 +10,8 @@ import { hasRadarEcho, latestRadarFrame, parseWeatherMotion, radarTilePoint, typ
 import { parseFirLabels, type FirLabel } from './firLabels';
 import { isOnVisibleHemisphere } from './globeVisibility';
 import { loadGnssInterference, type GnssInterferenceRegion } from './gnssInterference';
-import { TouchdownAirportSelector, airportStatusAfterActivation, normalizeIcao, flightDeckAuxiliaryControls, type FlightPlanAirportStatus, type PlanAirportPair } from './flightPlanGround';
-import { VerticalProfileController } from './verticalProfileController';
+import { TouchdownAirportSelector, airportStatusAfterActivation, clearFlightPlanState, handleFlightDeckEscape, normalizeIcao, flightDeckAuxiliaryControls, type FlightPlanAirportStatus, type PlanAirportPair } from './flightPlanGround';
+import { VerticalProfileController, createSessionProfileOpenPreference } from './verticalProfileController';
 import { createVerticalProfileView } from './verticalProfileView';
 import './flightDeck.css';
 
@@ -139,8 +139,12 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   root.innerHTML = `<div id="fd-map"></div><aside id="fd-panel"><div class="fd-panel-head"><strong id="fd-panel-title"></strong><button id="fd-close" type="button" aria-label="${tr('close')}">×</button></div><div id="fd-form"><div class="fd-service">SimBrief <span>FLIGHT PLANNING</span></div><button id="fd-import" type="button" class="fd-primary">${tr('import')}</button><p id="fd-feedback" role="status"></p></div><div id="fd-content"></div></aside><div class="fd-map-top"><button id="fd-north" type="button">↑ &nbsp;${tr('north')}</button><button id="fd-projection" type="button">3D</button></div><div class="fd-map-tools"><button id="fd-fit" type="button" title="${tr('fit')}" aria-label="${tr('fit')}">⛶</button><button id="fd-locate" type="button" title="${tr('locate')}" aria-label="${tr('locate')}">⌖</button><button id="fd-grid" type="button" title="${tr('grid')}" aria-label="${tr('grid')}" aria-pressed="true">⊞</button><button id="fd-fir" type="button" title="FIR / ATC boundaries" aria-label="FIR / ATC boundaries" aria-pressed="true">FIR</button><button id="fd-gnss" type="button" title="GNSS interference" aria-label="GNSS interference" aria-pressed="${gnssInterferenceEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="14" cy="11" r="3"/><path d="M14 3v3m0 10v3M6 11h3m10 0h3M8.3 5.3l2.1 2.1m7.2 7.2 2.1 2.1m0-11.4-2.1 2.1m-7.2 7.2-2.1 2.1"/></svg><span>GNSS</span></button><button id="fd-traffic" type="button" title="VATSIM traffic" aria-label="VATSIM traffic" aria-pressed="${globeTrafficEnabled}"><span class="fd-tool-icon">✈</span><span>VATSIM</span></button><button id="fd-weather" type="button" title="Weather radar" aria-label="Weather radar" aria-pressed="${weatherRadarEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 14h14a4 4 0 0 0 0-8 7 7 0 0 0-13-1 4.5 4.5 0 0 0-1 9Z"/><path d="m10 17-2 3m7-3-2 3m7-3-2 3"/></svg><span>Radar</span></button><button id="fd-terrain" type="button" title="${tr('terrain')}" aria-label="${tr('terrain')}" aria-pressed="${terrainEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 19 11 3l6 10 3-5 6 11H2Z"/><path d="m8 8 3 3 3-3"/></svg><span>${tr('terrain')}</span></button><button id="fd-plus" type="button" aria-label="Zoom in">+</button><button id="fd-minus" type="button" aria-label="Zoom out">−</button></div><div class="fd-map-bottom"><span>${tr('local')} · <a href="https://github.com/vatsimnetwork/vatspy-data-project" target="_blank" rel="noopener">FIR/ATC: VAT-Spy · CC BY-SA 4.0</a></span><span id="fd-gnss-credit" hidden><span class="fd-gnss-legend"><i class="interference"></i>Interference <i class="spoofing"></i>Spoofing</span> · <a href="https://www.easa.europa.eu/en/domains/air-operations/global-navigation-satellite-system-outages-and-alterations" target="_blank" rel="noopener">EASA Data4Safety</a></span><span id="fd-radar-credit" hidden><a href="https://www.rainviewer.com/" target="_blank" rel="noopener">Radar: RainViewer</a> · <a href="https://open-meteo.com/" target="_blank" rel="noopener">Motion: Open-Meteo 700 hPa</a></span><span id="fd-terrain-credit"><a href="https://goto.arcgisonline.com/maps/World_Physical_Map" target="_blank" rel="noopener">Terrain: Esri · U.S. National Park Service</a></span><span id="fd-position">${tr('noPosition')}</span></div><p id="fd-map-error" role="alert" hidden></p></section>`;
   document.getElementById('app')!.append(root);
   const profileView = createVerticalProfileView(root);
+  let profilePreference;
+  try { profilePreference = createSessionProfileOpenPreference(sessionStorage); }
+  catch { profilePreference = createSessionProfileOpenPreference(); }
   profileController = new VerticalProfileController(profileView, {
     initialOpen: !matchMedia('(max-width: 620px)').matches,
+    preferenceStore: profilePreference,
     onOpenChange: open => {
       profileControl.setAttribute('aria-pressed', String(open));
       profileControl.setAttribute('aria-current', String(open));
@@ -212,7 +216,15 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   } catch { /* An invalid cached plan does not block startup. */ }
   void profileController.setPlan(plan);
   $('open-taxi-plan').addEventListener('click', () => setMode(false));
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('fd-root').hidden) $('fd-close').click(); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || $('fd-root').hidden) return;
+    e.preventDefault();
+    handleFlightDeckEscape(
+      $('fd-root').dataset.profileOpen === 'true',
+      () => profileController?.setOpen(false),
+      () => $('fd-close').click()
+    );
+  });
   new MutationObserver(() => applyGlobeTheme()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   setMode(true); renderPanel();
   window.setInterval(() => void refreshOnlineFirHighlights(), 15_000);
@@ -280,8 +292,16 @@ function renderPanel(): void {
     row.title = `${p.position[1].toFixed(4)}, ${p.position[0].toFixed(4)}`; row.append(number, name, meta); list.append(row);
   }); content.append(list);
   const actions = document.createElement('div'); actions.className = 'fd-plan-actions';
-  actions.append(button(tr('fit'), fitRoute), button(tr('clear'), () => { plan = undefined; void profileController?.setPlan(undefined); store({ identifier: $<HTMLInputElement>('fd-identifier').value, kind: 'username' }); $('fd-title').textContent = 'TaxiNow · ' + tr('view'); renderPanel(); drawRoute(); feedback(''); }));
+  actions.append(button(tr('fit'), fitRoute), button(tr('clear'), clearPlan));
   const stamp = document.createElement('small'); stamp.textContent = `${tr('imported')} ${new Date(plan.importedAt).toLocaleTimeString()}`; actions.append(stamp); content.append(actions);
+}
+function clearPlan(): void {
+  plan = clearFlightPlanState(profileController);
+  store({ identifier: $<HTMLInputElement>('fd-identifier').value, kind: 'username' });
+  $('fd-title').textContent = 'TaxiNow · ' + tr('view');
+  renderPanel();
+  drawRoute();
+  feedback('');
 }
 function gridData(): FeatureCollection<LineString> {
   const lines: number[][][] = [];
@@ -845,5 +865,5 @@ function renderFlightOverview(content: HTMLElement): void {
   content.append(details);
   const actions = document.createElement('div'); actions.className = 'fd-plan-actions';
   const stamp = document.createElement('small'); stamp.textContent = tr('imported') + ' ' + new Date(current.importedAt).toLocaleTimeString();
-  actions.append(stamp, button(tr('clear'), () => { plan = undefined; store({ identifier: $<HTMLInputElement>('fd-identifier').value, kind: 'username' }); $('fd-title').textContent = 'TaxiNow · ' + tr('view'); renderPanel(); drawRoute(); feedback(''); })); content.append(actions);
+  actions.append(stamp, button(tr('clear'), clearPlan)); content.append(actions);
 }

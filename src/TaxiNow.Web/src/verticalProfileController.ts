@@ -7,6 +7,31 @@ interface VerticalProfileControllerOptions {
   initialOpen: boolean;
   fetch?: typeof fetch;
   onOpenChange?: (open: boolean) => void;
+  preferenceStore?: ProfileOpenPreferenceStore;
+}
+
+export interface ProfileOpenPreferenceStore {
+  load(fallback: boolean): boolean;
+  save(open: boolean): void;
+}
+
+const profileOpenPreferenceKey = 'taxinow.map.profileOpen';
+
+export function createSessionProfileOpenPreference(
+  storage?: Pick<Storage, 'getItem' | 'setItem'>
+): ProfileOpenPreferenceStore {
+  return {
+    load(fallback) {
+      try {
+        const value = storage?.getItem(profileOpenPreferenceKey);
+        return value === 'true' ? true : value === 'false' ? false : fallback;
+      } catch { return fallback; }
+    },
+    save(open) {
+      try { storage?.setItem(profileOpenPreferenceKey, String(open)); }
+      catch { /* The controller retains the choice in memory. */ }
+    }
+  };
 }
 
 const unavailableTerrain: ElevationProfileResponse = {
@@ -27,7 +52,7 @@ export class VerticalProfileController {
   private readonly fetch: typeof fetch;
 
   constructor(private readonly view: VerticalProfileView, private readonly options: VerticalProfileControllerOptions) {
-    this.openPreference = options.initialOpen;
+    this.openPreference = options.preferenceStore?.load(options.initialOpen) ?? options.initialOpen;
     this.fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
@@ -73,6 +98,7 @@ export class VerticalProfileController {
     // not be interpreted as the user choosing to close the profile.
     if (this.applyingOpen) return;
     this.openPreference = open;
+    this.options.preferenceStore?.save(open);
     this.applyOpen();
   }
 

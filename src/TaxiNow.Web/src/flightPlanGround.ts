@@ -13,6 +13,26 @@ export function flightDeckAuxiliaryControls(
   };
 }
 
+export interface FlightPlanProfileTarget {
+  setPlan(plan: undefined): Promise<void> | void;
+}
+
+export function clearFlightPlanState(
+  target: FlightPlanProfileTarget | undefined
+): undefined {
+  void target?.setPlan(undefined);
+  return undefined;
+}
+
+export function handleFlightDeckEscape(
+  profileOpen: boolean,
+  closeProfile: () => void,
+  closePanel: () => void
+): void {
+  if (profileOpen) closeProfile();
+  else closePanel();
+}
+
 export interface AirportDownloadSummary {
   icao: string;
   state: string;

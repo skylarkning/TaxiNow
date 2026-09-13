@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.WebUtilities;
 using TaxiNow.Storage;
 
@@ -16,7 +17,7 @@ public sealed record ElevationProfileRequest(
 public sealed record ElevationSample(
     double Longitude,
     double Latitude,
-    double CumulativeNauticalMiles,
+    [property: JsonPropertyName("distanceNm")] double CumulativeNauticalMiles,
     double ElevationFeet);
 
 public sealed record ElevationProfileResponse(
