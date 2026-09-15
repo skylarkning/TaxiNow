@@ -123,6 +123,51 @@ export interface VatsimTrafficResponse {
   aircraft: VatsimTrafficAircraft[];
 }
 
+export interface BeyondAtcTrafficAircraft {
+  objectId: number;
+  callsign: string;
+  latitude: number;
+  longitude: number;
+  headingDegrees: number;
+  altitudeFeet: number;
+  groundSpeedKnots: number;
+  onGround: boolean;
+  aircraftType: string | null;
+  title: string | null;
+}
+
+export interface BeyondAtcTrafficResponse {
+  sequence: number;
+  connected: boolean;
+  retrievedAtUtc: string;
+  isStale: boolean;
+  count: number;
+  aircraft: BeyondAtcTrafficAircraft[];
+}
+
+export interface SayIntentionsTrafficAircraft {
+  id: string;
+  simConnectId: number | null;
+  callsign: string;
+  latitude: number;
+  longitude: number;
+  headingDegrees: number;
+  altitudeFeet: number;
+  groundSpeedKnots: number;
+  onGround: boolean;
+  aircraftType: string | null;
+  title: string | null;
+}
+
+export interface SayIntentionsTrafficResponse {
+  clientConnected: boolean;
+  activeFlight: boolean;
+  retrievedAtUtc: string;
+  isStale: boolean;
+  count: number;
+  aircraft: SayIntentionsTrafficAircraft[];
+}
+
 export interface StoredMapAsset {
   icao: string;
   name: string;

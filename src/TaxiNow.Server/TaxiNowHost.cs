@@ -3,8 +3,10 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Json;
 using TaxiNow.Core.Airports;
 using TaxiNow.Core.Telemetry;
+using TaxiNow.Core.Traffic;
 using TaxiNow.Server.Airports;
 using TaxiNow.Server.Downloads;
+using TaxiNow.Server.SayIntentions;
 using TaxiNow.Server.Telemetry;
 using TaxiNow.Server.Vatsim;
 using TaxiNow.SimConnect.Managed;
@@ -21,11 +23,15 @@ public static class TaxiNowHost
         "/api/v1/integrations/vmas/presence";
     public const string VatsimTrafficPath =
         "/api/v1/integrations/vatsim/traffic";
+    public const string BeyondAtcTrafficPath =
+        "/api/v1/integrations/beyondatc/traffic";
+    public const string SayIntentionsTrafficPath =
+        "/api/v1/integrations/sayintentions/traffic";
     private const string VmasPresenceCorsPolicy = "VmasPresence";
-    public const string ProductVersion = "1.5.1";
-    public const string DisplayVersion = "V1.5.1";
-    public const int InternalBuildId = 127;
-    public const string BuildDate = "September 5, 2026";
+    public const string ProductVersion = "1.6.0";
+    public const string DisplayVersion = "V1.6";
+    public const int InternalBuildId = 129;
+    public const string BuildDate = "September 14, 2026";
 
     public static string MapShellUrl =>
         $"http://127.0.0.1:{DefaultPort}/?build={InternalBuildId}";
@@ -89,9 +95,12 @@ public static class TaxiNowHost
         builder.Services.AddSingleton<AirportCatalogService>();
         builder.Services.AddSingleton<TelemetryState>();
         builder.Services.AddSingleton<TelemetryRefreshSignal>();
+        builder.Services.AddSingleton<SimulatorTrafficState>();
         builder.Services.AddSingleton<DownloadJobService>();
         builder.Services.AddSingleton(
             _ => VatsimTrafficService.CreateDefault(ProductVersion));
+        builder.Services.AddSingleton(
+            _ => SayIntentionsTrafficService.CreateDefault(ProductVersion));
         builder.Services.AddSingleton<ITelemetrySource>(services =>
         {
             var configuration = services.GetRequiredService<IConfiguration>();
@@ -100,7 +109,8 @@ public static class TaxiNowHost
             if (mode != "replay")
             {
                 return new ManagedSimConnectTelemetrySource(
-                    services.GetRequiredService<TelemetryRefreshSignal>());
+                    services.GetRequiredService<TelemetryRefreshSignal>(),
+                    services.GetRequiredService<SimulatorTrafficState>());
             }
 
             if (string.IsNullOrWhiteSpace(replayPath))
@@ -248,6 +258,128 @@ public static class TaxiNowHost
             {
                 return Results.Problem(
                     title: "VATSIM traffic is temporarily unavailable.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
+        app.MapGet(BeyondAtcTrafficPath, (
+            double? west,
+            double? south,
+            double? east,
+            double? north,
+            SimulatorTrafficState traffic) =>
+        {
+            if (!VatsimTrafficBounds.TryCreate(
+                    west,
+                    south,
+                    east,
+                    north,
+                    out var bounds))
+            {
+                return Results.BadRequest(new
+                {
+                    error = "Provide valid west, south, east, and north bounds no larger than 30 degrees."
+                });
+            }
+
+            traffic.RequestObservation();
+            var snapshot = traffic.Latest;
+            var aircraft = snapshot.Aircraft
+                .Where(item => bounds.Contains(
+                    item.Longitude,
+                    item.Latitude))
+                .ToArray();
+            return Results.Ok(new
+            {
+                snapshot.Sequence,
+                snapshot.Connected,
+                snapshot.RetrievedAtUtc,
+                isStale = !snapshot.Connected ||
+                    DateTimeOffset.UtcNow - snapshot.RetrievedAtUtc >
+                    TimeSpan.FromSeconds(5),
+                count = aircraft.Length,
+                aircraft
+            });
+        });
+
+        app.MapGet(SayIntentionsTrafficPath, async (
+            double? west,
+            double? south,
+            double? east,
+            double? north,
+            SayIntentionsTrafficService sayIntentions,
+            SimulatorTrafficState simulatorTraffic,
+            CancellationToken token) =>
+        {
+            if (!VatsimTrafficBounds.TryCreate(
+                    west,
+                    south,
+                    east,
+                    north,
+                    out var bounds))
+            {
+                return Results.BadRequest(new
+                {
+                    error = "Provide valid west, south, east, and north bounds no larger than 30 degrees."
+                });
+            }
+
+            simulatorTraffic.RequestObservation();
+            try
+            {
+                var feed = await sayIntentions
+                    .GetTrafficAsync(token)
+                    .ConfigureAwait(false);
+                var simulatorSnapshot = simulatorTraffic.Latest;
+                var simulatorAircraft = simulatorSnapshot.Connected &&
+                    DateTimeOffset.UtcNow - simulatorSnapshot.RetrievedAtUtc <=
+                    TimeSpan.FromSeconds(5)
+                    ? simulatorSnapshot.Aircraft.ToDictionary(
+                        item => item.ObjectId)
+                    : [];
+                var aircraft = feed.Aircraft
+                    .Select(item =>
+                    {
+                        if (item.SimConnectId is { } simConnectId &&
+                            simulatorAircraft.TryGetValue(
+                                simConnectId,
+                                out var local))
+                        {
+                            return item with
+                            {
+                                Latitude = local.Latitude,
+                                Longitude = local.Longitude,
+                                HeadingDegrees = local.HeadingDegrees,
+                                AltitudeFeet = local.AltitudeFeet,
+                                GroundSpeedKnots = local.GroundSpeedKnots,
+                                OnGround = local.OnGround
+                            };
+                        }
+                        return item;
+                    })
+                    .Where(item => bounds.Contains(
+                        item.Longitude,
+                        item.Latitude))
+                    .ToArray();
+                return Results.Ok(new
+                {
+                    feed.ClientConnected,
+                    feed.ActiveFlight,
+                    feed.RetrievedAtUtc,
+                    feed.IsStale,
+                    count = aircraft.Length,
+                    aircraft
+                });
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception error) when (
+                error is HttpRequestException or JsonException or TaskCanceledException)
+            {
+                return Results.Problem(
+                    title: "SayIntentions traffic is temporarily unavailable.",
                     statusCode: StatusCodes.Status502BadGateway);
             }
         });

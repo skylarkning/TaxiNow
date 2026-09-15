@@ -23,8 +23,8 @@ the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release)
 The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
 third-party notices.
 
-Current development build: **V1.5.1**, internal build **127**
-(build date: September 5, 2026). The About dialog
+Current development build: **V1.6**, internal build **129**
+(build date: September 14, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is a free-of-charge application for personal
 flight-simulator use only.
@@ -49,6 +49,22 @@ their surrounding white canvas and create the required output sizes.
 
 ## Current vertical slice
 
+- Build 129 adds a separate **Show SayIntentions Traffic** setting. TaxiNow
+  reads the current SayIntentions `flight_id` from its documented local
+  `flightJSON` endpoint, then retrieves that flight's injected traffic from the
+  official SayIntentions Tracker so labels use real callsigns instead of MSFS
+  `AI-<object-id>` placeholders. Positions are matched back to SimConnect object
+  IDs when possible for one-second movement. VATSIM, BeyondATC, and
+  SayIntentions are mutually exclusive: selecting one turns the other two off.
+  References: [SayIntentions API documentation](https://p2.sayintentions.ai/p2/docs/)
+  and [official Tracker](https://tracker.sayintentions.ai/).
+- V1.6 adds a separate, per-device **Show BeyondATC Traffic** setting. TaxiNow
+  reads nearby non-user aircraft directly from MSFS through SimConnect once per
+  second and draws them as smaller violet aircraft with callsign labels. This
+  follows BeyondATC's supported setup, where MSFS traffic and other injectors
+  are disabled; SimConnect does not identify which client created an aircraft,
+  so TaxiNow deliberately treats all simulator AI aircraft as BeyondATC traffic
+  while this setting is enabled.
 - V1.5.1 can optionally display nearby live VATSIM traffic. TaxiNow retrieves the
   official public network-data feed through its local PC service, refreshes a
   shared cache at the feed's 15-second cadence, and sends only anonymous

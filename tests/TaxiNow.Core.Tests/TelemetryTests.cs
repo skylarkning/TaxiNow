@@ -1,10 +1,51 @@
 using TaxiNow.Core.Telemetry;
+using TaxiNow.Core.Traffic;
 using Xunit;
 
 namespace TaxiNow.Core.Tests;
 
 public sealed class TelemetryTests
 {
+    [Fact]
+    public void SimulatorTrafficState_PublishesImmutableSnapshots()
+    {
+        var time = new MutableTimeProvider(
+            new DateTimeOffset(2026, 9, 5, 12, 0, 0, TimeSpan.Zero));
+        var state = new SimulatorTrafficState(time);
+        var aircraft = new List<SimulatorTrafficAircraft>
+        {
+            new(
+                17,
+                "BAW123",
+                43.68,
+                -79.62,
+                270,
+                560,
+                14,
+                true,
+                "A320",
+                "FSLTL A320")
+        };
+
+        state.Publish(connected: true, aircraft);
+        aircraft.Clear();
+
+        var snapshot = state.Latest;
+        Assert.True(snapshot.Connected);
+        Assert.Equal(1, snapshot.Count);
+        Assert.Equal("BAW123", Assert.Single(snapshot.Aircraft).Callsign);
+
+        state.RequestObservation();
+        Assert.True(state.IsObservationRequested);
+        time.Advance(TimeSpan.FromSeconds(6));
+        Assert.False(state.IsObservationRequested);
+
+        state.Publish(connected: false);
+
+        Assert.False(state.Latest.Connected);
+        Assert.Empty(state.Latest.Aircraft);
+        Assert.True(state.Latest.Sequence > snapshot.Sequence);
+    }
     [Fact]
     public void HeadingInterpolation_CrossesNorthByShortestArc()
     {
@@ -130,5 +171,14 @@ public sealed class TelemetryTests
             now,
             now,
             sequence * 100);
+    }
+
+    private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        private DateTimeOffset _now = now;
+
+        public override DateTimeOffset GetUtcNow() => _now;
+
+        public void Advance(TimeSpan duration) => _now += duration;
     }
 }
