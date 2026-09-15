@@ -71,6 +71,15 @@ public sealed class MapAssetStore(TaxiNowDatabase database, StoragePaths paths)
         return await reader.ReadToEndAsync(cancellationToken);
     }
 
+    public async Task<bool> ContainsAsync(
+        string icao,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection(database.ConnectionString);
+        await connection.OpenAsync(cancellationToken);
+        return await ReadRelativePathAsync(connection, icao, cancellationToken) is not null;
+    }
+
     public async Task<bool> DeleteAsync(
         string icao,
         CancellationToken cancellationToken = default)

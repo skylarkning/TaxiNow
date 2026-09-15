@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Threading.Channels;
 using TaxiNow.Core.Telemetry;
+using TaxiNow.Core.Traffic;
 
 #if TAXINOW_MANAGED_SIMCONNECT
 using Microsoft.FlightSimulator.SimConnect;
@@ -16,10 +17,14 @@ namespace TaxiNow.SimConnect.Managed;
 public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
 {
     private readonly TelemetryRefreshSignal refreshSignal;
+    private readonly SimulatorTrafficState trafficState;
 
-    public ManagedSimConnectTelemetrySource(TelemetryRefreshSignal refreshSignal)
+    public ManagedSimConnectTelemetrySource(
+        TelemetryRefreshSignal refreshSignal,
+        SimulatorTrafficState trafficState)
     {
         this.refreshSignal = refreshSignal;
+        this.trafficState = trafficState;
     }
 
 #if TAXINOW_MANAGED_SIMCONNECT
@@ -105,6 +110,7 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
         }
         finally
         {
+            trafficState.Publish(connected: false);
             writer.TryComplete();
         }
     }
@@ -136,13 +142,15 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
 #if TAXINOW_MANAGED_SIMCONNECT
     private enum DataDefinition
     {
-        UserAircraft = 1
+        UserAircraft = 1,
+        InjectedAircraft = 2
     }
 
     private enum DataRequest
     {
         UserAircraft = 1,
-        UserAircraftRefresh = 2
+        UserAircraftRefresh = 2,
+        InjectedAircraft = 3
     }
 
     private enum SystemEvent
@@ -158,6 +166,29 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
         public double TrueHeadingDegrees;
         public double OnGround;
         public double GroundSpeedKnots;
+    }
+
+    [StructLayout(
+        LayoutKind.Sequential,
+        CharSet = CharSet.Ansi,
+        Pack = 1)]
+    private struct InjectedAircraftData
+    {
+        public double Latitude;
+        public double Longitude;
+        public double TrueHeadingDegrees;
+        public double AltitudeFeet;
+        public double OnGround;
+        public double GroundSpeedKnots;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string AtcId;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string AtcModel;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public string Title;
     }
 
     private void RunManagedOwner(
@@ -225,6 +256,9 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                 var lastPublishedAt = -1L;
                 var lastDataReceivedAt = -1L;
                 var positionHealthy = false;
+                var trafficBatch = new Dictionary<
+                    uint,
+                    SimulatorTrafficAircraft>();
 
                 connection.OnRecvOpen += (_, _) =>
                     PublishStatus(
@@ -252,6 +286,8 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                         lastPublished = null;
                         lastDataReceivedAt = -1;
                         positionHealthy = false;
+                        trafficBatch.Clear();
+                        trafficState.Publish(connected: true);
                         PublishStatus(
                             "flight-not-started",
                             edition,
@@ -304,10 +340,47 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                         HasPosition: true,
                         State: TrackingState.Connected));
                 };
+                connection.OnRecvSimobjectDataBytype += (_, message) =>
+                {
+                    if (message.dwRequestID !=
+                            (uint)DataRequest.InjectedAircraft ||
+                        !simulationRunning)
+                    {
+                        return;
+                    }
+
+                    if (message.dwentrynumber == 0)
+                    {
+                        trafficBatch.Clear();
+                    }
+
+                    if (message.dwObjectID !=
+                            FlightSimConnect.SIMCONNECT_OBJECT_ID_USER &&
+                        message.dwData.Length > 0 &&
+                        message.dwData[0] is InjectedAircraftData data &&
+                        !MatchesUserAircraft(data, lastPublished) &&
+                        TryCreateTrafficAircraft(
+                            message.dwObjectID,
+                            data,
+                            out var aircraft))
+                    {
+                        trafficBatch[message.dwObjectID] = aircraft;
+                    }
+
+                    if (message.dwoutof == 0 ||
+                        message.dwentrynumber + 1 >= message.dwoutof)
+                    {
+                        trafficState.Publish(
+                            connected: true,
+                            trafficBatch.Values);
+                    }
+                };
 
                 AddTelemetryDefinitions(connection);
                 connection.RegisterDataDefineStruct<UserAircraftData>(
                     DataDefinition.UserAircraft);
+                connection.RegisterDataDefineStruct<InjectedAircraftData>(
+                    DataDefinition.InjectedAircraft);
                 connection.SubscribeToSystemEvent(
                     SystemEvent.Simulation,
                     "Sim");
@@ -329,6 +402,7 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     stop
                 };
                 var nextProcessCheckAt = clock.ElapsedMilliseconds + 1_000;
+                var nextTrafficRequestAt = clock.ElapsedMilliseconds;
                 while (!quitReceived)
                 {
                     var signaled = WaitHandle.WaitAny(
@@ -362,6 +436,17 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     }
 
                     var loopTime = clock.ElapsedMilliseconds;
+                    if (simulationRunning &&
+                        trafficState.IsObservationRequested &&
+                        loopTime >= nextTrafficRequestAt)
+                    {
+                        nextTrafficRequestAt = loopTime + 1_000;
+                        connection.RequestDataOnSimObjectType(
+                            DataRequest.InjectedAircraft,
+                            DataDefinition.InjectedAircraft,
+                            50_000,
+                            SIMCONNECT_SIMOBJECT_TYPE.AIRCRAFT);
+                    }
                     if (loopTime >= nextProcessCheckAt)
                     {
                         nextProcessCheckAt = loopTime + 1_000;
@@ -421,6 +506,7 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
                     TrackingState.Connecting);
             }
 
+            trafficState.Publish(connected: false);
             var nextEdition = SimulatorProcessDetector.GetRunningEdition();
             PublishStatus(
                 nextEdition != SimulatorEdition.Unknown
@@ -474,6 +560,131 @@ public sealed class ManagedSimConnectTelemetrySource : ITelemetrySource
             SIMCONNECT_DATATYPE.FLOAT64,
             0,
             4);
+
+        connection.AddToDataDefinition(
+            DataDefinition.InjectedAircraft,
+            "PLANE LATITUDE",
+            "degrees",
+            SIMCONNECT_DATATYPE.FLOAT64,
+            0,
+            0);
+        connection.AddToDataDefinition(
+            DataDefinition.InjectedAircraft,
+            "PLANE LONGITUDE",
+            "degrees",
+            SIMCONNECT_DATATYPE.FLOAT64,
+            0,
+            1);
+        connection.AddToDataDefinition(
+            DataDefinition.InjectedAircraft,
+            "PLANE HEADING DEGREES TRUE",
+            "degrees",
+            SIMCONNECT_DATATYPE.FLOAT64,
+            0,
+            2);
+        connection.AddToDataDefinition(
+            DataDefinition.InjectedAircraft,
+            "PLANE ALTITUDE",
+            "feet",
+            SIMCONNECT_DATATYPE.FLOAT64,
+            0,
+            3);
+        connection.AddToDataDefinition(
+            DataDefinition.InjectedAircraft,
+            "SIM ON GROUND",
+            "bool",
+            SIMCONNECT_DATATYPE.FLOAT64,
+            0,
+            4);
+        connection.AddToDataDefinition(
+            DataDefinition.InjectedAircraft,
+            "GROUND VELOCITY",
+            "knots",
+            SIMCONNECT_DATATYPE.FLOAT64,
+            0,
+            5);
+        connection.AddToDataDefinition(
+            DataDefinition.InjectedAircraft,
+            "ATC ID",
+            null,
+            SIMCONNECT_DATATYPE.STRING32,
+            0,
+            6);
+        connection.AddToDataDefinition(
+            DataDefinition.InjectedAircraft,
+            "ATC MODEL",
+            null,
+            SIMCONNECT_DATATYPE.STRING32,
+            0,
+            7);
+        connection.AddToDataDefinition(
+            DataDefinition.InjectedAircraft,
+            "TITLE",
+            null,
+            SIMCONNECT_DATATYPE.STRING256,
+            0,
+            8);
+    }
+
+    private static bool TryCreateTrafficAircraft(
+        uint objectId,
+        InjectedAircraftData data,
+        out SimulatorTrafficAircraft aircraft)
+    {
+        aircraft = default!;
+        if (!double.IsFinite(data.Latitude) ||
+            !double.IsFinite(data.Longitude) ||
+            !double.IsFinite(data.TrueHeadingDegrees) ||
+            !double.IsFinite(data.AltitudeFeet) ||
+            !double.IsFinite(data.GroundSpeedKnots) ||
+            data.Latitude is < -90 or > 90 ||
+            data.Longitude is < -180 or > 180)
+        {
+            return false;
+        }
+
+        var callsign = CleanTrafficText(data.AtcId) ?? $"AI-{objectId}";
+        aircraft = new SimulatorTrafficAircraft(
+            objectId,
+            callsign,
+            data.Latitude,
+            data.Longitude,
+            ((data.TrueHeadingDegrees % 360) + 360) % 360,
+            (int)Math.Round(data.AltitudeFeet),
+            Math.Max(0, (int)Math.Round(data.GroundSpeedKnots)),
+            data.OnGround != 0,
+            CleanTrafficText(data.AtcModel),
+            CleanTrafficText(data.Title));
+        return true;
+    }
+
+    private static string? CleanTrafficText(string? value)
+    {
+        var cleaned = value?.Trim().TrimEnd('\0').Trim();
+        return string.IsNullOrWhiteSpace(cleaned) ? null : cleaned;
+    }
+
+    private static bool MatchesUserAircraft(
+        InjectedAircraftData candidate,
+        UserAircraftData? userAircraft)
+    {
+        if (userAircraft is not { } user)
+        {
+            return false;
+        }
+
+        var headingDelta = Math.Abs(
+            ((candidate.TrueHeadingDegrees -
+              user.TrueHeadingDegrees + 540) % 360) - 180);
+        return TelemetryMath.DistanceMeters(
+                   candidate.Latitude,
+                   candidate.Longitude,
+                   user.Latitude,
+                   user.Longitude) <= 0.5 &&
+               headingDelta <= 0.5 &&
+               Math.Abs(
+                   candidate.GroundSpeedKnots -
+                   user.GroundSpeedKnots) <= 0.5;
     }
 
     private static bool HasMeaningfulChange(

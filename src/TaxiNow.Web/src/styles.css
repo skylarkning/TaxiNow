@@ -695,6 +695,96 @@ button:disabled {
   transform: translateX(-50%);
 }
 
+.beyondatc-traffic-marker {
+  z-index: 1;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.beyondatc-traffic-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  width: 21.6px;
+  height: 21.6px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+  transform: translate(-50%, -50%) rotate(var(--beyondatc-screen-heading, 0deg));
+  transform-origin: center;
+}
+
+.beyondatc-traffic-shape {
+  fill: #b58cff;
+  stroke: #21123d;
+  stroke-width: 2;
+  paint-order: stroke;
+}
+
+.beyondatc-traffic-label {
+  position: absolute;
+  top: 13px;
+  left: 50%;
+  padding: 1px 3px;
+  color: #f5f8fa;
+  background: rgba(7, 11, 14, 0.9);
+  border: 1px solid rgba(202, 179, 255, 0.72);
+  border-radius: 2px;
+  font-size: 8px;
+  font-weight: 850;
+  line-height: 1.1;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+  transform: translateX(-50%);
+}
+
+.sayintentions-traffic-marker {
+  z-index: 1;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.sayintentions-traffic-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  width: 21.6px;
+  height: 21.6px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+  transform: translate(-50%, -50%) rotate(var(--sayintentions-screen-heading, 0deg));
+  transform-origin: center;
+}
+
+.sayintentions-traffic-shape {
+  fill: #ff4fda;
+  stroke: #3d0734;
+  stroke-width: 2;
+  paint-order: stroke;
+}
+
+.sayintentions-traffic-label {
+  position: absolute;
+  top: 13px;
+  left: 50%;
+  padding: 1px 3px;
+  color: #f5f8fa;
+  background: rgba(7, 11, 14, 0.9);
+  border: 1px solid rgba(255, 143, 231, 0.76);
+  border-radius: 2px;
+  font-size: 8px;
+  font-weight: 850;
+  line-height: 1.1;
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
+  transform: translateX(-50%);
+}
+
 footer {
   position: absolute;
   inset: auto 0 0 0;
