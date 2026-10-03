@@ -17,6 +17,7 @@ import type {
 } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./styles.css";
+import { setupFlightDeck, updateFlightDeckPosition } from "./flightDeck";
 import type {
   AppStatus,
   AirportFeature,
@@ -320,7 +321,7 @@ function setupThemeSelector(): void {
       return null;
     }
   })();
-  const initial = saved === "light" ? "light" : "dark";
+  const initial = saved === "dark" ? "dark" : "light";
   applyTheme(initial);
 
   const selector = document.querySelector<HTMLButtonElement>("#theme-selector");
@@ -3958,6 +3959,7 @@ async function connectTelemetry(): Promise<void> {
 }
 
 function applyTelemetrySample(sample: TelemetrySnapshot): void {
+  updateFlightDeckPosition(sample);
   if (sample.hasPosition) {
     telemetrySamples.push(sample);
     while (telemetrySamples.length > 2) {
@@ -5711,6 +5713,7 @@ async function requestJson<T>(
 }
 
 initializeLocalization();
+setupFlightDeck();
 void start().catch((error: unknown) => {
   console.error(error);
   setStatus(t("error.mapLoad"), "error");

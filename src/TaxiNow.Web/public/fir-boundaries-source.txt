@@ -1,0 +1,5 @@
+VATSIM VAT-Spy Data Project
+https://github.com/vatsimnetwork/vatspy-data-project
+Retrieved 2026-09-09, master snapshot. CC BY-SA 4.0.
+Derived from Boundaries.geojson and VATSpy.dat; added display names; includes FIR and ATC sub-sectors.
+Features: 1121
