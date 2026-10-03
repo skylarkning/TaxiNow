@@ -37,10 +37,12 @@ public sealed class MapAssetStoreTests : IAsyncLifetime
 
         var asset = await _store.ImportAsync(fixture, cancellationToken);
         var json = await _store.ReadJsonAsync("cyyz", cancellationToken);
+        var contains = await _store.ContainsAsync("cyyz", cancellationToken);
         var summary = await _store.GetSummaryAsync(cancellationToken);
 
         Assert.Equal("CYYZ", asset.Icao);
         Assert.NotNull(json);
+        Assert.True(contains);
         using var document = JsonDocument.Parse(json);
         Assert.Equal(
             2,
@@ -62,6 +64,7 @@ public sealed class MapAssetStoreTests : IAsyncLifetime
         await _store.ImportAsync(fixture, cancellationToken);
 
         Assert.True(await _store.DeleteAsync("CYYZ", cancellationToken));
+        Assert.False(await _store.ContainsAsync("CYYZ", cancellationToken));
         Assert.Null(await _store.ReadJsonAsync("CYYZ", cancellationToken));
         Assert.False(File.Exists(Path.Combine(_paths.MapsPath, "CYYZ.json.gz")));
     }

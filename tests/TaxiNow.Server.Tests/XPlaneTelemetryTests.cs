@@ -65,6 +65,41 @@ public sealed class XPlaneTelemetryTests
         Assert.True(samples.Current.OnGround);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Reconnection_RequiresFreshCompletePosition(bool partialPacket)
+    {
+        using var simulator = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["TaxiNow:XPlane:Port"] = ((IPEndPoint)simulator.Client.LocalEndPoint!).Port.ToString()
+        }).Build();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var source = new XPlaneTelemetrySource(configuration);
+        await using var samples = source.ReadAllAsync(timeout.Token).GetAsyncEnumerator(timeout.Token);
+        var first = samples.MoveNextAsync().AsTask();
+        var request = await simulator.ReceiveAsync(timeout.Token);
+        await simulator.SendAsync(CreateResponse(43.68f, -79.62f, 237.5f, 10f, 1f), request.RemoteEndPoint, timeout.Token);
+        Assert.True(await first);
+        Assert.True(samples.Current.HasPosition);
+        Assert.True(await samples.MoveNextAsync());
+        Assert.False(samples.Current.HasPosition);
+
+        var partial = samples.MoveNextAsync().AsTask();
+        await simulator.SendAsync(partialPacket ? CreateResponse(44f) : new byte[] { 1, 2, 3 }, request.RemoteEndPoint, timeout.Token);
+        Assert.True(await partial);
+        Assert.False(samples.Current.HasPosition);
+
+        var recovered = samples.MoveNextAsync().AsTask();
+        await simulator.SendAsync(CreateResponse(44f, -80f, 180f, 5f, 0f), request.RemoteEndPoint, timeout.Token);
+        Assert.True(await recovered);
+        Assert.True(samples.Current.HasPosition);
+        Assert.Equal(44, samples.Current.Latitude);
+        Assert.Equal(-80, samples.Current.Longitude);
+        Assert.False(samples.Current.OnGround);
+    }
+
     private static byte[] CreateResponse(params float[] values)
     {
         var packet = new byte[5 + values.Length * 8];

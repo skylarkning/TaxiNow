@@ -27,6 +27,7 @@ public sealed class XPlaneTelemetrySource(IConfiguration configuration) : ITelem
         using var udp = new UdpClient(AddressFamily.InterNetwork);
         udp.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
         var values = new Dictionary<int, float>();
+        var updatedAt = new Dictionary<int, long>();
         var clock = Stopwatch.StartNew();
         long sequence = 0;
 
@@ -43,9 +44,25 @@ public sealed class XPlaneTelemetrySource(IConfiguration configuration) : ITelem
             while (clock.ElapsedMilliseconds < receivedUntil && !cancellationToken.IsCancellationRequested)
             {
                 var response = await ReceiveWithTimeoutAsync(udp, cancellationToken);
-                if (response is null) break;
-                foreach (var pair in XPlaneRrefCodec.ParseResponse(response.Value.Buffer)) values[pair.Key] = pair.Value;
-                if (!Enumerable.Range(0, Datarefs.Length).All(values.ContainsKey)) continue;
+                if (response is null)
+                {
+                    values.Clear();
+                    updatedAt.Clear();
+                    break;
+                }
+                if (!response.Value.RemoteEndPoint.Equals(endpoint)) continue;
+                var receivedAt = clock.ElapsedMilliseconds;
+                var packet = XPlaneRrefCodec.ParseResponse(response.Value.Buffer);
+                var updated = false;
+                foreach (var pair in packet)
+                {
+                    if (pair.Key < 0 || pair.Key >= Datarefs.Length) continue;
+                    values[pair.Key] = pair.Value;
+                    updatedAt[pair.Key] = receivedAt;
+                    updated = true;
+                }
+                if (!updated || !Enumerable.Range(0, Datarefs.Length).All(index =>
+                        updatedAt.TryGetValue(index, out var timestamp) && receivedAt - timestamp < 1_000)) continue;
                 gotPosition = true;
                 var now = DateTimeOffset.UtcNow;
                 yield return new TelemetrySnapshot(
@@ -57,6 +74,8 @@ public sealed class XPlaneTelemetrySource(IConfiguration configuration) : ITelem
 
             if (!gotPosition)
             {
+                values.Clear();
+                updatedAt.Clear();
                 var now = DateTimeOffset.UtcNow;
                 yield return new TelemetrySnapshot(
                     ++sequence, SimulatorEdition.XPlane12, false, false, 0, 0, 0, 0,

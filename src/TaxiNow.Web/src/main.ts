@@ -22,13 +22,23 @@ import type {
   AppStatus,
   AirportFeature,
   AirportMap,
+  BeyondAtcTrafficAircraft,
+  BeyondAtcTrafficResponse,
   DownloadJob,
+  NearestAirportResponse,
+  SayIntentionsTrafficAircraft,
+  SayIntentionsTrafficResponse,
   StorageSummary,
   StoredMapAsset,
   TelemetrySnapshot,
   VatsimTrafficAircraft,
   VatsimTrafficResponse
 } from "./contracts";
+import {
+  isTrafficSourceEnabled,
+  resolveTrafficSource,
+  type TrafficSource
+} from "./trafficSource";
 import {
   interpolateOwnship,
   isPointInsideBounds,
@@ -54,6 +64,7 @@ import {
   featureCounts,
   filterAirportFeatures
 } from "./airportGeometry";
+import { shouldIdentifyCurrentAirport } from "./airportAutoSelection";
 import {
   getLocale,
   initializeLocalization,
@@ -96,6 +107,11 @@ const autoUpdateStorageKey = "taxinow.updates.autoCheck";
 const updateCheckedAtStorageKey = "taxinow.updates.lastCheckedAt";
 const vatsimTrafficStorageKey = "taxinow.map.vatsimTraffic";
 const vatsimTrafficRefreshMilliseconds = 15_000;
+const beyondAtcTrafficStorageKey = "taxinow.map.beyondAtcTraffic";
+const beyondAtcTrafficRefreshMilliseconds = 1_000;
+const sayIntentionsTrafficStorageKey = "taxinow.map.sayIntentionsTraffic";
+const sayIntentionsTrafficRefreshMilliseconds = 1_000;
+const airportDetectionIntervalMilliseconds = 15_000;
 const aircraftPathData =
   "M0 -18 L4 -5 L16 2 L16 6 L4 4 L3 14 L8 18 L0 16 L-8 18 L-3 14 L-4 4 L-16 6 L-16 2 L-4 -5 Z";
 let lastOwnshipFrameAt = 0;
@@ -126,6 +142,10 @@ let mapInitialized = false;
 let assetRefreshInFlight = false;
 let activeDownloads = false;
 let currentAirportMap: AirportMap | null = null;
+let airportDetectionInFlight = false;
+let lastAirportDetectionAt = Number.NEGATIVE_INFINITY;
+let lastPromptedAirportIcao: string | null = null;
+let automaticAirportSelectionSuspended = false;
 let taxiGraph: TaxiGraph | null = null;
 let taxiRunways: TaxiDestination[] = [];
 let taxiGates: TaxiDestination[] = [];
@@ -144,10 +164,23 @@ let activeManualTaxiPopup: maplibregl.Popup | null = null;
 let taxiwaySelectionAnimationFrame: number | null = null;
 let lastTaxiwaySelectionPaintAt = 0;
 let updateRelease: UpdateRelease | null = null;
-let vatsimTrafficEnabled = readBooleanPreference(vatsimTrafficStorageKey);
+let selectedTrafficSource: TrafficSource | null = resolveTrafficSource({
+  vatsim: readBooleanPreference(vatsimTrafficStorageKey),
+  beyondAtc: readBooleanPreference(beyondAtcTrafficStorageKey),
+  sayIntentions: readBooleanPreference(sayIntentionsTrafficStorageKey)
+});
+let vatsimTrafficEnabled = selectedTrafficSource === "vatsim";
 let vatsimTrafficRefreshTimer: number | null = null;
 let vatsimTrafficRefreshInFlight = false;
 const vatsimTrafficMarkers = new Map<string, maplibregl.Marker>();
+let beyondAtcTrafficEnabled = selectedTrafficSource === "beyondatc";
+let beyondAtcTrafficRefreshTimer: number | null = null;
+let beyondAtcTrafficRefreshInFlight = false;
+const beyondAtcTrafficMarkers = new Map<number, maplibregl.Marker>();
+let sayIntentionsTrafficEnabled = selectedTrafficSource === "sayintentions";
+let sayIntentionsTrafficRefreshTimer: number | null = null;
+let sayIntentionsTrafficRefreshInFlight = false;
+const sayIntentionsTrafficMarkers = new Map<string, maplibregl.Marker>();
 const assetGroupOpenState = new Map<string, boolean>();
 const downloadProgressWatch = new Map<
   string,
@@ -244,7 +277,7 @@ function writeBooleanPreference(key: string, value: boolean): void {
 async function start(): Promise<void> {
   setupLanguageSelector();
   setupThemeSelector();
-  setupVatsimTrafficSettings();
+  setupTrafficSourceSettings();
   setupResponsiveHeader();
   setupDesktopWindowSettings();
   setupDesktopIntegrationSettings();
@@ -344,36 +377,70 @@ function applyTheme(theme: "dark" | "light"): void {
   }
 }
 
-function setupVatsimTrafficSettings(): void {
-  const toggle = document.querySelector<HTMLButtonElement>(
-    "#show-vatsim-traffic"
-  );
-  if (!toggle) {
-    return;
-  }
-
-  const sync = (): void => {
-    toggle.setAttribute("aria-checked", String(vatsimTrafficEnabled));
-  };
-  sync();
-  toggle.addEventListener("click", () => {
-    vatsimTrafficEnabled = !vatsimTrafficEnabled;
-    writeBooleanPreference(vatsimTrafficStorageKey, vatsimTrafficEnabled);
-    sync();
-    window.dispatchEvent(new CustomEvent("taxinow:vatsim-traffic-change", {
-      detail: { enabled: vatsimTrafficEnabled }
-    }));
-    if (vatsimTrafficEnabled) {
-      startVatsimTrafficPolling();
-      void refreshVatsimTraffic();
-    } else {
-      stopVatsimTrafficPolling();
-      clearVatsimTrafficMarkers();
+function setupTrafficSourceSettings(): void {
+  const entries: Array<[TrafficSource, string]> = [
+    ["vatsim", "#show-vatsim-traffic"],
+    ["beyondatc", "#show-beyondatc-traffic"],
+    ["sayintentions", "#show-sayintentions-traffic"]
+  ];
+  for (const [source, selector] of entries) {
+    const toggle = document.querySelector<HTMLButtonElement>(selector);
+    if (!toggle) {
+      continue;
     }
-  });
+    toggle.addEventListener("click", () => {
+      applyTrafficSource(selectedTrafficSource === source ? null : source);
+    });
+  }
+  applyTrafficSource(selectedTrafficSource);
+}
+
+function applyTrafficSource(source: TrafficSource | null): void {
+  selectedTrafficSource = source;
+  vatsimTrafficEnabled = source === "vatsim";
+  window.dispatchEvent(new CustomEvent("taxinow:vatsim-traffic-change", {
+    detail: { enabled: vatsimTrafficEnabled }
+  }));
+  beyondAtcTrafficEnabled = source === "beyondatc";
+  sayIntentionsTrafficEnabled = source === "sayintentions";
+  writeBooleanPreference(vatsimTrafficStorageKey, vatsimTrafficEnabled);
+  writeBooleanPreference(beyondAtcTrafficStorageKey, beyondAtcTrafficEnabled);
+  writeBooleanPreference(
+    sayIntentionsTrafficStorageKey,
+    sayIntentionsTrafficEnabled
+  );
 
   if (vatsimTrafficEnabled) {
     startVatsimTrafficPolling();
+    void refreshVatsimTraffic();
+  } else {
+    stopVatsimTrafficPolling();
+    clearVatsimTrafficMarkers();
+  }
+  if (beyondAtcTrafficEnabled) {
+    startBeyondAtcTrafficPolling();
+    void refreshBeyondAtcTraffic();
+  } else {
+    stopBeyondAtcTrafficPolling();
+    clearBeyondAtcTrafficMarkers();
+  }
+  if (sayIntentionsTrafficEnabled) {
+    startSayIntentionsTrafficPolling();
+    void refreshSayIntentionsTraffic();
+  } else {
+    stopSayIntentionsTrafficPolling();
+    clearSayIntentionsTrafficMarkers();
+  }
+
+  for (const [trafficSource, selector] of [
+    ["vatsim", "#show-vatsim-traffic"],
+    ["beyondatc", "#show-beyondatc-traffic"],
+    ["sayintentions", "#show-sayintentions-traffic"]
+  ] as Array<[TrafficSource, string]>) {
+    document.querySelector<HTMLButtonElement>(selector)?.setAttribute(
+      "aria-checked",
+      String(isTrafficSourceEnabled(selectedTrafficSource, trafficSource))
+    );
   }
 }
 
@@ -530,6 +597,328 @@ function clearVatsimTrafficMarkers(): void {
     marker.remove();
   }
   vatsimTrafficMarkers.clear();
+}
+
+function startBeyondAtcTrafficPolling(): void {
+  if (beyondAtcTrafficRefreshTimer !== null) {
+    return;
+  }
+  beyondAtcTrafficRefreshTimer = window.setInterval(
+    () => void refreshBeyondAtcTraffic(),
+    beyondAtcTrafficRefreshMilliseconds
+  );
+}
+
+function stopBeyondAtcTrafficPolling(): void {
+  if (beyondAtcTrafficRefreshTimer === null) {
+    return;
+  }
+  window.clearInterval(beyondAtcTrafficRefreshTimer);
+  beyondAtcTrafficRefreshTimer = null;
+}
+
+async function refreshBeyondAtcTraffic(): Promise<void> {
+  if (!beyondAtcTrafficEnabled || !mapInitialized || !currentAirportMap ||
+      beyondAtcTrafficRefreshInFlight) {
+    return;
+  }
+
+  beyondAtcTrafficRefreshInFlight = true;
+  const targetMap = map;
+  const targetAirport = selectedAirportIcao;
+  const bounds = currentAirportMap.airport.bounds;
+  const longitudePadding = Math.max(
+    (bounds.maxLon - bounds.minLon) * 0.15,
+    0.01
+  );
+  const latitudePadding = Math.max(
+    (bounds.maxLat - bounds.minLat) * 0.15,
+    0.01
+  );
+  const query = new URLSearchParams({
+    west: String(Math.max(-180, bounds.minLon - longitudePadding)),
+    south: String(Math.max(-90, bounds.minLat - latitudePadding)),
+    east: String(Math.min(180, bounds.maxLon + longitudePadding)),
+    north: String(Math.min(90, bounds.maxLat + latitudePadding))
+  });
+
+  try {
+    const response = await getJson<BeyondAtcTrafficResponse>(
+      `/api/v1/integrations/beyondatc/traffic?${query}`
+    );
+    if (!beyondAtcTrafficEnabled || map !== targetMap ||
+        selectedAirportIcao !== targetAirport) {
+      return;
+    }
+    if (!response.connected || response.isStale) {
+      clearBeyondAtcTrafficMarkers();
+      return;
+    }
+    reconcileBeyondAtcTrafficMarkers(response, targetMap);
+  } catch (error) {
+    console.warn("TaxiNow could not refresh BeyondATC traffic.", error);
+  } finally {
+    beyondAtcTrafficRefreshInFlight = false;
+  }
+}
+
+function reconcileBeyondAtcTrafficMarkers(
+  response: BeyondAtcTrafficResponse,
+  targetMap: MapLibreMap
+): void {
+  const activeObjectIds = new Set<number>();
+  for (const aircraft of response.aircraft) {
+    activeObjectIds.add(aircraft.objectId);
+    let marker = beyondAtcTrafficMarkers.get(aircraft.objectId);
+    if (!marker) {
+      marker = new maplibregl.Marker({
+        element: createBeyondAtcTrafficElement(aircraft, targetMap),
+        anchor: "center",
+        rotationAlignment: "viewport",
+        pitchAlignment: "viewport",
+        subpixelPositioning: true
+      })
+        .setLngLat([aircraft.longitude, aircraft.latitude])
+        .addTo(targetMap);
+      beyondAtcTrafficMarkers.set(aircraft.objectId, marker);
+    }
+    marker.setLngLat([aircraft.longitude, aircraft.latitude]);
+    updateBeyondAtcTrafficElement(marker.getElement(), aircraft, targetMap);
+  }
+
+  for (const [objectId, marker] of beyondAtcTrafficMarkers) {
+    if (!activeObjectIds.has(objectId)) {
+      marker.remove();
+      beyondAtcTrafficMarkers.delete(objectId);
+    }
+  }
+}
+
+function createBeyondAtcTrafficElement(
+  aircraft: BeyondAtcTrafficAircraft,
+  targetMap: MapLibreMap
+): HTMLElement {
+  const namespace = "http://www.w3.org/2000/svg";
+  const element = document.createElement("div");
+  element.className = "beyondatc-traffic-marker";
+  element.setAttribute("aria-hidden", "true");
+  const svg = document.createElementNS(namespace, "svg");
+  svg.setAttribute("class", "beyondatc-traffic-icon");
+  svg.setAttribute("viewBox", "-22 -22 44 44");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(namespace, "path");
+  path.setAttribute("d", aircraftPathData);
+  path.setAttribute("class", "beyondatc-traffic-shape");
+  svg.append(path);
+  const label = document.createElement("span");
+  label.className = "beyondatc-traffic-label";
+  element.append(svg, label);
+  updateBeyondAtcTrafficElement(element, aircraft, targetMap);
+  return element;
+}
+
+function updateBeyondAtcTrafficElement(
+  element: HTMLElement,
+  aircraft: BeyondAtcTrafficAircraft,
+  targetMap: MapLibreMap
+): void {
+  const type = aircraft.aircraftType ? ` · ${aircraft.aircraftType}` : "";
+  element.title = `${aircraft.callsign}${type} · ${aircraft.altitudeFeet} ft · ${aircraft.groundSpeedKnots} kt`;
+  element.dataset.headingDegrees = String(aircraft.headingDegrees);
+  element.querySelector<HTMLElement>(".beyondatc-traffic-label")!.textContent =
+    aircraft.callsign;
+  updateBeyondAtcTrafficMarkerHeading(element, targetMap.getBearing());
+}
+
+function updateBeyondAtcTrafficMarkerHeading(
+  element: HTMLElement,
+  mapBearingDegrees: number
+): void {
+  const headingDegrees = Number(element.dataset.headingDegrees ?? 0);
+  element.style.setProperty(
+    "--beyondatc-screen-heading",
+    `${headingDegrees - mapBearingDegrees}deg`
+  );
+}
+
+function syncBeyondAtcTrafficMarkerHeadings(targetMap: MapLibreMap): void {
+  if (!mapInitialized || map !== targetMap) {
+    return;
+  }
+  const bearing = targetMap.getBearing();
+  for (const marker of beyondAtcTrafficMarkers.values()) {
+    updateBeyondAtcTrafficMarkerHeading(marker.getElement(), bearing);
+  }
+}
+
+function clearBeyondAtcTrafficMarkers(): void {
+  for (const marker of beyondAtcTrafficMarkers.values()) {
+    marker.remove();
+  }
+  beyondAtcTrafficMarkers.clear();
+}
+
+function startSayIntentionsTrafficPolling(): void {
+  if (sayIntentionsTrafficRefreshTimer !== null) {
+    return;
+  }
+  sayIntentionsTrafficRefreshTimer = window.setInterval(
+    () => void refreshSayIntentionsTraffic(),
+    sayIntentionsTrafficRefreshMilliseconds
+  );
+}
+
+function stopSayIntentionsTrafficPolling(): void {
+  if (sayIntentionsTrafficRefreshTimer === null) {
+    return;
+  }
+  window.clearInterval(sayIntentionsTrafficRefreshTimer);
+  sayIntentionsTrafficRefreshTimer = null;
+}
+
+async function refreshSayIntentionsTraffic(): Promise<void> {
+  if (!sayIntentionsTrafficEnabled || !mapInitialized ||
+      !currentAirportMap || sayIntentionsTrafficRefreshInFlight) {
+    return;
+  }
+
+  sayIntentionsTrafficRefreshInFlight = true;
+  const targetMap = map;
+  const targetAirport = selectedAirportIcao;
+  const bounds = currentAirportMap.airport.bounds;
+  const longitudePadding = Math.max(
+    (bounds.maxLon - bounds.minLon) * 0.15,
+    0.01
+  );
+  const latitudePadding = Math.max(
+    (bounds.maxLat - bounds.minLat) * 0.15,
+    0.01
+  );
+  const query = new URLSearchParams({
+    west: String(Math.max(-180, bounds.minLon - longitudePadding)),
+    south: String(Math.max(-90, bounds.minLat - latitudePadding)),
+    east: String(Math.min(180, bounds.maxLon + longitudePadding)),
+    north: String(Math.min(90, bounds.maxLat + latitudePadding))
+  });
+
+  try {
+    const response = await getJson<SayIntentionsTrafficResponse>(
+      `/api/v1/integrations/sayintentions/traffic?${query}`
+    );
+    if (!sayIntentionsTrafficEnabled || map !== targetMap ||
+        selectedAirportIcao !== targetAirport) {
+      return;
+    }
+    if (!response.clientConnected || !response.activeFlight) {
+      clearSayIntentionsTrafficMarkers();
+      return;
+    }
+    reconcileSayIntentionsTrafficMarkers(response, targetMap);
+  } catch (error) {
+    clearSayIntentionsTrafficMarkers();
+    console.warn("TaxiNow could not refresh SayIntentions traffic.", error);
+  } finally {
+    sayIntentionsTrafficRefreshInFlight = false;
+  }
+}
+
+function reconcileSayIntentionsTrafficMarkers(
+  response: SayIntentionsTrafficResponse,
+  targetMap: MapLibreMap
+): void {
+  const activeIds = new Set<string>();
+  for (const aircraft of response.aircraft) {
+    activeIds.add(aircraft.id);
+    let marker = sayIntentionsTrafficMarkers.get(aircraft.id);
+    if (!marker) {
+      marker = new maplibregl.Marker({
+        element: createSayIntentionsTrafficElement(aircraft, targetMap),
+        anchor: "center",
+        rotationAlignment: "viewport",
+        pitchAlignment: "viewport",
+        subpixelPositioning: true
+      })
+        .setLngLat([aircraft.longitude, aircraft.latitude])
+        .addTo(targetMap);
+      sayIntentionsTrafficMarkers.set(aircraft.id, marker);
+    }
+    marker.setLngLat([aircraft.longitude, aircraft.latitude]);
+    updateSayIntentionsTrafficElement(marker.getElement(), aircraft, targetMap);
+  }
+
+  for (const [id, marker] of sayIntentionsTrafficMarkers) {
+    if (!activeIds.has(id)) {
+      marker.remove();
+      sayIntentionsTrafficMarkers.delete(id);
+    }
+  }
+}
+
+function createSayIntentionsTrafficElement(
+  aircraft: SayIntentionsTrafficAircraft,
+  targetMap: MapLibreMap
+): HTMLElement {
+  const namespace = "http://www.w3.org/2000/svg";
+  const element = document.createElement("div");
+  element.className = "sayintentions-traffic-marker";
+  element.setAttribute("aria-hidden", "true");
+  const svg = document.createElementNS(namespace, "svg");
+  svg.setAttribute("class", "sayintentions-traffic-icon");
+  svg.setAttribute("viewBox", "-22 -22 44 44");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS(namespace, "path");
+  path.setAttribute("d", aircraftPathData);
+  path.setAttribute("class", "sayintentions-traffic-shape");
+  svg.append(path);
+  const label = document.createElement("span");
+  label.className = "sayintentions-traffic-label";
+  element.append(svg, label);
+  updateSayIntentionsTrafficElement(element, aircraft, targetMap);
+  return element;
+}
+
+function updateSayIntentionsTrafficElement(
+  element: HTMLElement,
+  aircraft: SayIntentionsTrafficAircraft,
+  targetMap: MapLibreMap
+): void {
+  const type = aircraft.aircraftType ? ` · ${aircraft.aircraftType}` : "";
+  element.title = `${aircraft.callsign}${type} · ${aircraft.altitudeFeet} ft · ${aircraft.groundSpeedKnots} kt`;
+  element.dataset.headingDegrees = String(aircraft.headingDegrees);
+  element.querySelector<HTMLElement>(
+    ".sayintentions-traffic-label"
+  )!.textContent = aircraft.callsign;
+  updateSayIntentionsTrafficMarkerHeading(element, targetMap.getBearing());
+}
+
+function updateSayIntentionsTrafficMarkerHeading(
+  element: HTMLElement,
+  mapBearingDegrees: number
+): void {
+  const headingDegrees = Number(element.dataset.headingDegrees ?? 0);
+  element.style.setProperty(
+    "--sayintentions-screen-heading",
+    `${headingDegrees - mapBearingDegrees}deg`
+  );
+}
+
+function syncSayIntentionsTrafficMarkerHeadings(
+  targetMap: MapLibreMap
+): void {
+  if (!mapInitialized || map !== targetMap) {
+    return;
+  }
+  const bearing = targetMap.getBearing();
+  for (const marker of sayIntentionsTrafficMarkers.values()) {
+    updateSayIntentionsTrafficMarkerHeading(marker.getElement(), bearing);
+  }
+}
+
+function clearSayIntentionsTrafficMarkers(): void {
+  for (const marker of sayIntentionsTrafficMarkers.values()) {
+    marker.remove();
+  }
+  sayIntentionsTrafficMarkers.clear();
 }
 
 function setupUpdateExperience(appStatus: AppStatus): void {
@@ -1586,6 +1975,8 @@ async function loadAirport(icao: string): Promise<void> {
 
   if (mapInitialized) {
     clearVatsimTrafficMarkers();
+    clearBeyondAtcTrafficMarkers();
+    clearSayIntentionsTrafficMarkers();
     domOwnshipMarker?.remove();
     domOwnshipMarker = null;
     domOwnshipElement = null;
@@ -1604,9 +1995,19 @@ async function loadAirport(icao: string): Promise<void> {
   map = createMap(airport);
   mapInitialized = true;
   const activeMap = map;
-  activeMap.on("rotate", () => syncVatsimTrafficMarkerHeadings(activeMap));
+  activeMap.on("rotate", () => {
+    syncVatsimTrafficMarkerHeadings(activeMap);
+    syncBeyondAtcTrafficMarkerHeadings(activeMap);
+    syncSayIntentionsTrafficMarkerHeadings(activeMap);
+  });
   if (vatsimTrafficEnabled) {
     void refreshVatsimTraffic();
+  }
+  if (beyondAtcTrafficEnabled) {
+    void refreshBeyondAtcTraffic();
+  }
+  if (sayIntentionsTrafficEnabled) {
+    void refreshSayIntentionsTraffic();
   }
   renderAirportPicker(
     document.querySelector<HTMLInputElement>("#airport-search")!.value
@@ -1623,17 +2024,7 @@ function setupAirportPicker(): void {
   const quickDownload =
     document.querySelector<HTMLButtonElement>("#quick-download")!;
 
-  const setOpen = (open: boolean): void => {
-    panel.hidden = !open;
-    toggle.setAttribute("aria-expanded", String(open));
-    if (open) {
-      search.focus();
-      search.select();
-      renderAirportPicker(search.value);
-    }
-  };
-
-  toggle.addEventListener("click", () => setOpen(panel.hidden));
+  toggle.addEventListener("click", () => setAirportPickerOpen(panel.hidden));
   search.addEventListener("input", () => {
     search.value = search.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
     renderAirportPicker(search.value);
@@ -1649,14 +2040,30 @@ function setupAirportPicker(): void {
     if (!panel.hidden &&
         event.target instanceof Node &&
         !document.querySelector(".airport-switcher")!.contains(event.target)) {
-      setOpen(false);
+      setAirportPickerOpen(false);
     }
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !panel.hidden) {
-      setOpen(false);
+      setAirportPickerOpen(false);
     }
   });
+}
+
+function setAirportPickerOpen(open: boolean): void {
+  const toggle =
+    document.querySelector<HTMLButtonElement>("#airport-picker-toggle")!;
+  const panel =
+    document.querySelector<HTMLElement>("#airport-picker-panel")!;
+  const search =
+    document.querySelector<HTMLInputElement>("#airport-search")!;
+  panel.hidden = !open;
+  toggle.setAttribute("aria-expanded", String(open));
+  if (open) {
+    search.focus();
+    search.select();
+    renderAirportPicker(search.value);
+  }
 }
 
 function renderAirportPicker(query: string): void {
@@ -1700,6 +2107,7 @@ function renderAirportPicker(query: string): void {
         .join(" · ");
     button.append(code, name, location);
     button.addEventListener("click", async () => {
+      automaticAirportSelectionSuspended = true;
       feedback.textContent = t("airport.loading");
       feedback.className = "feedback";
       try {
@@ -2047,11 +2455,7 @@ async function refreshAssetManager(): Promise<void> {
     );
 
     if (pendingAirportIcao &&
-        installedAssets.some((asset) => asset.icao === pendingAirportIcao) &&
-        jobs.some((job) =>
-          job.currentIcao === pendingAirportIcao &&
-          job.state === "completed"
-        )) {
+        installedAssets.some((asset) => asset.icao === pendingAirportIcao)) {
       const downloadedIcao = pendingAirportIcao;
       pendingAirportIcao = null;
       await loadAirport(downloadedIcao);
@@ -3545,6 +3949,15 @@ function applyTelemetrySample(sample: TelemetrySnapshot): void {
         : t("status.synced"),
       "connected"
     );
+    if (!sample.onGround) {
+      automaticAirportSelectionSuspended = false;
+    } else if (shouldIdentifyCurrentAirport(
+      sample,
+      airportPerimeter,
+      automaticAirportSelectionSuspended
+    )) {
+      void synchronizeAirportWithPosition(sample);
+    }
   } else {
     telemetrySamples.length = 0;
     lastRenderedOwnship = null;
@@ -3554,6 +3967,68 @@ function applyTelemetrySample(sample: TelemetrySnapshot): void {
         : t("status.flightStopped"),
       sample.state === "disconnected" ? "error" : "waiting"
     );
+  }
+}
+
+async function synchronizeAirportWithPosition(
+  sample: TelemetrySnapshot
+): Promise<void> {
+  if (airportDetectionInFlight ||
+      performance.now() - lastAirportDetectionAt <
+        airportDetectionIntervalMilliseconds) {
+    return;
+  }
+
+  airportDetectionInFlight = true;
+  lastAirportDetectionAt = performance.now();
+  try {
+    const query = new URLSearchParams({
+      latitude: String(sample.latitude),
+      longitude: String(sample.longitude)
+    });
+    const result = await getJson<NearestAirportResponse>(
+      `/api/v1/airports/nearest?${query}`
+    );
+    const latest = telemetrySamples.at(-1);
+    if (!result.airport ||
+        !latest?.connected ||
+        !latest.onGround ||
+        automaticAirportSelectionSuspended) {
+      return;
+    }
+
+    const icao = result.airport.icao.toUpperCase();
+    if (icao === selectedAirportIcao) {
+      lastPromptedAirportIcao = null;
+      return;
+    }
+
+    if (result.installed) {
+      lastPromptedAirportIcao = null;
+      await loadAirport(icao);
+      setStatus(t("airport.autoSwitched", { icao }), "connected");
+      return;
+    }
+
+    if (lastPromptedAirportIcao === icao) {
+      return;
+    }
+    lastPromptedAirportIcao = icao;
+    const search =
+      document.querySelector<HTMLInputElement>("#airport-search")!;
+    search.value = icao;
+    setAirportPickerOpen(true);
+    const feedback =
+      document.querySelector<HTMLElement>("#airport-picker-feedback")!;
+    feedback.textContent = t("airport.currentNotDownloaded", {
+      icao,
+      name: result.airport.name
+    });
+    feedback.className = "feedback error";
+  } catch (error) {
+    console.warn("Unable to identify the current airport.", error);
+  } finally {
+    airportDetectionInFlight = false;
   }
 }
 

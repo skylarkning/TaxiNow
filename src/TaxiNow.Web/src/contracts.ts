@@ -88,6 +88,22 @@ export interface AppStatus {
   lanEnabled: boolean;
 }
 
+export interface AirportCatalogMatch {
+  icao: string;
+  name: string;
+  countryCode: string;
+  regionCode: string | null;
+  municipality: string | null;
+  latitude: number;
+  longitude: number;
+  distanceMeters: number;
+}
+
+export interface NearestAirportResponse {
+  airport: AirportCatalogMatch | null;
+  installed: boolean;
+}
+
 export interface VatsimTrafficAircraft {
   callsign: string;
   latitude: number;
@@ -105,6 +121,51 @@ export interface VatsimTrafficResponse {
   isStale: boolean;
   count: number;
   aircraft: VatsimTrafficAircraft[];
+}
+
+export interface BeyondAtcTrafficAircraft {
+  objectId: number;
+  callsign: string;
+  latitude: number;
+  longitude: number;
+  headingDegrees: number;
+  altitudeFeet: number;
+  groundSpeedKnots: number;
+  onGround: boolean;
+  aircraftType: string | null;
+  title: string | null;
+}
+
+export interface BeyondAtcTrafficResponse {
+  sequence: number;
+  connected: boolean;
+  retrievedAtUtc: string;
+  isStale: boolean;
+  count: number;
+  aircraft: BeyondAtcTrafficAircraft[];
+}
+
+export interface SayIntentionsTrafficAircraft {
+  id: string;
+  simConnectId: number | null;
+  callsign: string;
+  latitude: number;
+  longitude: number;
+  headingDegrees: number;
+  altitudeFeet: number;
+  groundSpeedKnots: number;
+  onGround: boolean;
+  aircraftType: string | null;
+  title: string | null;
+}
+
+export interface SayIntentionsTrafficResponse {
+  clientConnected: boolean;
+  activeFlight: boolean;
+  retrievedAtUtc: string;
+  isStale: boolean;
+  count: number;
+  aircraft: SayIntentionsTrafficAircraft[];
 }
 
 export interface StoredMapAsset {

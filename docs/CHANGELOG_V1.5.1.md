@@ -1,6 +1,16 @@
-# TaxiNow V1.5 (Build 126)
+# TaxiNow V1.5.1 (Build 127)
 
-Build date: August 30, 2026
+Build date: September 5, 2026
+
+## Fixed in Build 127
+
+- Aircraft tracking now automatically re-establishes its position after a
+  legitimate long-distance telemetry gap. This fixes the case where the icon
+  could remain missing at the destination until TaxiNow was restarted.
+- Once ground tracking is stable, TaxiNow identifies the aircraft's current
+  airport and switches to the installed map. If the map is not downloaded, the
+  airport picker opens with a download prompt and switches automatically after
+  installation.
 
 ## New
 
