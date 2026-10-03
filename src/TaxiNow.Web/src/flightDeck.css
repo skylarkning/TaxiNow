@@ -14,11 +14,11 @@ body.flightdeck header button { border-radius:4px; box-shadow:none; }
 body.flightdeck header #open-taxi-plan,body.flightdeck header #open-assets { background:#3d4551; color:#fff; border:0; }
 .fd-tabs { position:absolute; display:flex; align-items:center; gap:8px; bottom:9px; left:18px; right:22px; height:32px; }
 .fd-tabs button { min-width:90px; height:32px; border:0; background:#404751; color:#e8eef2; font-size:13px; padding:4px 15px; }
-.fd-tabs button[aria-pressed="true"],.fd-rail button[aria-current="true"] { background:#087fbd; color:white; }
+.fd-tabs button[aria-pressed="true"],.fd-rail > button[aria-current="true"] { background:#087fbd; color:white; }
 #fd-title { margin-left:auto; color:#cad4dd; font-size:13px; letter-spacing:.3px; }
 .fd-rail { position:absolute; top:104px; bottom:30px; left:0; width:74px; background:#20252d; z-index:9; padding:10px 6px; display:flex; flex-direction:column; gap:8px; border-right:1px solid #424954; }
-.fd-rail button { white-space:normal; min-height:54px; border:0; background:#3b424d; border-radius:4px; color:#e4eaf0; padding:8px 4px; font-size:12px; line-height:1.25; }
-.fd-rail button:last-child { margin-top:auto; }
+.fd-rail > button { white-space:normal; min-height:54px; border:0; background:#3b424d; border-radius:4px; color:#e4eaf0; padding:8px 4px; font-size:12px; line-height:1.25; }
+.fd-rail > button:last-child { margin-top:auto; }
 .fd-airport-shortcuts { display:grid; gap:6px; padding-top:2px; border-top:1px solid #59616d; }
 .fd-rail .fd-airport-shortcut { position:relative; display:grid; place-items:center; align-content:center; gap:1px; min-height:58px; padding:5px 2px; background:#34414c; }
 .fd-rail .fd-airport-shortcut:last-child { margin-top:0; }
@@ -94,11 +94,11 @@ body.flightdeck .taxi-plan-panel { top:116px; left:88px; bottom:44px; max-height
 body.flightdeck .asset-panel { top:116px; bottom:44px; max-height:calc(100% - 160px); border-radius:6px; box-shadow:none; }
 body.flightdeck button { cursor:pointer; }body.flightdeck button:focus-visible,body.flightdeck input:focus-visible,body.flightdeck select:focus-visible { outline:2px solid #269fdf; outline-offset:3px; }
 @media(max-width:1000px) { #fd-title { display:none; } body.flightdeck header #airport-name { display:none; } #fd-panel { width:310px; } body.flightdeck header .wordmark { width:90px; } }
-@media(max-width:620px) { body.flightdeck header { padding-left:10px; padding-right:10px; } body.flightdeck header #open-assets,body.flightdeck header .wordmark { display:none; } .fd-rail { width:55px; }.fd-rail button { font-size:10px; }.fd-airport-shortcut strong { font-size:11px; } #fd-root { left:55px; }body.flightdeck #map { left:55px; } .fd-tabs { left:8px; gap:5px; }.fd-tabs button { min-width:78px; padding:4px 8px; } #fd-panel { left:8px; right:8px; width:auto; top:68px; bottom:40px; max-height:70%; }.fd-map-top { right:8px; }.fd-map-tools { right:8px; }.fd-map-bottom span:first-child { display:none; } body.flightdeck .taxi-plan-panel { left:63px; width:calc(100% - 71px); } body.flightdeck footer #map-summary { display:none; } }
+@media(max-width:620px) { body.flightdeck header { padding-left:10px; padding-right:10px; } body.flightdeck header #open-assets,body.flightdeck header .wordmark { display:none; } .fd-rail { width:55px; }.fd-rail > button { font-size:10px; }.fd-airport-shortcut strong { font-size:11px; } #fd-root { left:55px; }body.flightdeck #map { left:55px; } .fd-tabs { left:8px; gap:5px; }.fd-tabs button { min-width:78px; padding:4px 8px; } #fd-panel { left:8px; right:8px; width:auto; top:68px; bottom:40px; max-height:70%; }.fd-map-top { right:8px; }.fd-map-tools { right:8px; }.fd-map-bottom span:first-child { display:none; } body.flightdeck .taxi-plan-panel { left:63px; width:calc(100% - 71px); } body.flightdeck footer #map-summary { display:none; } }
 @media(prefers-reduced-motion:reduce) { .flightdeck * { scroll-behavior:auto!important; transition:none!important; } }
 html[data-theme] body.flightdeck .fd-tabs button { background:#414854; color:#eef3f8; border:0; }
-html[data-theme] body.flightdeck .fd-tabs button[aria-pressed="true"],html[data-theme] body.flightdeck .fd-rail button[aria-current="true"] { background:#087fbd; color:#fff; }
-html[data-theme] body.flightdeck .fd-rail button { background:#3c4550; color:#eaf0f4; }
+html[data-theme] body.flightdeck .fd-tabs button[aria-pressed="true"],html[data-theme] body.flightdeck .fd-rail > button[aria-current="true"] { background:#087fbd; color:#fff; }
+html[data-theme] body.flightdeck .fd-rail > button { background:#3c4550; color:#eaf0f4; }
 html[data-theme] body.flightdeck #fd-import { background:transparent; color:#34a8e5; border-color:#238fc8; }
 html[data-theme] body.flightdeck #fd-import:hover { background:rgba(52,168,229,.12); }
 html[data-theme] body.flightdeck .fd-map-tools button { background:#3c4550; color:#eef3f8; }
@@ -271,3 +271,19 @@ html[data-theme] body.flightdeck #fd-profile-retry { pointer-events:auto; paddin
 @media(prefers-reduced-motion:reduce) {
   #fd-map,.fd-map-bottom,.fd-map-tools,#fd-panel { transition:none; }
 }
+
+/* Explicit palette for light surfaces; dark chrome stays separate from content. */
+html[data-theme="light"] body.flightdeck { --fd-panel:#f5f7fa; --fd-field:#fff; --fd-text:#24343e; --fd-muted:#536774; --fd-line:#cbd5df; }
+body.flightdeck .fd-account-settings { border-color:var(--fd-line); color:var(--fd-text); }
+body.flightdeck .fd-account-settings input { background:var(--fd-field); color:var(--fd-text); border-color:var(--fd-line); }
+body.flightdeck .fd-account-settings small { color:var(--fd-muted); }
+html[data-theme="light"] body.flightdeck .fd-map-tools { background:#fff; border-color:#bac7d2; }
+html[data-theme="light"] body.flightdeck .fd-map-tools button { background:#fff; color:#24343e; border-color:#cbd5df; }
+html[data-theme="light"] body.flightdeck .fd-map-tools button[aria-pressed="true"] { background:#087fbd; color:#fff; }
+html[data-theme="light"] body.flightdeck #fd-vertical-profile { --fd-profile-background:#f5f7fa; --fd-profile-surface:#fff; --fd-profile-text:#24343e; --fd-profile-muted:#536774; --fd-profile-grid:#cbd5df; --fd-profile-terrain:#c7d8df; --fd-profile-terrain-stroke:#587785; --fd-profile-route:#0876b0; --fd-profile-amber:#a86b00; --fd-profile-red:#c93838; --fd-profile-aircraft:#08784c; }
+html[data-theme="light"] body.flightdeck #fd-profile-close,html[data-theme="light"] body.flightdeck #fd-profile-retry { background:#fff; color:#24343e; }
+body.flightdeck .fd-fir-popup { color:var(--fd-text); }
+body.flightdeck .fd-fir-popup small { color:var(--fd-muted); }
+
+html[data-theme] body.flightdeck .fd-rail #airport-picker-toggle { background:#3c4550; color:#eef3f8; }
+html[data-theme] body.flightdeck .fd-rail #airport-picker-toggle:hover,html[data-theme] body.flightdeck .fd-rail #airport-picker-toggle[aria-expanded="true"] { background:#4b5867; border-color:#69b5dd; }

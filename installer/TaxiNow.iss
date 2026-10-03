@@ -11,15 +11,15 @@
   #error InstallerOutputDir must be supplied by the packaging script.
 #endif
 #ifndef SetupBaseFilename
-  #define SetupBaseFilename "TaxiNow-V2.0-Build-201-Setup"
+  #define SetupBaseFilename "TaxiNow-V2.0-Build-202-Setup"
 #endif
 #ifndef DefaultDataRoot
   #define DefaultDataRoot "{localappdata}\TaxiNow"
 #endif
 
 #define ProductName "TaxiNow"
-#define ProductDisplayName "TaxiNow V2.0 (Build 201)"
-#define ProductVersion "2.0.0.201"
+#define ProductDisplayName "TaxiNow V2.0 (Build 202)"
+#define ProductVersion "2.0.0.202"
 #define ProductPublisher "Sky Ning"
 #define ProductExeName "TaxiNow.App.exe"
 #define WebView2ClientId "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
@@ -51,10 +51,10 @@ SolidCompression=yes
 WizardStyle=modern
 LicenseFile={#RepoRoot}\EULA.txt
 InfoAfterFile={#RepoRoot}\NOTICE
-VersionInfoVersion=2.0.0.201
-VersionInfoProductVersion=2.0.0.201
+VersionInfoVersion=2.0.0.202
+VersionInfoProductVersion=2.0.0.202
 VersionInfoCompany={#ProductPublisher}
-VersionInfoDescription=TaxiNow V2.0 Build 201 Installer
+VersionInfoDescription=TaxiNow V2.0 Build 202 Installer
 VersionInfoProductName={#ProductName}
 CloseApplications=yes
 CloseApplicationsFilter={#ProductExeName}

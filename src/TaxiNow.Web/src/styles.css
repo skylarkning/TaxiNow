@@ -2369,3 +2369,7 @@ html[data-theme="light"] .fallback-label-taxilane {
   fill: #8a6500;
   stroke: #ffffff;
 }
+
+/* The app supplies both palettes; do not let automatic browser darkening recolour light surfaces. */
+html[data-theme="light"] { color-scheme:only light; }
+html[data-theme="dark"] { color-scheme:dark; }

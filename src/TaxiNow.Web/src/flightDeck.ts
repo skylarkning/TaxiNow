@@ -1,7 +1,7 @@
 import { controllersForFir, onlineFirIds, type FirCallsign, type Controller } from './firControllers';
 import * as ml from 'maplibre-gl';
 import type { FeatureCollection, LineString } from 'geojson';
-import { getLocale } from './localization';
+import { getLocale, t } from './localization';
 import { activeRouteLeg, parseSimBrief, routeCoordinates, routeSections, type FlightPlan } from './flightPlan';
 import { flightDeckTabs, formatWaypointCoordinates, type FlightDeckTab } from './flightDeckPresentation';
 import { fetchLatestSimBriefPlan, filterSimBriefNavigation } from './simBriefClient';
@@ -21,25 +21,7 @@ import {
 import './flightDeck.css';
 import { followAircraft } from './aircraftFollow';
 
-const words = {
-  flight: ['飞行计划', 'Flight'], route: ['航路信息', 'Route Info'],
-  ground: ['地面', 'Taxi'], globe: ['航图', 'Map'], maps: ['地图管理', 'Maps'],
-  planner: ['滑行规划', 'Plan Taxi'], terrain: ['地形', 'Terrain'], profile: ['垂直', 'PROFILE'],
-  import: ['导入', 'Import'], alias: ['用户名', 'Username'], pilot: ['Pilot ID', 'Pilot ID'],
-  help: ['先在 SimBrief 生成计划，再在这里导入。', 'Generate a plan in SimBrief, then import it here.'],
-  empty: ['准备下一段飞行', 'Your next flight starts here'], emptyText: ['从 SimBrief 导入航路，在地球上查看完整旅程。', 'Import from SimBrief to explore your route on the globe.'],
-  fit: ['完整航路', 'Fit route'], clear: ['清除计划', 'Clear plan'], north: ['正北向上', 'North Up'],
-  locate: ['定位飞机', 'Locate aircraft'], follow: ['持续跟随飞机', 'Follow aircraft'], grid: ['经纬网', 'Grid'], points: ['航路点', 'Waypoints'],
-  loading: ['正在导入…', 'Importing…'], failed: ['导入失败。请检查账号、网络，并确认已生成含详细 Navlog 的计划。', 'Import failed. Check your account, connection and a generated plan with a detailed Navlog.'],
-  ready: ['导入成功', 'Plan imported'], distance: ['航路距离', 'Route distance'], altitude: ['计划高度', 'Planned altitude'],
-  noPosition: ['暂无有效飞机位置', 'No valid aircraft position'], view: ['全球航路', 'Global route'],
-  imported: ['导入时间', 'Imported'], close: ['收起面板', 'Close panel'], saved: ['已恢复上次计划', 'Last plan restored'],
-  mapError: ['地图加载失败，请刷新页面重试。', 'Map failed to load. Refresh to retry.'],
-  privacy: ['只需账号标识，无需密码', 'Account identifier only. No password.'],
-  local: ['基础地图 · Natural Earth', 'Base map · Natural Earth'], sample: ['预览示例', 'Preview sample']
-};
-type Word = keyof typeof words;
-function tr(key: Word): string { return words[key][getLocale().startsWith('zh') ? 0 : 1]!; }
+function tr(key: string, parameters?: Record<string, string | number>): string { return t('flightdeck.' + key, parameters); }
 const key = 'taxinow.simbrief';
 const usernameKey = key + '.username';
 const vatsimTrafficKey = 'taxinow.map.vatsimTraffic';
@@ -98,17 +80,17 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   const flightIdentity = document.createElement('div'); flightIdentity.className = 'fd-flight-identity';
   flightIdentity.append(flightNumber, airportName);
   document.querySelector('.header-primary')!.append(flightIdentity);
-  const airportCaption = document.createElement('small'); airportCaption.textContent = 'AIRPORT ▾';
+  const airportCaption = document.createElement('small'); airportCaption.textContent = tr('airport') + ' ▾';
   $('airport-picker-toggle').querySelector('[aria-hidden]')?.remove();
   $('airport-picker-toggle').prepend(airportCaption);
-  const nav = document.createElement('nav'); nav.className = 'fd-tabs'; nav.setAttribute('aria-label', 'Flight navigation');
+  const nav = document.createElement('nav'); nav.className = 'fd-tabs'; nav.setAttribute('aria-label', tr('navigation'));
   for (const tab of flightDeckTabs) {
     const b = button(tr(tab), () => { setMode(true); currentTab = tab; $('fd-panel').hidden = false; renderPanel(); });
     b.id = `fd-tab-${tab}`; nav.append(b);
   }
   const title = document.createElement('div'); title.id = 'fd-title'; title.textContent = 'TaxiNow · ' + tr('view'); nav.append(title);
   document.querySelector('header')!.append(nav);
-  const rail = document.createElement('nav'); rail.className = 'fd-rail'; rail.setAttribute('aria-label', 'Map views');
+  const rail = document.createElement('nav'); rail.className = 'fd-rail'; rail.setAttribute('aria-label', tr('mapViews'));
   rail.append(button(tr('globe'), () => setMode(true)), button(tr('ground'), () => setMode(false)));
   rail.children[0]!.id = 'fd-globe-mode'; rail.children[1]!.id = 'fd-ground-mode';
   rail.prepend(document.querySelector('.airport-switcher')!);
@@ -118,7 +100,7 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   profileControl.setAttribute('aria-pressed', 'false');
   rail.append(profileControl);
   const airportShortcuts = document.createElement('div'); airportShortcuts.id = 'fd-airport-shortcuts'; airportShortcuts.className = 'fd-airport-shortcuts';
-  for (const [kind, label] of [['origin', getLocale().startsWith('zh') ? '起飞' : 'FROM'], ['destination', getLocale().startsWith('zh') ? '落地' : 'TO']] as const) {
+  for (const [kind, label] of [['origin', tr('from')], ['destination', tr('to')]] as const) {
     const shortcut = button('', () => { const icao = shortcut.dataset.icao; if (icao) void activateGroundAirport(icao); }, 'fd-airport-shortcut');
     shortcut.id = `fd-${kind}-airport`; shortcut.disabled = true;
     const caption = document.createElement('small'); caption.textContent = label;
@@ -153,7 +135,7 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   });
   document.getElementById('app')!.append(rail);
   const root = document.createElement('section'); root.id = 'fd-root'; root.setAttribute('aria-label', tr('view'));
-  root.innerHTML = `<div id="fd-map"></div><aside id="fd-panel"><div class="fd-panel-head"><strong id="fd-panel-title"></strong><button id="fd-close" type="button" aria-label="${tr('close')}">×</button></div><div id="fd-form"><div class="fd-service">SimBrief <span>FLIGHT PLANNING</span></div><button id="fd-import" type="button" class="fd-primary">${tr('import')}</button><p id="fd-feedback" role="status"></p></div><div id="fd-content"></div></aside><div class="fd-map-top"><button id="fd-north" type="button">↑ &nbsp;${tr('north')}</button><button id="fd-projection" type="button">3D</button></div><div class="fd-map-tools"><button id="fd-fit" type="button" title="${tr('fit')}" aria-label="${tr('fit')}">⛶</button><button id="fd-locate" type="button" title="${tr('locate')}" aria-label="${tr('locate')}">⌖</button><button id="fd-grid" type="button" title="${tr('grid')}" aria-label="${tr('grid')}" aria-pressed="true">⊞</button><button id="fd-fir" type="button" title="FIR / ATC boundaries" aria-label="FIR / ATC boundaries" aria-pressed="true">FIR</button><button id="fd-gnss" type="button" title="GNSS interference" aria-label="GNSS interference" aria-pressed="${gnssInterferenceEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="14" cy="11" r="3"/><path d="M14 3v3m0 10v3M6 11h3m10 0h3M8.3 5.3l2.1 2.1m7.2 7.2 2.1 2.1m0-11.4-2.1 2.1m-7.2 7.2-2.1 2.1"/></svg><span>GNSS</span></button><button id="fd-traffic" type="button" title="VATSIM traffic" aria-label="VATSIM traffic" aria-pressed="${globeTrafficEnabled}"><span class="fd-tool-icon">✈</span><span>VATSIM</span></button><button id="fd-weather" type="button" title="Weather radar" aria-label="Weather radar" aria-pressed="${weatherRadarEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 14h14a4 4 0 0 0 0-8 7 7 0 0 0-13-1 4.5 4.5 0 0 0-1 9Z"/><path d="m10 17-2 3m7-3-2 3m7-3-2 3"/></svg><span>Radar</span></button><button id="fd-terrain" type="button" title="${tr('terrain')}" aria-label="${tr('terrain')}" aria-pressed="${terrainEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 19 11 3l6 10 3-5 6 11H2Z"/><path d="m8 8 3 3 3-3"/></svg><span>${tr('terrain')}</span></button><button id="fd-plus" type="button" aria-label="Zoom in">+</button><button id="fd-minus" type="button" aria-label="Zoom out">−</button></div><div class="fd-map-bottom"><span>${tr('local')} · <a href="https://github.com/vatsimnetwork/vatspy-data-project" target="_blank" rel="noopener">FIR/ATC: VAT-Spy · CC BY-SA 4.0</a></span><span id="fd-gnss-credit" hidden><span class="fd-gnss-legend"><i class="interference"></i>Interference <i class="spoofing"></i>Spoofing</span> · <a href="https://www.easa.europa.eu/en/domains/air-operations/global-navigation-satellite-system-outages-and-alterations" target="_blank" rel="noopener">EASA Data4Safety</a></span><span id="fd-radar-credit" hidden><a href="https://www.rainviewer.com/" target="_blank" rel="noopener">Radar: RainViewer</a> · <a href="https://open-meteo.com/" target="_blank" rel="noopener">Motion: Open-Meteo 700 hPa</a></span><span id="fd-terrain-credit"><a href="https://goto.arcgisonline.com/maps/World_Physical_Map" target="_blank" rel="noopener">Terrain: Esri · U.S. National Park Service</a></span><span id="fd-position">${tr('noPosition')}</span></div><p id="fd-map-error" role="alert" hidden></p></section>`;
+  root.innerHTML = `<div id="fd-map"></div><aside id="fd-panel"><div class="fd-panel-head"><strong id="fd-panel-title"></strong><button id="fd-close" type="button" aria-label="${tr('close')}">×</button></div><div id="fd-form"><div class="fd-service">SimBrief <span>${tr('planning')}</span></div><button id="fd-import" type="button" class="fd-primary">${tr('import')}</button><p id="fd-feedback" role="status"></p></div><div id="fd-content"></div></aside><div class="fd-map-top"><button id="fd-north" type="button">↑ &nbsp;${tr('north')}</button><button id="fd-projection" type="button">3D</button></div><div class="fd-map-tools"><button id="fd-fit" type="button" title="${tr('fit')}" aria-label="${tr('fit')}">⛶</button><button id="fd-locate" type="button" title="${tr('locate')}" aria-label="${tr('locate')}">⌖</button><button id="fd-grid" type="button" title="${tr('grid')}" aria-label="${tr('grid')}" aria-pressed="true">⊞</button><button id="fd-fir" type="button" title="${tr('fir')}" aria-label="${tr('fir')}" aria-pressed="true">FIR</button><button id="fd-gnss" type="button" title="${tr('gnss')}" aria-label="${tr('gnss')}" aria-pressed="${gnssInterferenceEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="14" cy="11" r="3"/><path d="M14 3v3m0 10v3M6 11h3m10 0h3M8.3 5.3l2.1 2.1m7.2 7.2 2.1 2.1m0-11.4-2.1 2.1m-7.2 7.2-2.1 2.1"/></svg><span>GNSS</span></button><button id="fd-traffic" type="button" title="VATSIM ${tr('aircraft')}" aria-label="VATSIM ${tr('aircraft')}" aria-pressed="${globeTrafficEnabled}"><span class="fd-tool-icon">✈</span><span>VATSIM</span></button><button id="fd-weather" type="button" title="${tr('weather')}" aria-label="${tr('weather')}" aria-pressed="${weatherRadarEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 14h14a4 4 0 0 0 0-8 7 7 0 0 0-13-1 4.5 4.5 0 0 0-1 9Z"/><path d="m10 17-2 3m7-3-2 3m7-3-2 3"/></svg><span>${tr('radar')}</span></button><button id="fd-terrain" type="button" title="${tr('terrain')}" aria-label="${tr('terrain')}" aria-pressed="${terrainEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 19 11 3l6 10 3-5 6 11H2Z"/><path d="m8 8 3 3 3-3"/></svg><span>${tr('terrain')}</span></button><button id="fd-plus" type="button" aria-label="${tr('zoomIn')}">+</button><button id="fd-minus" type="button" aria-label="${tr('zoomOut')}">−</button></div><div class="fd-map-bottom"><span>${tr('local')} · <a href="https://github.com/vatsimnetwork/vatspy-data-project" target="_blank" rel="noopener">FIR/ATC: VAT-Spy · CC BY-SA 4.0</a></span><span id="fd-gnss-credit" hidden><span class="fd-gnss-legend"><i class="interference"></i>${tr('interference')} <i class="spoofing"></i>${tr('spoofing')}</span> · <a href="https://www.easa.europa.eu/en/domains/air-operations/global-navigation-satellite-system-outages-and-alterations" target="_blank" rel="noopener">EASA Data4Safety</a></span><span id="fd-radar-credit" hidden><a href="https://www.rainviewer.com/" target="_blank" rel="noopener">${tr('radar')}: RainViewer</a> · <a href="https://open-meteo.com/" target="_blank" rel="noopener">${tr('motion')}: Open-Meteo 700 hPa</a></span><span id="fd-terrain-credit"><a href="https://goto.arcgisonline.com/maps/World_Physical_Map" target="_blank" rel="noopener">${tr('terrain')}: Esri · U.S. National Park Service</a></span><span id="fd-position">${tr('noPosition')}</span></div><p id="fd-map-error" role="alert" hidden></p></section>`;
   document.getElementById('app')!.append(root);
   const profileView = createVerticalProfileView(root);
   let profilePreference;
@@ -179,7 +161,7 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   $('fd-close').onclick = () => { $('fd-panel').hidden = true; $(`fd-tab-${currentTab}`).focus(); };
   $('fd-import').onclick = () => void importPlan();
   const accountSettings = document.createElement('div'); accountSettings.className = 'fd-account-settings';
-  accountSettings.innerHTML = '<strong>SimBrief</strong><label for="fd-identifier">Username</label><input id="fd-identifier" maxlength="100" placeholder="Navigraph Alias" autocomplete="off" spellcheck="false"><small>' + (getLocale().startsWith('zh') ? 'SimBrief用户名会自动保存' : 'Your SimBrief username is saved automatically.') + '</small>';
+  accountSettings.innerHTML = '<strong>SimBrief</strong><label for="fd-identifier">' + tr('alias') + '</label><input id="fd-identifier" maxlength="100" placeholder="' + tr('alias') + '" autocomplete="off" spellcheck="false"><small>' + (tr('savedUsername')) + '</small>';
   settingsMenu.prepend(accountSettings);
   $('fd-identifier').addEventListener('input', () => { try { localStorage.setItem(usernameKey, $<HTMLInputElement>('fd-identifier').value.trim()); } catch { /* Keep usable in memory. */ } });
   $('fd-identifier').addEventListener('keydown', e => { if (e.key === 'Enter') { settingsMenu.hidden = true; $('settings-selector').setAttribute('aria-expanded', 'false'); } });
@@ -279,22 +261,22 @@ function setMode(globe: boolean): void {
 async function importPlan(): Promise<void> {
   const control = $<HTMLButtonElement>('fd-import'); if (control.disabled) return;
   const identifier = $<HTMLInputElement>('fd-identifier').value.trim();
-  if (!identifier) { feedback(getLocale().startsWith('zh') ? '请先在右上角设置中填写 SimBrief Username。' : 'Enter your SimBrief Username in Settings first.', true); $('settings-menu').hidden = false; $('settings-selector').setAttribute('aria-expanded', 'true'); $('fd-identifier').focus(); return; }
+  if (!identifier) { feedback(tr('enterUsername'), true); $('settings-menu').hidden = false; $('settings-selector').setAttribute('aria-expanded', 'true'); $('fd-identifier').focus(); return; }
   control.disabled = true; control.textContent = tr('loading'); feedback('');
   try {
     const response = await fetchLatestSimBriefPlan(identifier, AbortSignal.timeout(25000));
-    if (!response.ok) throw new Error(response.status === 400 ? (getLocale().startsWith('zh') ? '未找到计划：请核对 Username，并在 SimBrief 生成计划。' : 'Plan unavailable: check Username and generate a plan in SimBrief.') : response.status === 504 ? (getLocale().startsWith('zh') ? 'SimBrief 请求超时，请重试。' : 'SimBrief timed out. Please retry.') : (getLocale().startsWith('zh') ? '无法连接 SimBrief 服务，请稍后重试。' : 'SimBrief service unavailable. Please retry.'));
+    if (!response.ok) throw new Error(response.status === 400 ? (tr('planUnavailable')) : response.status === 504 ? (tr('timeout')) : (tr('serviceUnavailable')));
     const data = filterSimBriefNavigation(await response.json()), parsed = parseSimBrief(data);
     plan = parsed; void profileController?.setPlan(parsed); store({ identifier, kind: 'username', raw: data, importedAt: parsed.importedAt }); renderPanel(); drawRoute(); fitRoute(); feedback(tr('ready'));
     void groundNavigation.ensureAirports({ origin: parsed.origin, destination: parsed.destination });
-  } catch (error) { feedback(error instanceof Error ? (error.name === 'TimeoutError' ? 'SimBrief request timed out.' : error.message === 'Invalid flight plan' || error.message.includes('navlog') ? (getLocale().startsWith('zh') ? '计划缺少详细航路，请启用 Detailed Navlog 后重新生成。' : 'Generate a plan with Detailed Navlog enabled.') : error.message) : tr('failed'), true); }
+  } catch (error) { feedback(error instanceof Error ? (error.name === 'TimeoutError' ? tr('timeout') : error.message === 'Invalid flight plan' || error.message.includes('navlog') ? (tr('navlog')) : error.message) : tr('failed'), true); }
   finally { control.disabled = false; control.textContent = '↓  ' + tr('import'); }
 }
 function renderPanel(): void {
-  const flightLabel = plan?.callsign || (getLocale().startsWith('zh') ? '未设置航班号' : 'No flight number');
+  const flightLabel = plan?.callsign || (tr('noFlight'));
   $('fd-flight-number').textContent = flightLabel;
-  $('airport-picker-toggle').setAttribute('aria-label', flightLabel + (getLocale().startsWith('zh') ? '，选择机场' : ', select airport'));
-  $('airport-picker-toggle').title = getLocale().startsWith('zh') ? '选择地面地图机场' : 'Select ground map airport';
+  $('airport-picker-toggle').setAttribute('aria-label', tr('selectAirport'));
+  $('airport-picker-toggle').title = tr('selectAirport');
   for (const tab of flightDeckTabs) $(`fd-tab-${tab}`).setAttribute('aria-pressed', String(tab === currentTab));
   $('fd-panel').dataset.tab = currentTab;
   $('fd-panel-title').textContent = tr(currentTab); $('fd-form').hidden = currentTab !== 'flight';
@@ -369,9 +351,9 @@ function createGlobe(): void {
       $('fd-map-error').hidden = false;
       const sourceId = 'sourceId' in e ? e.sourceId : '';
       $('fd-map-error').textContent = sourceId === 'terrain'
-        ? (getLocale().startsWith('zh') ? '部分地形未能加载，请检查网络，或关闭地形使用基础地图。' : 'Some terrain tiles could not load. Check your connection or turn off Terrain.')
+        ? (tr('terrainError'))
         : sourceId === 'weather-radar'
-          ? (getLocale().startsWith('zh') ? '气象雷达图层暂时无法加载，请稍后重试。' : 'Weather radar is temporarily unavailable. Please try again.')
+          ? (tr('radarError'))
           : tr('mapError');
     });
     routeMap.once('style.load', () => { applyGlobeTheme(); drawRoute(); if (plan) fitRoute(); void loadFirLabels(); void refreshOnlineFirHighlights(); if (gnssInterferenceEnabled) void refreshGnssInterference(); if (globeTrafficEnabled) void refreshGlobeTraffic(); if (weatherRadarEnabled) void refreshWeatherRadar(); });
@@ -474,7 +456,7 @@ function updateFirLabelMarkers(): void {
     frequency.hidden = !frequency.textContent;
     const warning = marker.getElement().querySelector<HTMLElement>('.fd-gnss-label')!;
     const gnss = gnssInterferenceEnabled ? gnssRegions.get(label.id) : undefined;
-    warning.textContent = gnss ? (gnss.spoofing ? 'GNSS SPOOF' : 'GNSS') : '';
+    warning.textContent = gnss ? (gnss.spoofing ? tr('spoofWarning') : 'GNSS') : '';
     warning.classList.toggle('spoofing', !!gnss?.spoofing);
     warning.hidden = !warning.textContent;
   }
@@ -506,7 +488,7 @@ async function refreshGlobeTraffic(): Promise<void> {
     $('fd-map-error').hidden = true;
   } catch {
     $('fd-map-error').hidden = false;
-    $('fd-map-error').textContent = getLocale().startsWith('zh') ? 'VATSIM 在线飞机获取失败，请稍后重试。' : 'Could not load VATSIM aircraft. Please try again.';
+    $('fd-map-error').textContent = tr('trafficError');
   } finally { globeTrafficLoading = false; }
 }
 function updateVisibleGlobeTraffic(): void {
@@ -518,7 +500,7 @@ function updateVisibleGlobeTraffic(): void {
     return point.x >= -24 && point.y >= -24 && point.x <= container.clientWidth + 24 && point.y <= container.clientHeight + 24;
   });
   reconcileGlobeTraffic(visible);
-  $('fd-traffic').title = `${visible.length.toLocaleString()} / ${latestGlobeTraffic.length.toLocaleString()} VATSIM aircraft in view · ${globeTrafficUpdatedAt}`;
+  $('fd-traffic').title = `${tr('trafficInView', { visible: visible.length, total: latestGlobeTraffic.length })} · ${globeTrafficUpdatedAt}`;
 }
 function reconcileGlobeTraffic(aircraft: VatsimTrafficAircraft[]): void {
   if (!routeMap) return;
@@ -537,7 +519,7 @@ function reconcileGlobeTraffic(aircraft: VatsimTrafficAircraft[]): void {
     marker.setLngLat([item.longitude, item.latitude]);
     const element = marker.getElement();
     element.dataset.heading = String(item.headingDegrees);
-    element.setAttribute('aria-label', `${item.callsign}, ${item.aircraftType || 'aircraft'}, ${item.altitudeFeet} feet`);
+    element.setAttribute('aria-label', `${item.callsign}, ${item.aircraftType || tr('aircraft')}, ${item.altitudeFeet} FT`);
     element.title = `${item.callsign} · ${item.aircraftType || '—'} · ${item.altitudeFeet.toLocaleString()} FT · ${item.groundSpeedKnots} KT`;
     element.querySelector<HTMLElement>('.fd-vatsim-label')!.textContent = item.callsign;
     element.style.setProperty('--fd-aircraft-heading', `${item.headingDegrees - routeMap.getBearing()}deg`);
@@ -547,18 +529,17 @@ function reconcileGlobeTraffic(aircraft: VatsimTrafficAircraft[]): void {
   updateGlobeTrafficLabelVisibility();
 }
 function createTrafficPopupContent(item: VatsimTrafficAircraft): HTMLElement {
-  const zh = getLocale().startsWith('zh');
-  const model = vatsimTrafficPopupModel(item, zh);
+  const model = vatsimTrafficPopupModel(item, getLocale().startsWith('zh'));
   const card = document.createElement('article'); card.className = 'fd-traffic-popup';
   const header = document.createElement(vatsimTrafficPopupHeaderElement); header.className = 'fd-traffic-popup-header';
   const identity = document.createElement('div'); const callsign = document.createElement('strong'); callsign.textContent = model.callsign;
-  const type = document.createElement('small'); type.textContent = model.aircraftType; identity.append(callsign, type);
+  const type = document.createElement('small'); type.textContent = item.aircraftType || tr('typeUnknown'); identity.append(callsign, type);
   const source = document.createElement('span'); source.textContent = 'VATSIM'; header.append(identity, source);
   const route = document.createElement('section'); route.className = 'fd-traffic-popup-route'; route.classList.toggle('unavailable', model.routeUnavailable);
-  const routeLabel = document.createElement('small'); routeLabel.textContent = zh ? '航线' : 'ROUTE';
-  const routeValue = document.createElement('strong'); routeValue.textContent = model.route; route.append(routeLabel, routeValue);
+  const routeLabel = document.createElement('small'); routeLabel.textContent = tr('routeLabel');
+  const routeValue = document.createElement('strong'); routeValue.textContent = model.routeUnavailable ? tr('routeUnavailable') : model.route; route.append(routeLabel, routeValue);
   const metrics = document.createElement('dl'); metrics.className = 'fd-traffic-popup-metrics';
-  for (const [label, value] of [[zh ? '高度' : 'ALT', model.altitude], [zh ? '地速' : 'GS', model.groundSpeed], [zh ? '航向' : 'HDG', model.heading]]) {
+  for (const [label, value] of [[tr('alt'), model.altitude], [tr('gs'), model.groundSpeed], [tr('hdg'), model.heading]]) {
     const group = document.createElement('div'); const term = document.createElement('dt'); term.textContent = label!;
     const description = document.createElement('dd'); description.textContent = value!; group.append(term, description); metrics.append(group);
   }
@@ -601,11 +582,11 @@ async function refreshWeatherRadar(): Promise<void> {
     routeMap.addLayer({ id: 'weather-radar', type: 'raster', source: 'weather-radar', paint: { 'raster-opacity': 0.68, 'raster-fade-duration': 200 } }, 'fir-online');
     latestRadarTileUrl = frame.tileUrl;
     void refreshWeatherMotion(++weatherMotionGeneration);
-    $('fd-weather').title = `${getLocale().startsWith('zh') ? '气象雷达' : 'Weather radar'} · ${new Date(frame.observedAtUnix * 1000).toLocaleTimeString()}`;
+    $('fd-weather').title = `${tr('weather')} · ${new Date(frame.observedAtUnix * 1000).toLocaleTimeString()}`;
     $('fd-map-error').hidden = true;
   } catch {
     $('fd-map-error').hidden = false;
-    $('fd-map-error').textContent = getLocale().startsWith('zh') ? '气象雷达获取失败，请检查网络后重试。' : 'Could not load weather radar. Check your connection and try again.';
+    $('fd-map-error').textContent = tr('radarError');
   } finally { weatherRadarLoading = false; }
 }
 
@@ -617,7 +598,6 @@ function scheduleWeatherMotionRefresh(): void {
 }
 
 function renderAirportShortcuts(): void {
-  const zh = getLocale().startsWith('zh');
   for (const [kind, icao] of [['origin', plan?.origin], ['destination', plan?.destination]] as const) {
     const shortcut = $<HTMLButtonElement>(`fd-${kind}-airport`);
     if (!shortcut) continue;
@@ -628,12 +608,12 @@ function renderAirportShortcuts(): void {
     shortcut.disabled = !normalized || status === 'opening';
     shortcut.querySelector('strong')!.textContent = normalized || '----';
     const statusText = shortcut.querySelector<HTMLElement>('.fd-airport-status')!;
-    statusText.textContent = status === 'checking' ? (zh ? '检查' : 'CHECK')
-      : status === 'downloading' ? (zh ? '下载' : 'LOAD')
+    statusText.textContent = status === 'checking' ? (tr('check'))
+      : status === 'downloading' ? (tr('load'))
       : status === 'ready' ? '✓'
-      : status === 'failed' ? (zh ? '重试' : 'RETRY')
+      : status === 'failed' ? (tr('retry'))
       : status === 'opening' ? '…' : '';
-    const role = kind === 'origin' ? (zh ? '起飞机场' : 'Departure airport') : (zh ? '落地机场' : 'Arrival airport');
+    const role = kind === 'origin' ? (tr('departure')) : (tr('arrival'));
     shortcut.title = normalized ? `${role} ${normalized}` : role;
     shortcut.setAttribute('aria-label', shortcut.title);
   }
@@ -769,13 +749,13 @@ async function refreshGnssInterference(): Promise<void> {
     routeMap.setFilter('gnss-spoofing', ['in', ['get', 'id'], ['literal', supportedRegions.filter(region => region.spoofing).map(region => region.icao)]]);
     updateFirLabelMarkers();
     const date = new Date(`${feed.observedOn}T00:00:00`).toLocaleDateString();
-    const status = feed.isStale ? (getLocale().startsWith('zh') ? ' · 缓存数据' : ' · cached data') : '';
-    $('fd-gnss').title = `${getLocale().startsWith('zh') ? 'GNSS 干扰' : 'GNSS interference'} · ${supportedRegions.length} FIR · ${date}${status}`;
+    const status = feed.isStale ? (' · ' + tr('cached')) : '';
+    $('fd-gnss').title = `${tr('gnss')} · ${supportedRegions.length} FIR · ${date}${status}`;
     $('fd-gnss-credit').title = `${date}${status}`;
     $('fd-map-error').hidden = true;
   } catch {
     $('fd-map-error').hidden = false;
-    $('fd-map-error').textContent = getLocale().startsWith('zh') ? 'GNSS 干扰数据获取失败，请稍后重试。' : 'Could not load GNSS interference data. Please try again.';
+    $('fd-map-error').textContent = tr('gnssError');
   } finally { gnssInterferenceLoading = false; }
 }
 
@@ -802,7 +782,7 @@ async function refreshOnlineFirHighlights(): Promise<void> {
     }
     routeMap.setFilter('fir-online', ['in', ['get', 'id'], ['literal', ids]]);
     updateFirLabelMarkers();
-    $('fd-fir').title = getLocale().startsWith('zh') ? `FIR / ATC 边界 · ${ids.length} 个区域在线` : `FIR / ATC boundaries · ${ids.length} regions online`;
+    $('fd-fir').title = `${tr('fir')} · ${tr('onlineRegions', { count: ids.length })}`;
   } catch {
     onlineFirFrequencies.clear();
     updateFirLabelMarkers();
@@ -856,17 +836,16 @@ export function updateFlightDeckPosition(sample: TelemetrySnapshot): void {
 let firMappings: Promise<FirCallsign[]> | undefined;
 async function showFirFrequencies(e: ml.MapLayerMouseEvent): Promise<void> {
   if (!routeMap) return;
-  const zh = getLocale().startsWith('zh');
   const areas = [...new Map((e.features || []).map(f => [String(f.properties?.id), String(f.properties?.name || f.properties?.id)])).entries()];
   if (!areas.length) return;
   const content = document.createElement('div'); content.className = 'fd-fir-popup';
-  const title = document.createElement('strong'); title.textContent = zh ? 'VATSIM 在线区域管制' : 'VATSIM online area control';
+  const title = document.createElement('strong'); title.textContent = tr('onlineControl');
   const body = document.createElement('div');
   const popup = new ml.Popup({ maxWidth: '360px' }).setLngLat(e.lngLat).setDOMContent(content).addTo(routeMap);
-  const refresh = button(zh ? '刷新频率' : 'Refresh frequencies', () => void load());
+  const refresh = button(tr('refreshFrequencies'), () => void load());
   content.append(title, body, refresh);
   async function load(): Promise<void> {
-    refresh.disabled = true; body.textContent = zh ? '正在获取在线频率…' : 'Loading online frequencies…';
+    refresh.disabled = true; body.textContent = tr('loadingFrequencies');
     try {
       firMappings ??= fetch('/fir-callsigns.json').then(r => { if (!r.ok) throw new Error(); return r.json() as Promise<FirCallsign[]>; }).catch(error => { firMappings = undefined; throw error; });
       const [mappings, response] = await Promise.all([firMappings, fetch('/api/v1/integrations/vatsim/controllers', { signal: AbortSignal.timeout(15000) })]);
@@ -874,16 +853,16 @@ async function showFirFrequencies(e: ml.MapLayerMouseEvent): Promise<void> {
       const feed = await response.json() as { controllers: Controller[]; isStale: boolean; feedUpdatedAtUtc: string };
       if (!popup.isOpen()) return;
       body.replaceChildren();
-      if (feed.isStale) { body.textContent = zh ? '在线数据已过期，请刷新后查看频率。' : 'Online data is stale. Refresh to see current frequencies.'; return; }
+      if (feed.isStale) { body.textContent = tr('staleFrequencies'); return; }
       for (const [id, name] of areas) {
         const section = document.createElement('section'); const heading = document.createElement('h4'); heading.textContent = name; section.append(heading);
         const matches = controllersForFir(id, feed.controllers, mappings);
-        if (!matches.length) { const empty = document.createElement('p'); empty.textContent = zh ? '暂无匹配的在线区域管制席位' : 'No matching area controller online'; section.append(empty); }
+        if (!matches.length) { const empty = document.createElement('p'); empty.textContent = tr('noController'); section.append(empty); }
         for (const station of matches) { const row = document.createElement('p'); row.textContent = station.callsign + ' · ' + station.frequency + ' MHz'; section.append(row); }
         body.append(section);
       }
-      const updated = document.createElement('small'); updated.textContent = (zh ? '数据更新：' : 'Feed updated: ') + new Date(feed.feedUpdatedAtUtc).toLocaleTimeString(); body.append(updated);
-    } catch { if (popup.isOpen()) body.textContent = zh ? '频率获取失败，请重试。' : 'Could not load frequencies. Please retry.'; }
+      const updated = document.createElement('small'); updated.textContent = (tr('feedUpdated')) + new Date(feed.feedUpdatedAtUtc).toLocaleTimeString(); body.append(updated);
+    } catch { if (popup.isOpen()) body.textContent = tr('frequencyError'); }
     finally { refresh.disabled = false; }
   }
   await load();
@@ -891,11 +870,11 @@ async function showFirFrequencies(e: ml.MapLayerMouseEvent): Promise<void> {
 
 function renderFlightOverview(content: HTMLElement): void {
   if (!plan) return;
-  const current = plan, zh = getLocale().startsWith('zh');
+  const current = plan;
   const card = document.createElement('div'); card.className = 'fd-flight-card';
   for (const [code, name, label, position] of [
-    [current.origin, current.originName, zh ? '出发' : 'FROM', current.points[0]!.position],
-    [current.destination, current.destinationName, zh ? '到达' : 'TO', current.points.at(-1)!.position]
+    [current.origin, current.originName, tr('from'), current.points[0]!.position],
+    [current.destination, current.destinationName, tr('to'), current.points.at(-1)!.position]
   ] as const) {
     const row = button('', () => routeMap?.easeTo({ center: position, zoom: 6 }), 'fd-airport-row');
     const badge = document.createElement('strong'); badge.textContent = code;
@@ -904,13 +883,13 @@ function renderFlightOverview(content: HTMLElement): void {
     row.append(badge, fullName, caption); card.append(row);
   }
   const route = document.createElement('section'); route.className = 'fd-route-chips-section';
-  const caption = document.createElement('div'); caption.className = 'fd-section-label'; caption.textContent = zh ? '航路点与航路' : 'WAYPOINTS & AIRWAYS'; route.append(caption);
+  const caption = document.createElement('div'); caption.className = 'fd-section-label'; caption.textContent = tr('waypointsAirways'); route.append(caption);
   const chips = document.createElement('div'); chips.className = 'fd-route-chips';
   let lastAirway = '';
   current.points.slice(1, -1).forEach(point => {
     if (point.airway && point.airway !== lastAirway) { const airway = document.createElement('span'); airway.className = 'fd-airway-chip'; airway.textContent = point.airway; chips.append(airway); lastAirway = point.airway; }
     const chip = button(point.ident, () => { routeMap?.easeTo({ center: point.position, zoom: 6 }); chips.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', 'false')); chip.setAttribute('aria-pressed', 'true'); }, 'fd-route-chip');
-    chip.title = zh ? '在地图上查看 ' + point.ident : 'Locate ' + point.ident; chip.setAttribute('aria-pressed', 'false'); chips.append(chip);
+    chip.title = tr('locatePoint', { ident: point.ident }); chip.setAttribute('aria-pressed', 'false'); chips.append(chip);
   });
   if (current.points.length === 2) { const direct = document.createElement('span'); direct.className = 'fd-airway-chip'; direct.textContent = 'DCT'; chips.append(direct); }
   route.append(chips); card.append(route);
@@ -918,7 +897,7 @@ function renderFlightOverview(content: HTMLElement): void {
   const metric = document.createElement('div'); const label = document.createElement('small'); label.textContent = tr('distance'); const value = document.createElement('strong'); value.textContent = Math.round(current.distance).toLocaleString() + ' NM'; metric.append(label, value);
   distance.append(metric, button(tr('fit'), fitRoute)); card.append(distance); content.append(card);
   const details = document.createElement('div'); details.className = 'fd-flight-details';
-  for (const [label, value] of [[zh ? '机型' : 'Aircraft', current.aircraft || '—'], [tr('altitude'), current.altitude ? current.altitude + ' FT' : '—']]) { const row = document.createElement('div'); const caption = document.createElement('span'); caption.textContent = label!; const text = document.createElement('strong'); text.textContent = value!; row.append(caption, text); details.append(row); }
+  for (const [label, value] of [[tr('aircraft'), current.aircraft || '—'], [tr('altitude'), current.altitude ? current.altitude + ' FT' : '—']]) { const row = document.createElement('div'); const caption = document.createElement('span'); caption.textContent = label!; const text = document.createElement('strong'); text.textContent = value!; row.append(caption, text); details.append(row); }
   content.append(details);
   const actions = document.createElement('div'); actions.className = 'fd-plan-actions';
   const stamp = document.createElement('small'); stamp.textContent = tr('imported') + ' ' + new Date(current.importedAt).toLocaleTimeString();
