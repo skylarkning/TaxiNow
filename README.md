@@ -23,8 +23,8 @@ the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release)
 The installer carries the TaxiNow Personal Non-Commercial License, EULA, and
 third-party notices.
 
-Current development build: **V1.6**, internal build **129**
-(build date: September 14, 2026). The About dialog
+Current development build: **V2.0**, internal build **201**
+(build date: October 3, 2026). The About dialog
 identifies the developer, links to the official GitHub account, and clearly
 states that TaxiNow is a free-of-charge application for personal
 flight-simulator use only.
@@ -46,6 +46,10 @@ the square red-over-black mark is used for the Windows executable, window, and
 notification-area icon. The two generated pictures under the `concepts`
 subdirectory are the source artwork; the production PNG/ICO files only crop
 their surrounding white canvas and create the required output sizes.
+
+## Contributors
+
+- [睡务局局长（stewieqi-del）](https://github.com/stewieqi-del)
 
 ## Current vertical slice
 
@@ -268,7 +272,14 @@ dotnet run --project .\src\TaxiNow.App
 ```
 
 Closing the desktop window quits TaxiNow and releases the local server port.
-Minimizing hides the window in the Windows notification area instead.
+Minimizing keeps TaxiNow in the taskbar by default. Enable **Minimize to tray**
+in Settings to hide the window in the Windows notification area instead; this
+preference is remembered on the PC.
+
+In TAXI, the heading-up aircraft control continuously follows both position and
+heading, including when the aircraft moves outside the current view. In MAP,
+the **Follow aircraft** button beside **Locate aircraft** enables continuous
+position and heading follow; **Locate aircraft** remains a one-time action.
 
 For another device, use the **Access at:** address shown in the TaxiNow header.
 Enter that local IP address in a phone or iPad browser; Firefox is recommended.

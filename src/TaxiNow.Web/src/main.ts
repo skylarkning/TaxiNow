@@ -17,6 +17,7 @@ import type {
 } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./styles.css";
+import { followAircraft } from './aircraftFollow';
 import {
   setupFlightDeck,
   updateFlightDeckPosition,
@@ -225,6 +226,7 @@ interface DesktopStorageMessage {
 interface DesktopWindowSettingsMessage {
   type: "window-settings";
   keepVisible: boolean;
+  minimizeToTray: boolean;
 }
 
 interface DesktopIntegrationSettingsMessage {
@@ -1106,7 +1108,7 @@ function setupResponsiveHeader(): void {
   const header = document.querySelector<HTMLElement>("header");
   const primary = header?.querySelector<HTMLElement>(".header-primary");
   const airportToggle = header?.querySelector<HTMLElement>(
-    ".airport-picker-toggle"
+    ".fd-flight-identity, .airport-picker-toggle"
   );
   const actions = header?.querySelector<HTMLElement>(".actions");
   if (!header || !primary || !airportToggle || !actions) {
@@ -2455,6 +2457,14 @@ function setupDesktopWindowSettings(): void {
   }
 
   toggle.hidden = false;
+  const minimizeToggle = document.querySelector<HTMLButtonElement>("#minimize-to-tray");
+  if (minimizeToggle) {
+    minimizeToggle.hidden = false;
+    minimizeToggle.addEventListener("click", () => bridge.postMessage({
+      type: "window-settings:set",
+      minimizeToTray: minimizeToggle.getAttribute("aria-checked") !== "true"
+    }));
+  }
   toggle.addEventListener("click", () => {
     const enabled = toggle.getAttribute("aria-checked") !== "true";
     bridge.postMessage({
@@ -2469,6 +2479,9 @@ function setupDesktopWindowSettings(): void {
       return;
     }
     toggle.setAttribute("aria-checked", String(message.keepVisible));
+    if (minimizeToggle && typeof message.minimizeToTray === "boolean") {
+      minimizeToggle.setAttribute("aria-checked", String(message.minimizeToTray));
+    }
   });
   bridge.postMessage({ type: "window-settings:get" });
 }
@@ -4258,7 +4271,7 @@ function renderOwnship(frameTime = performance.now()): void {
       }
     ) || (domReady && !domOwnshipSynchronized);
     if (!rendererNeedsSynchronization) {
-      if (headingFollowEnabled && renderedOwnship.visible) {
+      if (headingFollowEnabled && ownship.visible && !ownship.stale) {
         updateHeadingFollowCamera(
           [renderedOwnship.longitude, renderedOwnship.latitude],
           renderedOwnship.heading,
@@ -4322,7 +4335,7 @@ function renderOwnship(frameTime = performance.now()): void {
         frameTime
       );
     }
-    if (renderedOwnship.visible && headingFollowEnabled) {
+    if (ownship.visible && !ownship.stale && headingFollowEnabled) {
       updateHeadingFollowCamera(
         [renderedOwnship.longitude, renderedOwnship.latitude],
         renderedOwnship.heading,
@@ -4449,23 +4462,22 @@ function updateHeadingFollowCamera(
   frameTime: number,
   force = false
 ): void {
+  const timestamp = Date.parse(telemetrySamples.at(-1)?.serverTimestampUtc ?? '');
+  if (!Number.isFinite(timestamp) || Date.now() - timestamp >= 15_000) return;
   if (
-    !map?.isStyleLoaded() ||
-    (!force && frameTime - lastTaxiCameraAt < 700) ||
-    (!force && map.isMoving())
+    !map || document.body.dataset.mapView === 'globe' ||
+    (!force && frameTime - lastTaxiCameraAt < 250)
   ) {
     return;
   }
   lastTaxiCameraAt = frameTime;
   const canvasHeight = map.getCanvas().clientHeight;
-  map.easeTo({
-    center: position,
-    bearing: heading,
-    zoom: Math.max(map.getZoom(), 16),
-    offset: [0, Math.min(220, canvasHeight * 0.23)],
-    duration: force ? 350 : 500,
-    essential: true
-  });
+  const panel = document.querySelector<HTMLElement>('#taxi-plan-panel');
+  const canvas = map.getCanvas().getBoundingClientRect();
+  const panelBounds = panel?.classList.contains('open') ? panel.getBoundingClientRect() : undefined;
+  const coveredWidth = panelBounds && panelBounds.width < canvas.width * 0.7
+    ? Math.max(0, Math.min(canvas.width, panelBounds.right - canvas.left)) : 0;
+  followAircraft(map, position, heading, [coveredWidth / 2, Math.min(220, canvasHeight * 0.23)], 16);
 }
 
 function setTaxiRouteGeometry(coordinates: Coordinate[]): void {

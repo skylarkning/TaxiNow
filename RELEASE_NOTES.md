@@ -1,3 +1,34 @@
+# TaxiNow V2.0 — Build 201
+
+- Added the current airport ICAO selector above the chart button and moved the airport name beside the flight number.
+- Restored scrolling in the settings menu so all options remain accessible.
+- Clarified that the SimBrief username is saved automatically.
+
+# TaxiNow V2.0 — Build 200
+
+Release date: October 3, 2026
+
+- Adds the FlightDeck MAP workspace, SimBrief import, live VATSIM controllers
+  and aircraft, weather radar, GNSS overlays, and X-Plane 12 support.
+- Adds the full-screen vertical route profile with terrain, altitude
+  constraints, live MSL/AGL altitude, and terrain clearance. Expired telemetry
+  automatically clears the live profile after 15 seconds.
+- Downloads SimBrief departure and arrival airport maps and opens the
+  destination TAXI map after touchdown.
+- Fixes continuous position and heading follow in TAXI and adds persistent
+  aircraft follow in MAP. Partial X-Plane reconnect data cannot revive old
+  coordinates or altitude.
+- Minimizes to the taskbar by default; Settings offers a persistent
+  **Minimize to tray** option.
+- Removes the NavApron FAQ and credits contributor
+  [睡务局局长（stewieqi-del）](https://github.com/stewieqi-del).
+
+Close TaxiNow, then run `TaxiNow-V2.0-Build-200-Setup.exe`. You may install over
+an earlier version. Keep downloaded maps and user data when uninstalling if
+you intend to reinstall. A portable ZIP is also provided.
+
+---
+
 # TaxiNow V1.5.1 — Build 127
 
 Release date: September 5, 2026

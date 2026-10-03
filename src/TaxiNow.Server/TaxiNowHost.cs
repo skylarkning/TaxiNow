@@ -38,10 +38,10 @@ public static class TaxiNowHost
     public const string ElevationProfilePath =
         "/api/v1/elevation/profile";
     private const string VmasPresenceCorsPolicy = "VmasPresence";
-    public const string ProductVersion = "1.6.0";
-    public const string DisplayVersion = "V1.6";
-    public const int InternalBuildId = 129;
-    public const string BuildDate = "September 14, 2026";
+    public const string ProductVersion = "2.0.0";
+    public const string DisplayVersion = "V2.0";
+    public const int InternalBuildId = 201;
+    public const string BuildDate = "October 3, 2026";
 
     public static string MapShellUrl =>
         $"http://127.0.0.1:{DefaultPort}/?build={InternalBuildId}";
