@@ -39,7 +39,7 @@
     <Content Include="..\..\tools\map_pipeline\dist\taxinow-map-pipeline.exe"
              Link="pipeline\taxinow-map-pipeline.exe"
              CopyToOutputDirectory="PreserveNewest"
-             Condition="Exists('..\..\tools\map_pipeline\dist\taxinow-map-pipeline.exe')" />
+             Visible="false" />
     <Content Include="..\TaxiNow.Web\dist\**\*"
              Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest"

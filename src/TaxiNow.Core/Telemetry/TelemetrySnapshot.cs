@@ -33,7 +33,9 @@ public sealed record TelemetrySnapshot(
     long SourceMonotonicMilliseconds,
     bool HasPosition = true,
     bool IsStale = false,
-    TrackingState State = TrackingState.Connected);
+    TrackingState State = TrackingState.Connected,
+    double? AltitudeMslFeet = null,
+    double? AltitudeAglFeet = null);
 
 public interface ITelemetrySource
 {

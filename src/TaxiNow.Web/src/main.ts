@@ -17,7 +17,19 @@ import type {
 } from "geojson";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./styles.css";
-import { setupFlightDeck, updateFlightDeckPosition } from "./flightDeck";
+import {
+  setupFlightDeck,
+  updateFlightDeckPosition,
+  updateFlightPlanAirportStatus
+} from "./flightDeck";
+import {
+  AirportDownloadStartGate,
+  LatestAirportActivation,
+  airportsNeedingDownload,
+  normalizeIcao,
+  normalizePlanAirports,
+  type PlanAirportPair
+} from "./flightPlanGround";
 import type {
   AppStatus,
   AirportFeature,
@@ -136,10 +148,19 @@ let renderedTaxiRouteCoordinates: Coordinate[] = [];
 let assetRefreshTimer: number | null = null;
 let assetPanelOpen = false;
 let installedAssets: StoredMapAsset[] = [];
+let latestDownloadJobs: DownloadJob[] = [];
+const flightPlanAirportIcaos = new Set<string>();
+const airportInstallWaiters = new Map<string, Array<{
+  resolve: () => void;
+  reject: (error: Error) => void;
+}>>();
+const flightPlanDownloadStartGate = new AirportDownloadStartGate();
+const latestAirportActivation = new LatestAirportActivation();
 let selectedAirportIcao = "";
 let pendingAirportIcao: string | null = null;
+let pendingAirportActivation: { isCurrent: () => boolean } | null = null;
 let mapInitialized = false;
-let assetRefreshInFlight = false;
+let assetRefreshPromise: Promise<boolean> | null = null;
 let activeDownloads = false;
 let currentAirportMap: AirportMap | null = null;
 let airportDetectionInFlight = false;
@@ -296,7 +317,12 @@ async function start(): Promise<void> {
   serverLink.title = t("access.title", {
     addresses: appStatus.localUrls.join(", ")
   });
-  await refreshAssetManager();
+  if (!await refreshAssetManager()) {
+    for (const icao of flightPlanAirportIcaos) {
+      updateFlightPlanAirportStatus(icao, "failed");
+    }
+    return;
+  }
   const lastAirport = readLastAirport();
   const initialIcao =
     lastAirport && installedAssets.some((asset) => asset.icao === lastAirport)
@@ -1919,16 +1945,25 @@ function applyProductMetadata(status: AppStatus): void {
   }
 }
 
-async function loadAirport(icao: string): Promise<void> {
+async function loadAirport(
+  icao: string,
+  shouldCommit?: () => boolean
+): Promise<void> {
+  if (!shouldCommit) {
+    const activation = latestAirportActivation.begin();
+    cancelAirportInstallWaiters();
+    shouldCommit = activation.isCurrent;
+  }
+  const downloadedAirport = await getJson<AirportMap>(
+    `/api/v1/airports/${encodeURIComponent(icao)}/map`
+  );
+  if (!shouldCommit()) return;
   closeManualTaxiContextMenu();
   stopTaxiwaySelectionAnimation();
   clearTaxiRoute();
   manualTaxiStart = null;
   manualTaxiDestination = null;
   selectedTaxiwaySequence = [];
-  const downloadedAirport = await getJson<AirportMap>(
-    `/api/v1/airports/${encodeURIComponent(icao)}/map`
-  );
   const visibleFeatures = filterAirportFeatures(
     downloadedAirport.features,
     downloadedAirport.airport.center
@@ -2158,6 +2193,8 @@ async function queueIcaoDownload(
     feedback.className = "feedback error";
     return;
   }
+  const activation = latestAirportActivation.begin();
+  cancelAirportInstallWaiters();
   const quickDownload =
     document.querySelector<HTMLButtonElement>("#quick-download")!;
   quickDownload.disabled = true;
@@ -2174,6 +2211,7 @@ async function queueIcaoDownload(
       })
     });
     pendingAirportIcao = icao;
+    pendingAirportActivation = activation;
     feedback.textContent = t("airport.downloading", { icao });
     feedback.className = "feedback success";
     ensureAssetPolling();
@@ -2184,6 +2222,128 @@ async function queueIcaoDownload(
     feedback.className = "feedback error";
   } finally {
     quickDownload.disabled = false;
+  }
+}
+
+async function ensureFlightPlanAirports(plan: PlanAirportPair): Promise<void> {
+  latestAirportActivation.cancel();
+  cancelAirportInstallWaiters();
+  flightPlanAirportIcaos.clear();
+  for (const icao of normalizePlanAirports(plan)) {
+    flightPlanAirportIcaos.add(icao);
+    updateFlightPlanAirportStatus(icao, "checking");
+  }
+
+  if (!await refreshAssetManager()) {
+    for (const icao of flightPlanAirportIcaos) {
+      updateFlightPlanAirportStatus(icao, "failed");
+    }
+    return;
+  }
+  const missing = airportsNeedingDownload(
+    plan,
+    installedAssets.map(asset => asset.icao),
+    latestDownloadJobs.flatMap(job => job.currentIcao
+      ? [{ icao: job.currentIcao, state: job.state }]
+      : [])
+  );
+  await Promise.allSettled(missing.map(startFlightPlanAirportDownload));
+}
+
+async function startFlightPlanAirportDownload(icao: string): Promise<void> {
+  return flightPlanDownloadStartGate.run(icao, async () => {
+    updateFlightPlanAirportStatus(icao, "downloading");
+    try {
+      await requestJson<DownloadJob>("/api/v1/downloads", {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "icao",
+          icao,
+          countryCode: null,
+          regionCode: null
+        })
+      });
+      ensureAssetPolling();
+    } catch (error) {
+      const failure = error instanceof Error ? error : new Error(String(error));
+      updateFlightPlanAirportStatus(icao, "failed");
+      rejectAirportInstallWaiters(icao, failure);
+      throw failure;
+    }
+  });
+}
+
+class AirportNavigationCancelledError extends Error {}
+
+async function openFlightPlanAirport(icao: string): Promise<boolean> {
+  const normalized = normalizeIcao(icao);
+  if (!normalized) throw new Error(`Invalid airport ICAO: ${icao}`);
+  const activation = latestAirportActivation.begin();
+  cancelAirportInstallWaiters();
+  flightPlanAirportIcaos.add(normalized);
+  try {
+    if (!await refreshAssetManager()) {
+      throw new Error("Could not refresh airport downloads.");
+    }
+    if (!activation.isCurrent()) return false;
+    if (!installedAssets.some(asset => asset.icao === normalized)) {
+      const active = latestDownloadJobs.some(job =>
+        job.currentIcao === normalized &&
+        (job.state === "queued" || job.state === "running")
+      );
+      if (!active) await startFlightPlanAirportDownload(normalized);
+      if (!activation.isCurrent()) return false;
+      await waitForAirportInstall(normalized);
+    }
+    if (!activation.isCurrent()) return false;
+    await loadAirport(normalized, activation.isCurrent);
+    return activation.isCurrent();
+  } catch (error) {
+    if (error instanceof AirportNavigationCancelledError) return false;
+    throw error;
+  }
+}
+
+function waitForAirportInstall(icao: string): Promise<void> {
+  if (installedAssets.some(asset => asset.icao === icao)) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const waiters = airportInstallWaiters.get(icao) || [];
+    waiters.push({ resolve, reject });
+    airportInstallWaiters.set(icao, waiters);
+  });
+}
+
+function resolveAirportInstallWaiters(icao: string): void {
+  for (const waiter of airportInstallWaiters.get(icao) || []) waiter.resolve();
+  airportInstallWaiters.delete(icao);
+}
+
+function rejectAirportInstallWaiters(icao: string, error: Error): void {
+  for (const waiter of airportInstallWaiters.get(icao) || []) waiter.reject(error);
+  airportInstallWaiters.delete(icao);
+}
+
+function cancelAirportInstallWaiters(): void {
+  const cancellation = new AirportNavigationCancelledError("Airport navigation superseded.");
+  for (const icao of [...airportInstallWaiters.keys()]) {
+    rejectAirportInstallWaiters(icao, cancellation);
+  }
+}
+
+function syncFlightPlanAirportStatuses(jobs: readonly DownloadJob[]): void {
+  for (const icao of flightPlanAirportIcaos) {
+    if (installedAssets.some(asset => asset.icao === icao)) {
+      updateFlightPlanAirportStatus(icao, "ready");
+      resolveAirportInstallWaiters(icao);
+      continue;
+    }
+    const job = jobs.find(candidate => candidate.currentIcao === icao);
+    if (job?.state === "failed" || job?.state === "cancelled") {
+      updateFlightPlanAirportStatus(icao, "failed");
+      rejectAirportInstallWaiters(icao, new Error(job.error || `${icao} download failed.`));
+    } else if (job) {
+      updateFlightPlanAirportStatus(icao, "downloading");
+    }
   }
 }
 
@@ -2437,17 +2597,23 @@ async function submitDownload(form: HTMLFormElement): Promise<void> {
   }
 }
 
-async function refreshAssetManager(): Promise<void> {
-  if (assetRefreshInFlight) {
-    return;
-  }
-  assetRefreshInFlight = true;
+function refreshAssetManager(): Promise<boolean> {
+  if (assetRefreshPromise) return assetRefreshPromise;
+  assetRefreshPromise = performAssetRefresh().finally(() => {
+    assetRefreshPromise = null;
+  });
+  return assetRefreshPromise;
+}
+
+async function performAssetRefresh(): Promise<boolean> {
   try {
     const [storage, jobs] = await Promise.all([
       getJson<StorageSummary>("/api/v1/storage"),
       getJson<DownloadJob[]>("/api/v1/downloads")
     ]);
     installedAssets = storage.assets;
+    latestDownloadJobs = jobs;
+    syncFlightPlanAirportStatuses(jobs);
     renderStorage(storage);
     renderDownloadJobs(jobs);
     renderAirportPicker(
@@ -2457,14 +2623,20 @@ async function refreshAssetManager(): Promise<void> {
     if (pendingAirportIcao &&
         installedAssets.some((asset) => asset.icao === pendingAirportIcao)) {
       const downloadedIcao = pendingAirportIcao;
+      const activation = pendingAirportActivation;
       pendingAirportIcao = null;
-      await loadAirport(downloadedIcao);
-      const feedback =
-        document.querySelector<HTMLElement>("#airport-picker-feedback")!;
-      feedback.textContent = t("airport.installed", {
-        icao: downloadedIcao
-      });
-      feedback.className = "feedback success";
+      pendingAirportActivation = null;
+      if (!activation || activation.isCurrent()) {
+        await loadAirport(downloadedIcao, activation?.isCurrent);
+        if (!activation || activation.isCurrent()) {
+          const feedback =
+            document.querySelector<HTMLElement>("#airport-picker-feedback")!;
+          feedback.textContent = t("airport.installed", {
+            icao: downloadedIcao
+          });
+          feedback.className = "feedback success";
+        }
+      }
     }
 
     activeDownloads = jobs.some(
@@ -2476,6 +2648,7 @@ async function refreshAssetManager(): Promise<void> {
       window.clearInterval(assetRefreshTimer);
       assetRefreshTimer = null;
     }
+    return true;
   } catch (error) {
     const feedback =
       document.querySelector<HTMLElement>("#download-feedback");
@@ -2486,8 +2659,7 @@ async function refreshAssetManager(): Promise<void> {
         }`;
       feedback.className = "feedback error";
     }
-  } finally {
-    assetRefreshInFlight = false;
+    return false;
   }
 }
 
@@ -5696,7 +5868,10 @@ async function requestJson<T>(
 }
 
 initializeLocalization();
-setupFlightDeck();
+setupFlightDeck({
+  ensureAirports: ensureFlightPlanAirports,
+  openAirport: openFlightPlanAirport
+});
 void start().catch((error: unknown) => {
   console.error(error);
   setStatus(t("error.mapLoad"), "error");

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TaxiNow.Core.Telemetry;
 using TaxiNow.Server;
 using TaxiNow.Server.Downloads;
+using TaxiNow.Server.Elevation;
 using TaxiNow.Storage;
 using Xunit;
 
@@ -97,6 +98,14 @@ public sealed class ServerContractTests
     }
 
     [Fact]
+    public void SimConnectClient_IsIncludedWithoutADeveloperSdkInstallation()
+    {
+        Assert.True(
+            TaxiNow.SimConnect.Managed.ManagedSimConnectTelemetrySource
+                .IsRuntimeAvailable);
+    }
+
+    [Fact]
     public void TelemetryContract_SerializesMsfs2020Edition()
     {
         var now = DateTimeOffset.UtcNow;
@@ -121,6 +130,56 @@ public sealed class ServerContractTests
 
         Assert.Contains("\"simulator\":\"msfs2020\"", json);
         Assert.Contains("\"state\":\"groundTracking\"", json);
+    }
+
+    [Fact]
+    public void TelemetryContract_SerializesAltitude()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var sample = new TelemetrySnapshot(
+            1,
+            SimulatorEdition.Msfs2024,
+            true,
+            false,
+            43.0,
+            -79.0,
+            90,
+            250,
+            now,
+            now,
+            10,
+            AltitudeMslFeet: 12_345,
+            AltitudeAglFeet: 10_900);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+
+        var json = JsonSerializer.Serialize(sample, options);
+
+        Assert.Contains("\"altitudeMslFeet\":12345", json);
+        Assert.Contains("\"altitudeAglFeet\":10900", json);
+    }
+
+    [Fact]
+    public void ElevationContract_UsesFrontendDistanceNmWireName()
+    {
+        var response = new ElevationProfileResponse(
+            [new ElevationSample(-79.6, 43.6, 12.5, 900)],
+            "fresh",
+            DateTimeOffset.Parse("2026-09-12T00:00:00Z"),
+            "Open-Meteo / Copernicus DEM",
+            "Elevation: Open-Meteo · Copernicus DEM");
+
+        var json = JsonSerializer.Serialize(
+            response,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        using var document = JsonDocument.Parse(json);
+        var sample = document.RootElement.GetProperty("samples")[0];
+        Assert.Equal(12.5, sample.GetProperty("distanceNm").GetDouble());
+        Assert.False(sample.TryGetProperty(
+            "cumulativeNauticalMiles",
+            out _));
     }
 
     [Fact]

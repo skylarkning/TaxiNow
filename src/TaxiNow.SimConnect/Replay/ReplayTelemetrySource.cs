@@ -56,7 +56,9 @@ public sealed class ReplayTelemetrySource(
                     frame.GroundSpeed,
                     replayStarted + TimeSpan.FromMilliseconds(frame.TMs / speed),
                     now,
-                    (long)stopwatch.Elapsed.TotalMilliseconds);
+                    (long)stopwatch.Elapsed.TotalMilliseconds,
+                    AltitudeMslFeet: frame.AltitudeMslFeet,
+                    AltitudeAglFeet: frame.AltitudeAglFeet);
             }
         } while (loop && !cancellationToken.IsCancellationRequested);
     }
@@ -103,6 +105,8 @@ public sealed class ReplayTelemetrySource(
         [property: JsonPropertyName("lon")] double Longitude,
         [property: JsonPropertyName("heading")] double Heading,
         [property: JsonPropertyName("groundSpeed")] double GroundSpeed,
-        [property: JsonPropertyName("onGround")] bool OnGround);
+        [property: JsonPropertyName("onGround")] bool OnGround,
+        [property: JsonPropertyName("altitudeMslFeet")] double? AltitudeMslFeet = null,
+        [property: JsonPropertyName("altitudeAglFeet")] double? AltitudeAglFeet = null);
 }
 

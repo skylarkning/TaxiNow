@@ -54,7 +54,7 @@ public sealed class XPlaneTelemetryTests
 
         var next = samples.MoveNextAsync().AsTask();
         var request = await simulator.ReceiveAsync(timeout.Token);
-        await simulator.SendAsync(CreateResponse(43.68f, -79.62f, 237.5f, 10f, 1f), request.RemoteEndPoint, timeout.Token);
+        await simulator.SendAsync(CreateResponse(43.68f, -79.62f, 237.5f, 10f, 1f, 3762.756f, 914.4f), request.RemoteEndPoint, timeout.Token);
 
         Assert.True(await next);
         Assert.Equal(SimulatorEdition.XPlane12, samples.Current.Simulator);
@@ -63,6 +63,8 @@ public sealed class XPlaneTelemetryTests
         Assert.Equal(237.5, samples.Current.TrueHeadingDegrees, 1);
         Assert.Equal(19.44, samples.Current.GroundSpeedKnots, 2);
         Assert.True(samples.Current.OnGround);
+        Assert.Equal(12345, samples.Current.AltitudeMslFeet!.Value, 0);
+        Assert.Equal(3000, samples.Current.AltitudeAglFeet!.Value, 0);
     }
 
     [Theory]
@@ -80,7 +82,7 @@ public sealed class XPlaneTelemetryTests
         await using var samples = source.ReadAllAsync(timeout.Token).GetAsyncEnumerator(timeout.Token);
         var first = samples.MoveNextAsync().AsTask();
         var request = await simulator.ReceiveAsync(timeout.Token);
-        await simulator.SendAsync(CreateResponse(43.68f, -79.62f, 237.5f, 10f, 1f), request.RemoteEndPoint, timeout.Token);
+        await simulator.SendAsync(CreateResponse(43.68f, -79.62f, 237.5f, 10f, 1f, 3762.756f, 914.4f), request.RemoteEndPoint, timeout.Token);
         Assert.True(await first);
         Assert.True(samples.Current.HasPosition);
         Assert.True(await samples.MoveNextAsync());
@@ -92,7 +94,7 @@ public sealed class XPlaneTelemetryTests
         Assert.False(samples.Current.HasPosition);
 
         var recovered = samples.MoveNextAsync().AsTask();
-        await simulator.SendAsync(CreateResponse(44f, -80f, 180f, 5f, 0f), request.RemoteEndPoint, timeout.Token);
+        await simulator.SendAsync(CreateResponse(44f, -80f, 180f, 5f, 0f, 3000f, 1000f), request.RemoteEndPoint, timeout.Token);
         Assert.True(await recovered);
         Assert.True(samples.Current.HasPosition);
         Assert.Equal(44, samples.Current.Latitude);

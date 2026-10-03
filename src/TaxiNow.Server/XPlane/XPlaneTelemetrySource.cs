@@ -14,7 +14,9 @@ public sealed class XPlaneTelemetrySource(IConfiguration configuration) : ITelem
         "sim/flightmodel/position/longitude",
         "sim/flightmodel/position/psi",
         "sim/flightmodel/position/groundspeed",
-        "sim/flightmodel/failures/onground_any"
+        "sim/flightmodel/failures/onground_any",
+        "sim/flightmodel/position/elevation",
+        "sim/flightmodel/position/y_agl"
     ];
 
     public async IAsyncEnumerable<TelemetrySnapshot> ReadAllAsync(
@@ -69,7 +71,9 @@ public sealed class XPlaneTelemetrySource(IConfiguration configuration) : ITelem
                     ++sequence, SimulatorEdition.XPlane12, true, values[4] > 0.5f,
                     values[0], values[1], values[2], values[3] * 1.94384449,
                     now, now, clock.ElapsedMilliseconds, HasPosition: true,
-                    State: TrackingState.Connected);
+                    State: TrackingState.Connected,
+                    AltitudeMslFeet: values[5] * 3.28083989501312,
+                    AltitudeAglFeet: values[6] * 3.28083989501312);
             }
 
             if (!gotPosition)

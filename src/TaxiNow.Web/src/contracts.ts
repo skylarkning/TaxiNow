@@ -63,6 +63,8 @@ export interface TelemetrySnapshot {
   sourceMonotonicMilliseconds: number;
   hasPosition: boolean;
   isStale: boolean;
+  altitudeMslFeet?: number | null;
+  altitudeAglFeet?: number | null;
   state:
     | "disconnected"
     | "connecting"
@@ -70,6 +72,19 @@ export interface TelemetrySnapshot {
     | "airborne"
     | "groundTracking"
     | "reconnecting";
+}
+
+export interface ElevationProfileResponse {
+  samples: Array<{
+    longitude: number;
+    latitude: number;
+    distanceNm: number;
+    elevationFeet: number;
+  }>;
+  cacheState: "fresh" | "cachedOffline";
+  generatedAt: string;
+  source: string;
+  attribution: string;
 }
 
 export interface AppStatus {
@@ -112,6 +127,8 @@ export interface VatsimTrafficAircraft {
   altitudeFeet: number;
   groundSpeedKnots: number;
   aircraftType: string | null;
+  departureAirport: string | null;
+  arrivalAirport: string | null;
   lastUpdatedUtc: string | null;
 }
 

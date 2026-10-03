@@ -12,6 +12,8 @@ public sealed record VatsimTrafficAircraft(
     int AltitudeFeet,
     int GroundSpeedKnots,
     string? AircraftType,
+    string? DepartureAirport,
+    string? ArrivalAirport,
     DateTimeOffset? LastUpdatedUtc);
 
 public sealed record VatsimTrafficResponse(
@@ -263,12 +265,16 @@ public sealed class VatsimTrafficService : IDisposable
             ? speedValue
             : 0;
         string? aircraftType = null;
+        string? departureAirport = null;
+        string? arrivalAirport = null;
         if (pilot.TryGetProperty("flight_plan", out var flightPlan) &&
-            flightPlan.ValueKind == JsonValueKind.Object &&
-            flightPlan.TryGetProperty("aircraft_short", out var typeElement) &&
-            typeElement.ValueKind == JsonValueKind.String)
+            flightPlan.ValueKind == JsonValueKind.Object)
         {
-            aircraftType = typeElement.GetString();
+            aircraftType = ReadFlightPlanText(flightPlan, "aircraft_short");
+            departureAirport = ReadFlightPlanText(flightPlan, "departure")
+                ?.ToUpperInvariant();
+            arrivalAirport = ReadFlightPlanText(flightPlan, "arrival")
+                ?.ToUpperInvariant();
         }
 
         DateTimeOffset? lastUpdatedUtc = null;
@@ -291,8 +297,24 @@ public sealed class VatsimTrafficService : IDisposable
             altitude,
             groundSpeed,
             string.IsNullOrWhiteSpace(aircraftType) ? null : aircraftType.Trim(),
+            departureAirport,
+            arrivalAirport,
             lastUpdatedUtc);
         return true;
+    }
+
+    private static string? ReadFlightPlanText(
+        JsonElement flightPlan,
+        string propertyName)
+    {
+        if (!flightPlan.TryGetProperty(propertyName, out var value) ||
+            value.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var text = value.GetString()?.Trim();
+        return string.IsNullOrEmpty(text) ? null : text;
     }
 
     private static bool TryGetDouble(

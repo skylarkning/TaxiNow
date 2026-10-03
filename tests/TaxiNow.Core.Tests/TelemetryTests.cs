@@ -1,4 +1,5 @@
 using TaxiNow.Core.Telemetry;
+using TaxiNow.SimConnect.Replay;
 using TaxiNow.Core.Traffic;
 using Xunit;
 
@@ -154,6 +155,45 @@ public sealed class TelemetryTests
 
         Assert.True(signal.WaitHandle.WaitOne(0));
         Assert.False(signal.WaitHandle.WaitOne(0));
+    }
+
+    [Fact]
+    public void TelemetrySnapshot_AltitudeIsOptionalForExistingCallers()
+    {
+        var sample = Sample(1, true);
+
+        Assert.Null(sample.AltitudeMslFeet);
+        Assert.Null(sample.AltitudeAglFeet);
+    }
+
+    [Fact]
+    public async Task ReplayTelemetrySource_ForwardsAltitudeWhenPresent()
+    {
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            $"taxinow-altitude-{Guid.NewGuid():N}.jsonl");
+        await File.WriteAllTextAsync(
+            path,
+            """
+            {"tMs":0,"lat":43.68,"lon":-79.62,"heading":237.5,"groundSpeed":10,"onGround":false,"altitudeMslFeet":12345,"altitudeAglFeet":3000}
+            """,
+            TestContext.Current.CancellationToken);
+
+        try
+        {
+            var source = new ReplayTelemetrySource(path, loop: false);
+            await using var samples = source
+                .ReadAllAsync(TestContext.Current.CancellationToken)
+                .GetAsyncEnumerator(TestContext.Current.CancellationToken);
+
+            Assert.True(await samples.MoveNextAsync());
+            Assert.Equal(12_345, samples.Current.AltitudeMslFeet);
+            Assert.Equal(3_000, samples.Current.AltitudeAglFeet);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     private static TelemetrySnapshot Sample(long sequence, bool onGround)

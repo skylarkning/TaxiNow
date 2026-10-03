@@ -1,9 +1,20 @@
 export type Position = [number, number];
-export interface FlightPoint { ident: string; position: Position; airway: string; isProcedure?: boolean }
+export type AltitudeConstraintKind = 'at' | 'atOrAbove' | 'atOrBelow' | 'between';
+export interface FlightPoint {
+  ident: string;
+  position: Position;
+  airway: string;
+  isProcedure?: boolean;
+  plannedAltitudeFeet?: number;
+  constraintKind?: AltitudeConstraintKind;
+  minimumAltitudeFeet?: number;
+  maximumAltitudeFeet?: number;
+}
 export interface FlightPlan {
   origin: string; destination: string; originName: string; destinationName: string;
   callsign: string; aircraft: string; altitude: string; route: string;
   points: FlightPoint[]; distance: number; importedAt: string;
+  originElevationFeet?: number; destinationElevationFeet?: number;
 }
 type RecordValue = Record<string, unknown>;
 function record(value: unknown): RecordValue {
@@ -11,6 +22,49 @@ function record(value: unknown): RecordValue {
   return value as RecordValue;
 }
 function label(value: unknown): string { return typeof value === 'string' || typeof value === 'number' ? String(value).slice(0, 12000) : ''; }
+export function optionalAltitude(value: unknown): number | undefined {
+  if (typeof value === 'string' && !value.trim()) return undefined;
+  if (typeof value !== 'string' && typeof value !== 'number') return undefined;
+  const altitude = typeof value === 'string' ? Number(value.trim()) : value;
+  return Number.isFinite(altitude) && altitude >= -2000 && altitude <= 100000 ? altitude : undefined;
+}
+function constraintKind(value: unknown): AltitudeConstraintKind | undefined {
+  const descriptor = typeof value === 'number' && Number.isFinite(value)
+    ? String(value)
+    : typeof value === 'string' ? value.trim().toUpperCase() : '';
+  switch (descriptor) {
+    case '1': case 'AT': return 'at';
+    case '2': case 'AT_OR_ABOVE': return 'atOrAbove';
+    case '3': case 'AT_OR_BELOW': return 'atOrBelow';
+    case '4': case 'BETWEEN': return 'between';
+    default: return undefined;
+  }
+}
+function verticalFields(obj: RecordValue): Pick<FlightPoint, 'plannedAltitudeFeet' | 'constraintKind' | 'minimumAltitudeFeet' | 'maximumAltitudeFeet'> {
+  const plannedAltitudeFeet = optionalAltitude(obj.altitude_feet);
+  const kind = constraintKind(obj.altitude_desc);
+  const first = optionalAltitude(obj.altitude1);
+  const second = optionalAltitude(obj.altitude2);
+  const fields: Pick<FlightPoint, 'plannedAltitudeFeet' | 'constraintKind' | 'minimumAltitudeFeet' | 'maximumAltitudeFeet'> = {};
+  if (plannedAltitudeFeet !== undefined) fields.plannedAltitudeFeet = plannedAltitudeFeet;
+  if (!kind || (kind === 'between' && (first === undefined || second === undefined)) ||
+      (kind !== 'between' && first === undefined)) {
+    return fields;
+  }
+  fields.constraintKind = kind;
+  if (kind === 'at') {
+    fields.minimumAltitudeFeet = first;
+    fields.maximumAltitudeFeet = first;
+  } else if (kind === 'atOrAbove') {
+    fields.minimumAltitudeFeet = first;
+  } else if (kind === 'atOrBelow') {
+    fields.maximumAltitudeFeet = first;
+  } else {
+    fields.minimumAltitudeFeet = first;
+    fields.maximumAltitudeFeet = second;
+  }
+  return fields;
+}
 function point(value: unknown, airport = false): FlightPoint {
   const obj = record(value);
   const lng = label(obj.pos_long).trim(), lat = label(obj.pos_lat).trim();
@@ -19,7 +73,11 @@ function point(value: unknown, airport = false): FlightPoint {
   if (!ident || !lng || !lat || !position.every(Number.isFinite) || Math.abs(position[0]) > 180 || Math.abs(position[1]) > 90) {
     throw new Error(`Invalid waypoint: ${ident || '?'}`);
   }
-  return { ident: ident.slice(0, 40), position, airway: label(obj.via_airway).slice(0, 40), isProcedure: obj.is_sid_star === true || obj.is_sid_star === 1 || obj.is_sid_star === "1" };
+  return {
+    ident: ident.slice(0, 40), position, airway: label(obj.via_airway).slice(0, 40),
+    isProcedure: obj.is_sid_star === true || obj.is_sid_star === 1 || obj.is_sid_star === "1",
+    ...verticalFields(obj)
+  };
 }
 export function parseSimBrief(input: unknown): FlightPlan {
   const data = record(input), origin = record(data.origin), destination = record(data.destination);
@@ -30,9 +88,24 @@ export function parseSimBrief(input: unknown): FlightPlan {
   const navPoints = fixes.map(fix => point(fix));
   const arrival = point(destination, true); arrival.isProcedure = navPoints.at(-1)?.isProcedure;
   const all = [point(origin, true), ...navPoints, arrival];
-  const points = all.filter((p, i) => i === 0 || distanceNm(all[i - 1]!.position, p.position) > 0.005);
+  const points: FlightPoint[] = [];
+  for (const current of all) {
+    const previous = points.at(-1);
+    if (!previous || distanceNm(previous.position, current.position) > 0.005) {
+      points.push(current);
+      continue;
+    }
+    if (current.plannedAltitudeFeet !== undefined) previous.plannedAltitudeFeet = current.plannedAltitudeFeet;
+    if (current.constraintKind !== undefined) {
+      previous.constraintKind = current.constraintKind;
+      delete previous.minimumAltitudeFeet;
+      delete previous.maximumAltitudeFeet;
+    }
+    if (current.minimumAltitudeFeet !== undefined) previous.minimumAltitudeFeet = current.minimumAltitudeFeet;
+    if (current.maximumAltitudeFeet !== undefined) previous.maximumAltitudeFeet = current.maximumAltitudeFeet;
+  }
   if (points.length < 2) throw new Error('Route needs distinct points');
-  return {
+  const parsed: FlightPlan = {
     origin: label(origin.icao_code), destination: label(destination.icao_code),
     originName: label(origin.name), destinationName: label(destination.name),
     callsign: label(general.icao_airline) + label(general.flight_number),
@@ -41,6 +114,11 @@ export function parseSimBrief(input: unknown): FlightPlan {
     distance: points.slice(1).reduce((sum, p, i) => sum + distanceNm(points[i]!.position, p.position), 0),
     importedAt: new Date().toISOString()
   };
+  const originElevationFeet = optionalAltitude(origin.elevation);
+  const destinationElevationFeet = optionalAltitude(destination.elevation);
+  if (originElevationFeet !== undefined) parsed.originElevationFeet = originElevationFeet;
+  if (destinationElevationFeet !== undefined) parsed.destinationElevationFeet = destinationElevationFeet;
+  return parsed;
 }
 const rad = Math.PI / 180;
 export function distanceNm(a: Position, b: Position): number {
