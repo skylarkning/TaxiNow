@@ -95,6 +95,24 @@ public sealed class VatsimTrafficServiceTests
         Assert.Equal(2, handler.CallCount);
     }
 
+    [Fact]
+    public async Task GlobalTraffic_ReturnsEveryAircraftWithoutPersonalFields()
+    {
+        var handler = new CountingHandler(FeedJson);
+        var time = new MutableTimeProvider(
+            new DateTimeOffset(2026, 8, 30, 12, 0, 1, TimeSpan.Zero));
+        using var service = new VatsimTrafficService(new HttpClient(handler), time);
+
+        var result = await service.GetAllTrafficAsync(CancellationToken.None);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(new[] { "ACA123", "BAW99" }, result.Aircraft.Select(item => item.Callsign));
+        var serialized = System.Text.Json.JsonSerializer.Serialize(result);
+        Assert.DoesNotContain("Private Person", serialized);
+        Assert.DoesNotContain("Another Person", serialized);
+        Assert.DoesNotContain("cid", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData(null, 43d, -79d, 44d)]
     [InlineData(-200d, 43d, -79d, 44d)]

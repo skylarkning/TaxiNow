@@ -51,7 +51,7 @@ export interface AirportFeature {
 
 export interface TelemetrySnapshot {
   sequence: number;
-  simulator: "replay" | "msfs2020" | "msfs2024" | "unknown";
+  simulator: "replay" | "msfs2020" | "msfs2024" | "xPlane12" | "unknown";
   connected: boolean;
   onGround: boolean;
   latitude: number;

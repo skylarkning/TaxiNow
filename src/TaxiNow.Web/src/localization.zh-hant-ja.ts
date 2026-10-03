@@ -278,7 +278,7 @@ export const japaneseExtendedTranslations: Record<string, string> = {
   "about.versionLabel": "バージョン：", "about.buildDateLabel": "ビルド日：", "about.internalBuildLabel": "内部ビルド：",
   "faq.aria": "よくある質問", "faq.heading": "よくある質問と技術的制限",
   "faq.platform.q": "対応シミュレーターは？", "faq.platform.a": "Windows版Microsoft Flight Simulator 2020および2024に対応します。",
-  "faq.xplane.q": "X-Planeに対応しない理由は？", "faq.xplane.a": "私はX-Planeを日常的に使用しておらず、信頼できる対応を提供できるほどSDKに詳しくありません。現在は統合予定がありませんが、要望が多ければ将来検討します。これは代替マップデータとして一部のX-Plane Scenery Gatewayデータを使うこととは別です。",
+  "faq.xplane.q": "TaxiNowはX-Planeに対応していますか？", "faq.xplane.a": "はい。TaxiNowはX-Plane 12のUDP DataRefインターフェースから、自機の位置、真方位、対地速度、接地状態を受信します。X-PlaneとTaxiNowを同じコンピューターで起動してください。",
   "faq.feedback.q": "不具合報告や意見を送るには？", "faq.feedback.before": "TaxiNow公式の", "faq.feedback.after": "ページにコメントしてください。空港ICAO、シミュレーターの版、TaxiNowのバージョンと内部ビルド、必要に応じて画像を添えてください。",
   "faq.free.q": "将来有料になりますか？", "faq.free.a": "いいえ。TaxiNowは100%無料で、今後も無料を維持するつもりです。オープンなデータと技術を利用しており、課金は商用利用に当たる可能性があります。フライトシミュレーション仲間への贈り物として作った無料ツールです。",
   "faq.privacy.q": "データを収集しますか？安全ですか？", "faq.privacy.a1": "個人情報、シミュレーターテレメトリ、利用分析、クラッシュレポート、診断情報を収集・送信しません。機体位置はPCとローカルネットワーク内に留まります。常時接続は不要で、インターネットはマップ取得時だけ必要です。その際は対象空港／地域を地図提供元または公式TaxiNowパックホストへ照会します。",

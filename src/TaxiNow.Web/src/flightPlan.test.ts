@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSimBrief, distanceNm, routeCoordinates, routeSections } from './flightPlan';
+import { parseSimBrief, distanceNm, routeCoordinates, routeSections, activeRouteLeg } from './flightPlan';
 
 const plan = () => ({
   origin: { icao_code: 'ZBAA', name: 'Beijing', pos_long: '116.6', pos_lat: '40.1' },
@@ -68,4 +68,17 @@ it('separates SID and STAR legs using incoming fix flags and keeps enroute solid
  expect(sections[0]!.coordinates[0]).toEqual(parsed.points[0]!.position);
  expect(sections.at(-1)!.coordinates.at(-1)![1]).toBeCloseTo(22.3);
  expect(routeSections(parseSimBrief(value).points).map(s=>s.procedure)).toEqual([false]);
+});
+
+it('selects the next waypoint and draws only the live remainder of the active leg', () => {
+  const points = [
+    { ident: 'PEPMA', position: [0, 0] as [number, number], airway: '' },
+    { ident: 'MUSIT', position: [2, 0] as [number, number], airway: '' },
+    { ident: 'NEXT', position: [4, 0] as [number, number], airway: '' }
+  ];
+
+  const active = activeRouteLeg(points, [0.8, 0]);
+  expect(active?.nextIndex).toBe(1);
+  expect(active?.coordinates[0]).toEqual([0.8, 0]);
+  expect(active?.coordinates.at(-1)?.[0]).toBeCloseTo(2);
 });

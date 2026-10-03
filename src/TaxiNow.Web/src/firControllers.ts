@@ -10,3 +10,15 @@ export function controllersForFir(id: string, controllers: Controller[], mapping
     return matches.some(m => m.prefix.length === longest && m.id === id);
   }).sort((a, b) => a.callsign.localeCompare(b.callsign));
 }
+
+export function onlineFirIds(controllers: Controller[], mappings: FirCallsign[]): string[] {
+  const ids = new Set<string>();
+  for (const controller of controllers) {
+    const base = controller.callsign.replace(/_(CTR|FSS)$/, '');
+    if (base === controller.callsign) continue;
+    const matches = mappings.filter(mapping => base === mapping.prefix || base.startsWith(mapping.prefix + '_'));
+    const longest = Math.max(0, ...matches.map(mapping => mapping.prefix.length));
+    matches.filter(mapping => mapping.prefix.length === longest).forEach(mapping => ids.add(mapping.id));
+  }
+  return [...ids].sort();
+}

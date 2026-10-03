@@ -1,0 +1,319 @@
+{
+  "observedOn": "2026-09-09",
+  "retrievedAtUtc": "2026-09-09T00:00:00Z",
+  "isStale": true,
+  "regions": [
+    {
+      "rank": 1,
+      "region": "EUR",
+      "icao": "LTAA",
+      "name": "ANKARA",
+      "spoofing": false,
+      "reported": true
+    },
+    {
+      "rank": 2,
+      "region": "EUR",
+      "icao": "LRBB",
+      "name": "BUCURESTI",
+      "spoofing": false,
+      "reported": true
+    },
+    {
+      "rank": 3,
+      "region": "EUR",
+      "icao": "EPWW",
+      "name": "WARSZAWA",
+      "spoofing": true,
+      "reported": true
+    },
+    {
+      "rank": 4,
+      "region": "EUR",
+      "icao": "LBSR",
+      "name": "SOFIA",
+      "spoofing": true,
+      "reported": true
+    },
+    {
+      "rank": 5,
+      "region": "EUR",
+      "icao": "EYVL",
+      "name": "VILNIUS",
+      "spoofing": false,
+      "reported": true
+    },
+    {
+      "rank": 6,
+      "region": "ASIA",
+      "icao": "VYYF",
+      "name": "YANGON",
+      "spoofing": true,
+      "reported": false
+    },
+    {
+      "rank": 7,
+      "region": "EUR",
+      "icao": "LTBB",
+      "name": "ISTANBUL",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 8,
+      "region": "EUR",
+      "icao": "EETT",
+      "name": "TALLINN",
+      "spoofing": false,
+      "reported": true
+    },
+    {
+      "rank": 9,
+      "region": "EUR",
+      "icao": "EVRR",
+      "name": "RIGA",
+      "spoofing": false,
+      "reported": true
+    },
+    {
+      "rank": 10,
+      "region": "AFI",
+      "icao": "HHAA",
+      "name": "ASMARA",
+      "spoofing": false,
+      "reported": true
+    },
+    {
+      "rank": 11,
+      "region": "EUR",
+      "icao": "UGGG",
+      "name": "TBILISI",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 12,
+      "region": "EUR",
+      "icao": "EFIN",
+      "name": "HELSINKI",
+      "spoofing": false,
+      "reported": true
+    },
+    {
+      "rank": 13,
+      "region": "EUR",
+      "icao": "LCCC",
+      "name": "NICOSIA",
+      "spoofing": true,
+      "reported": true
+    },
+    {
+      "rank": 14,
+      "region": "EUR",
+      "icao": "UNNT",
+      "name": "NOVOSIBIRSK",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 15,
+      "region": "ASIA",
+      "icao": "VTBB",
+      "name": "BANGKOK",
+      "spoofing": true,
+      "reported": true
+    },
+    {
+      "rank": 16,
+      "region": "EUR",
+      "icao": "UBBA",
+      "name": "BAKU",
+      "spoofing": false,
+      "reported": true
+    },
+    {
+      "rank": 17,
+      "region": "EUR",
+      "icao": "UUWV",
+      "name": "MOSCOW",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 18,
+      "region": "EUR",
+      "icao": "ULLL",
+      "name": "SANKT-PETERBURG",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 19,
+      "region": "EUR",
+      "icao": "UWWW",
+      "name": "SAMARA",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 20,
+      "region": "MID",
+      "icao": "HECC",
+      "name": "CAIRO",
+      "spoofing": true,
+      "reported": true
+    },
+    {
+      "rank": 21,
+      "region": "EUR",
+      "icao": "UDDD",
+      "name": "YEREVAN ZVARTNOTS",
+      "spoofing": false,
+      "reported": true
+    },
+    {
+      "rank": 22,
+      "region": "EUR",
+      "icao": "UATT",
+      "name": "AKTOBE",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 23,
+      "region": "EUR",
+      "icao": "USSV",
+      "name": "YEKATERINBURG",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 24,
+      "region": "EUR",
+      "icao": "URRV",
+      "name": "ROSTOV-NA-DONU",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 25,
+      "region": "MID",
+      "icao": "ORBB",
+      "name": "BAGHDAD",
+      "spoofing": false,
+      "reported": true
+    },
+    {
+      "rank": 26,
+      "region": "MID",
+      "icao": "HSSS",
+      "name": "KHARTOUM",
+      "spoofing": true,
+      "reported": false
+    },
+    {
+      "rank": 27,
+      "region": "MID",
+      "icao": "OIIX",
+      "name": "TEHRAN",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 28,
+      "region": "EUR",
+      "icao": "UMMV",
+      "name": "MINSK",
+      "spoofing": true,
+      "reported": false
+    },
+    {
+      "rank": 29,
+      "region": "MID",
+      "icao": "OLBB",
+      "name": "BEIRUT",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 30,
+      "region": "EUR",
+      "icao": "UHHH",
+      "name": "KHABAROVSK",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 31,
+      "region": "EUR",
+      "icao": "UIII",
+      "name": "IRKUTSK",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 32,
+      "region": "EUR",
+      "icao": "UKFV",
+      "name": "SIMFEROPOL",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 33,
+      "region": "EUR",
+      "icao": "UNKL",
+      "name": "KRASNOYARSK",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 34,
+      "region": "EUR",
+      "icao": "UUYY",
+      "name": "SYKTYVKAR",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 35,
+      "region": "EUR",
+      "icao": "ULKK",
+      "name": "KOTLAS",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 36,
+      "region": "EUR",
+      "icao": "LUUU",
+      "name": "CHISINAU",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 37,
+      "region": "MID",
+      "icao": "OKAC",
+      "name": "KUWAIT",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 38,
+      "region": "ASIA",
+      "icao": "VGFR",
+      "name": "DHAKA",
+      "spoofing": false,
+      "reported": false
+    },
+    {
+      "rank": 39,
+      "region": "MID",
+      "icao": "OOMM",
+      "name": "MUSCAT",
+      "spoofing": true,
+      "reported": true
+    }
+  ]
+}

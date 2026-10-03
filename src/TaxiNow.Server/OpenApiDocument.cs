@@ -18,6 +18,10 @@ internal static class OpenApiDocument
                 "Minimal opt-in TaxiNow presence for the authorized vMAS origin"),
             ["/api/v1/integrations/vatsim/traffic"] = Get(
                 "Nearby VATSIM aircraft from the official public network feed"),
+            ["/api/v1/integrations/vatsim/traffic/global"] = Get(
+                "Global VATSIM aircraft from the official public network feed"),
+            ["/api/v1/integrations/gnss/interference"] = Get(
+                "FIRs affected by GNSS interference in EASA's latest seven-day analysis"),
             ["/api/v1/integrations/beyondatc/traffic"] = Get(
                 "Nearby AI aircraft injected into MSFS by BeyondATC"),
             ["/api/v1/integrations/sayintentions/traffic"] = Get(

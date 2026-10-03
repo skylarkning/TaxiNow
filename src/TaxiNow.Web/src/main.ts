@@ -292,9 +292,7 @@ async function start(): Promise<void> {
   const serverLink =
     document.querySelector<HTMLAnchorElement>("#server-url")!;
   serverLink.href = appStatus.localUrl;
-  serverLink.textContent = t("access.at", {
-    address: appStatus.localUrl.replace(/^https?:\/\//, "")
-  });
+  serverLink.textContent = `${getLocale().startsWith("zh") ? "移动设备" : "Mobile device"}: ${appStatus.localUrl}`;
   serverLink.title = t("access.title", {
     addresses: appStatus.localUrls.join(", ")
   });
@@ -325,9 +323,6 @@ function setupThemeSelector(): void {
   applyTheme(initial);
 
   const selector = document.querySelector<HTMLButtonElement>("#theme-selector");
-  const quickToggle = document.querySelector<HTMLButtonElement>(
-    "#quick-theme-toggle"
-  );
   const menu = document.querySelector<HTMLElement>("#theme-menu");
   if (!selector || !menu) {
     return;
@@ -341,14 +336,6 @@ function setupThemeSelector(): void {
         "aria-checked",
         String(option.dataset.themeOption === theme)
       );
-    }
-    if (quickToggle) {
-      quickToggle.dataset.currentTheme = theme;
-      quickToggle.setAttribute(
-        "aria-label",
-        t(theme === "dark" ? "settings.switchLight" : "settings.switchDark")
-      );
-      quickToggle.title = quickToggle.getAttribute("aria-label") ?? "";
     }
   };
   sync(initial);
@@ -373,18 +360,6 @@ function setupThemeSelector(): void {
       selector.setAttribute("aria-expanded", "false");
     });
   }
-  quickToggle?.addEventListener("click", () => {
-    const theme = document.documentElement.dataset.theme === "light"
-      ? "dark"
-      : "light";
-    try {
-      window.localStorage.setItem(themeStorageKey, theme);
-    } catch {
-      // The theme remains active for this session.
-    }
-    applyTheme(theme);
-    sync(theme);
-  });
 }
 
 function applyTheme(theme: "dark" | "light"): void {
@@ -423,6 +398,9 @@ function setupTrafficSourceSettings(): void {
 function applyTrafficSource(source: TrafficSource | null): void {
   selectedTrafficSource = source;
   vatsimTrafficEnabled = source === "vatsim";
+  window.dispatchEvent(new CustomEvent("taxinow:vatsim-traffic-change", {
+    detail: { enabled: vatsimTrafficEnabled }
+  }));
   beyondAtcTrafficEnabled = source === "beyondatc";
   sayIntentionsTrafficEnabled = source === "sayintentions";
   writeBooleanPreference(vatsimTrafficStorageKey, vatsimTrafficEnabled);
@@ -3965,7 +3943,12 @@ function applyTelemetrySample(sample: TelemetrySnapshot): void {
     while (telemetrySamples.length > 2) {
       telemetrySamples.shift();
     }
-    setStatus(t("status.synced"), "connected");
+    setStatus(
+      sample.simulator === "xPlane12"
+        ? (getLocale().startsWith("zh") ? "位置已与 X-Plane 12 同步。" : "Position in sync with X-Plane 12.")
+        : t("status.synced"),
+      "connected"
+    );
     if (!sample.onGround) {
       automaticAirportSelectionSuspended = false;
     } else if (shouldIdentifyCurrentAirport(

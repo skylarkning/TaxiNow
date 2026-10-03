@@ -5,6 +5,7 @@ public enum SimulatorEdition
     Replay,
     Msfs2020,
     Msfs2024,
+    XPlane12,
     Unknown
 }
 

@@ -25,5 +25,7 @@
              Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest"
              Condition="Exists('..\TaxiNow.Web\dist')" />
+    <Content Update="Gnss\easa-gnss-seven-day.json"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

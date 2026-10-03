@@ -6,6 +6,8 @@ using TaxiNow.Core.Telemetry;
 using TaxiNow.Core.Traffic;
 using TaxiNow.Server.Airports;
 using TaxiNow.Server.Downloads;
+using TaxiNow.Server.Gnss;
+using TaxiNow.Server.XPlane;
 using TaxiNow.Server.SayIntentions;
 using TaxiNow.Server.Telemetry;
 using TaxiNow.Server.Vatsim;
@@ -28,6 +30,10 @@ public static class TaxiNowHost
         "/api/v1/integrations/beyondatc/traffic";
     public const string SayIntentionsTrafficPath =
         "/api/v1/integrations/sayintentions/traffic";
+    public const string VatsimGlobalTrafficPath =
+        "/api/v1/integrations/vatsim/traffic/global";
+    public const string GnssInterferencePath =
+        "/api/v1/integrations/gnss/interference";
     private const string VmasPresenceCorsPolicy = "VmasPresence";
     public const string ProductVersion = "1.6.0";
     public const string DisplayVersion = "V1.6";
@@ -106,32 +112,30 @@ public static class TaxiNowHost
             _ => VatsimTrafficService.CreateDefault(ProductVersion));
         builder.Services.AddSingleton(
             _ => SayIntentionsTrafficService.CreateDefault(ProductVersion));
-        builder.Services.AddSingleton<ITelemetrySource>(services =>
+        builder.Services.AddSingleton(
+            _ => GnssInterferenceService.CreateDefault(ProductVersion));
+        if (ResolveTelemetryMode(builder.Configuration) == "replay")
         {
-            var configuration = services.GetRequiredService<IConfiguration>();
-            var replayPath = configuration["TaxiNow:ReplayPath"];
-            var mode = ResolveTelemetryMode(configuration);
-            if (mode != "replay")
+            builder.Services.AddSingleton<ITelemetrySource>(services =>
             {
-                return new ManagedSimConnectTelemetrySource(
+                var configuration = services.GetRequiredService<IConfiguration>();
+                var replayPath = configuration["TaxiNow:ReplayPath"];
+                if (string.IsNullOrWhiteSpace(replayPath))
+                    replayPath = Path.Combine(AppContext.BaseDirectory, "fixtures", "telemetry", "cyyz-taxi.jsonl");
+                return new ReplayTelemetrySource(
+                    Path.GetFullPath(replayPath),
+                    configuration.GetValue("TaxiNow:ReplaySpeed", 1d),
+                    configuration.GetValue("TaxiNow:ReplayLoop", true));
+            });
+        }
+        else
+        {
+            builder.Services.AddSingleton<ITelemetrySource>(services =>
+                new ManagedSimConnectTelemetrySource(
                     services.GetRequiredService<TelemetryRefreshSignal>(),
-                    services.GetRequiredService<SimulatorTrafficState>());
-            }
-
-            if (string.IsNullOrWhiteSpace(replayPath))
-            {
-                replayPath = Path.Combine(
-                    AppContext.BaseDirectory,
-                    "fixtures",
-                    "telemetry",
-                    "cyyz-taxi.jsonl");
-            }
-
-            return new ReplayTelemetrySource(
-                Path.GetFullPath(replayPath),
-                configuration.GetValue("TaxiNow:ReplaySpeed", 1d),
-                configuration.GetValue("TaxiNow:ReplayLoop", true));
-        });
+                    services.GetRequiredService<SimulatorTrafficState>()));
+            builder.Services.AddSingleton<ITelemetrySource, XPlaneTelemetrySource>();
+        }
         builder.Services.AddHostedService<TelemetryPublisher>();
 
         var app = builder.Build();
@@ -233,6 +237,18 @@ public static class TaxiNowHost
             try { return Results.Ok(await traffic.GetControllersAsync(token)); }
             catch (Exception error) when (error is HttpRequestException or JsonException or TaskCanceledException)
             { return Results.Problem(title: "VATSIM controllers unavailable.", statusCode: 502); }
+        });
+
+        app.MapGet(GnssInterferencePath, async (GnssInterferenceService interference, CancellationToken token) =>
+        {
+            try { return Results.Ok(await interference.GetAsync(token).ConfigureAwait(false)); }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+            catch (Exception error) when (error is HttpRequestException or InvalidDataException or TaskCanceledException)
+            {
+                return Results.Problem(
+                    title: "GNSS interference information is temporarily unavailable.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
         });
 
         app.MapGet(VatsimTrafficPath, async (
@@ -393,6 +409,29 @@ public static class TaxiNowHost
             {
                 return Results.Problem(
                     title: "SayIntentions traffic is temporarily unavailable.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
+        app.MapGet(VatsimGlobalTrafficPath, async (
+            VatsimTrafficService traffic,
+            CancellationToken token) =>
+        {
+            try
+            {
+                return Results.Ok(await traffic
+                    .GetAllTrafficAsync(token)
+                    .ConfigureAwait(false));
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception error) when (
+                error is HttpRequestException or JsonException or TaskCanceledException)
+            {
+                return Results.Problem(
+                    title: "VATSIM traffic is temporarily unavailable.",
                     statusCode: StatusCodes.Status502BadGateway);
             }
         });
@@ -573,11 +612,11 @@ public static class TaxiNowHost
                 "replay",
                 StringComparison.OrdinalIgnoreCase)
                 ? "replay"
-                : "msfs";
+                : "auto";
         }
 
         return string.IsNullOrWhiteSpace(configuration["TaxiNow:ReplayPath"])
-            ? "msfs"
+            ? "auto"
             : "replay";
     }
 
