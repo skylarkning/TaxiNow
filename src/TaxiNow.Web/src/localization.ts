@@ -401,16 +401,19 @@ translations["zh-Hant"] = toTraditionalTranslations(
   translations["zh-Hans"]
 );
 const settingsTranslations: Record<AppLocale, Record<string, string>> = {
-  en: { "settings.title": "Settings", "settings.aria": "Open settings", "settings.menu": "Settings", "settings.keepVisible": "Keep window visible" },
-  "zh-Hans": { "settings.title": "设置", "settings.aria": "打开设置", "settings.menu": "设置", "settings.keepVisible": "保持窗口始终可见" },
-  "zh-Hant": { "settings.title": "設定", "settings.aria": "開啟設定", "settings.menu": "設定", "settings.keepVisible": "保持視窗永遠顯示在最上層" },
-  ja: { "settings.title": "設定", "settings.aria": "設定を開く", "settings.menu": "設定", "settings.keepVisible": "ウィンドウを常に手前に表示" },
-  fr: { "settings.title": "Paramètres", "settings.aria": "Ouvrir les paramètres", "settings.menu": "Paramètres", "settings.keepVisible": "Garder la fenêtre visible" },
-  de: { "settings.title": "Einstellungen", "settings.aria": "Einstellungen öffnen", "settings.menu": "Einstellungen", "settings.keepVisible": "Fenster immer im Vordergrund" },
-  ko: { "settings.title": "설정", "settings.aria": "설정 열기", "settings.menu": "설정", "settings.keepVisible": "창을 항상 위에 표시" }
+  en: { "settings.title": "Settings", "settings.aria": "Open settings", "settings.menu": "Settings", "settings.keepVisible": "Keep window visible", "settings.minimizeToTray": "Minimize to tray" },
+  "zh-Hans": { "settings.title": "设置", "settings.aria": "打开设置", "settings.menu": "设置", "settings.keepVisible": "保持窗口始终可见", "settings.minimizeToTray": "最小化到托盘" },
+  "zh-Hant": { "settings.title": "設定", "settings.aria": "開啟設定", "settings.menu": "設定", "settings.keepVisible": "保持視窗永遠顯示在最上層", "settings.minimizeToTray": "最小化至系統匣" },
+  ja: { "settings.title": "設定", "settings.aria": "設定を開く", "settings.menu": "設定", "settings.keepVisible": "ウィンドウを常に手前に表示", "settings.minimizeToTray": "最小化時にトレイへ移動" },
+  fr: { "settings.title": "Paramètres", "settings.aria": "Ouvrir les paramètres", "settings.menu": "Paramètres", "settings.keepVisible": "Garder la fenêtre visible", "settings.minimizeToTray": "Réduire dans la zone de notification" },
+  de: { "settings.title": "Einstellungen", "settings.aria": "Einstellungen öffnen", "settings.menu": "Einstellungen", "settings.keepVisible": "Fenster immer im Vordergrund", "settings.minimizeToTray": "In den Infobereich minimieren" },
+  ko: { "settings.title": "설정", "settings.aria": "설정 열기", "settings.menu": "설정", "settings.keepVisible": "창을 항상 위에 표시", "settings.minimizeToTray": "트레이로 최소화" }
 };
 
+const contributorLabels: Record<AppLocale, string> = {"en": "Contributor", "zh-Hans": "贡献者", "zh-Hant": "貢獻者", "ja": "貢献者", "fr": "Contributeur", "de": "Mitwirkender", "ko": "기여자"};
+
 for (const locale of Object.keys(translations) as AppLocale[]) {
+  translations[locale]["about.contributors"] = contributorLabels[locale];
   Object.assign(translations[locale], extendedTranslations[locale]);
   Object.assign(translations[locale], settingsTranslations[locale]);
   Object.assign(translations[locale], v14Translations[locale]);

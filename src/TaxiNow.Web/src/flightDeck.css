@@ -140,7 +140,14 @@ body.flightdeck[data-map-view="ground"] .taxi-plan-panel { top:104px; left:74px;
 body.flightdeck #taxi-plan-backdrop { display:none!important; }
 @media(max-width:620px) { body.flightdeck[data-map-view="ground"] .taxi-plan-panel { left:55px; width:calc(100% - 55px); } }
 
-body.flightdeck #airport-picker-toggle #airport-code, body.flightdeck #airport-picker-toggle #airport-name { display:none!important; }
+body.flightdeck .fd-flight-identity { display:flex; align-items:center; gap:16px; min-width:0; }
+body.flightdeck .fd-flight-identity #airport-name { max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body.flightdeck .fd-rail #airport-picker-toggle { display:flex; flex-direction:column; justify-content:center; gap:8px; width:100%; max-width:none; min-height:64px; border:1px solid #9da7b0; border-radius:9px; }
+body.flightdeck .fd-rail #airport-picker-toggle small { font-size:9px; color:#d8e0e4; }
+body.flightdeck .fd-rail #airport-code { display:block; font-size:18px; color:#fff; }
+body.flightdeck .fd-rail .airport-picker-panel { position:fixed; top:114px; left:80px; max-height:calc(100dvh - 154px); overflow-y:auto; box-sizing:border-box; }
+body.flightdeck #settings-menu { max-height:calc(100dvh - 150px); overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; box-sizing:border-box; }
+@media(max-width:620px) { body.flightdeck .fd-rail .airport-picker-panel { left:61px; width:calc(100vw - 73px); } body.flightdeck .fd-rail #airport-code { font-size:14px; } }
 body.flightdeck #fd-flight-number { color:#f4f7fa; font-size:15px; letter-spacing:0.03em; white-space:nowrap; }
 
 #fd-terrain-credit { font-size:9px; }

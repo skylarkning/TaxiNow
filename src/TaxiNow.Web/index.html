@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#08111d" />
-    <title>TaxiNow V1.6</title>
+    <title>TaxiNow V2.0</title>
   </head>
   <body>
     <main id="app">
@@ -119,6 +119,15 @@
                       aria-checked="false"
                       hidden>
                 <span data-i18n="settings.keepVisible">Keep window visible</span>
+                <span class="settings-check" aria-hidden="true">✓</span>
+              </button>
+              <button id="minimize-to-tray"
+                      class="settings-check-row"
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked="false"
+                      hidden>
+                <span data-i18n="settings.minimizeToTray">Minimize to tray</span>
                 <span class="settings-check" aria-hidden="true">✓</span>
               </button>
               <button id="auto-check-updates"
@@ -771,7 +780,7 @@
             <h1 id="welcome-heading">Welcome to TaxiNow</h1>
             <p class="welcome-subtitle">欢迎使用 TaxiNow</p>
           </div>
-          <span class="welcome-version">V1.6</span>
+          <span class="welcome-version">V2.0</span>
         </div>
         <div class="welcome-languages">
           <section lang="en">
@@ -922,6 +931,8 @@
                target="_blank"
                rel="noopener noreferrer">skylarkning</a>).
           </p>
+          <p class="about-developer"><span data-i18n="about.contributors">Contributor</span>: <a href="https://github.com/stewieqi-del" target="_blank" rel="noopener noreferrer">睡务局局长（stewieqi-del）</a></p>
+
           <p>
             <span data-i18n="about.officialPrefix">Official releases:</span>
             <a href="https://flightsim.to/addon/112712/taxinow"
@@ -1022,21 +1033,15 @@
               <summary data-i18n="faq.real.q">Is TaxiNow suitable for real-world navigation?</summary>
               <p data-i18n="faq.real.a">No. Maps may be incomplete, outdated, inferred, or inaccurate. TaxiNow is exclusively for personal flight-simulator use.</p>
             </details>
-            <details>
-              <summary data-i18n="faq.navapron.q">There is another app called "NavApron" that looks so similar to TaxiNow; is NavApron related to TaxiNow?/Did you develop NavApron?</summary>
-              <p data-i18n="faq.navapron.a1">No. I did not develop NavApron, and I have not authorized anyone to create a work derived from TaxiNow. To my knowledge, NavApron appeared within a week of TaxiNow V1.0 Beta and within four days of TaxiNow V1.1. It is understood that timing and appearance alone cannot prove how another product was developed.</p>
-              <p data-i18n="faq.navapron.a2">However, the unusually close timing, similar UI/UX, apparently AI-generated features, OSM data query and processing logic, and prototype artifacts resembling issues I manually corrected in TaxiNow, including overlapping taxiway markers and level-of-detail transitions, give me reason to suspect that TaxiNow may have been used as a reference for a distilled or derivative work. That is my assessment, not a verified finding. NavApron also places prominent, visually disruptive donation buttons in its main interface. I otherwise have no comment on that project.</p>
-              <p data-i18n="faq.navapron.a3">TaxiNow remains copyrighted software despite being free. It may not be copied, derived from, reverse engineered, or supplied to AI tools for distillation. If you want to build a better tool using methods or technology demonstrated in TaxiNow, contact me through GitHub. I am willing to discuss parts of my methodology when proper credit is given. Commercial use, including soliciting donations, is strictly prohibited for any work using TaxiNow code, assets, or protected technology. I have invested substantial time and resources in creating TaxiNow as freeware, and I ask other developers to respect that work and contact me directly before attempting to reuse it.</p>
-            </details>
           </section>
           <p class="about-version">
             <span data-i18n="about.versionLabel">Version:</span>
-            <strong id="about-version-localized">V1.6</strong>
+            <strong id="about-version-localized">V2.0</strong>
             (<span data-i18n="about.buildDateLabel">Build date:</span>
-            <span id="about-build-date-localized">September 14, 2026</span>).
+            <span id="about-build-date-localized">October 3, 2026</span>).
             <br />
             <span data-i18n="about.internalBuildLabel">Internal build:</span>
-            <strong id="about-build-id-localized">129</strong>.
+            <strong id="about-build-id-localized">201</strong>.
           </p>
         </div>
         <div class="about-language about-legacy" lang="en">
@@ -1243,10 +1248,10 @@
           </details>
         </section>
         <p class="about-version">
-          Version: <strong id="about-version">V1.6</strong>
-          (Build date: <span id="about-build-date">September 14, 2026</span>).
+          Version: <strong id="about-version">V2.0</strong>
+          (Build date: <span id="about-build-date">October 3, 2026</span>).
           <br />
-          Internal build: <strong id="about-build-id">129</strong>.
+          Internal build: <strong id="about-build-id">201</strong>.
         </p>
         </div>
         <div class="about-chinese about-language about-legacy" lang="zh-Hans">
@@ -1422,10 +1427,10 @@
             </details>
           </section>
           <p class="about-version">
-            版本：<strong id="about-version-zh">V1.6</strong>
-            （构建日期：<span id="about-build-date-zh">2026年9月5日</span>）。
+            版本：<strong id="about-version-zh">V2.0</strong>
+            （构建日期：<span id="about-build-date-zh">2026年10月3日</span>）。
             <br />
-            内部构建号：<strong id="about-build-id-zh">129</strong>。
+            内部构建号：<strong id="about-build-id-zh">201</strong>。
           </p>
         </div>
       </section>
@@ -1435,7 +1440,7 @@
         </span>
         <span id="map-summary"></span>
         <span class="footer-right">
-          <span id="footer-version">V1.6</span>
+          <span id="footer-version">V2.0</span>
           <span id="attribution"
                 data-i18n="footer.fixture">Bundled TaxiNow fixture</span>
         </span>

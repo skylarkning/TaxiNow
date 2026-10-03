@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\TaxiNow.Storage\TaxiNow.Storage.csproj" />
+    <Compile Include="..\..\src\TaxiNow.App\DesktopSettingsStore.cs" Link="DesktopSettingsStore.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\fixtures\airport-maps\CYYZ.v2.json"
@@ -20,4 +21,3 @@
              CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
-

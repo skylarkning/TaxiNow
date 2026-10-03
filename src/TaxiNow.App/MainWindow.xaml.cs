@@ -15,22 +15,28 @@ public partial class MainWindow : Window
     private readonly Func<string, Task<bool>> _changeStorageRootAsync;
     private readonly Func<bool, bool> _changeKeepWindowVisible;
     private readonly Func<bool, bool> _changeVmasPresenceEnabled;
+    private readonly Func<bool, bool> _changeMinimizeToTray;
     private string _storageRoot;
     private bool _keepWindowVisible;
     private bool _vmasPresenceEnabled;
+    private bool _minimizeToTray;
     private bool _updateInstallInProgress;
 
     public MainWindow(
         string storageRoot,
         bool keepWindowVisible,
         bool vmasPresenceEnabled,
+        bool minimizeToTray,
         Func<string, Task<bool>> changeStorageRootAsync,
         Func<bool, bool> changeKeepWindowVisible,
-        Func<bool, bool> changeVmasPresenceEnabled)
+        Func<bool, bool> changeVmasPresenceEnabled,
+        Func<bool, bool> changeMinimizeToTray)
     {
         _storageRoot = storageRoot;
         _keepWindowVisible = keepWindowVisible;
         _vmasPresenceEnabled = vmasPresenceEnabled;
+        _minimizeToTray = minimizeToTray;
+        _changeMinimizeToTray = changeMinimizeToTray;
         _changeStorageRootAsync = changeStorageRootAsync;
         _changeKeepWindowVisible = changeKeepWindowVisible;
         _changeVmasPresenceEnabled = changeVmasPresenceEnabled;
@@ -136,8 +142,15 @@ public partial class MainWindow : Window
             try
             {
                 using var document = JsonDocument.Parse(e.WebMessageAsJson);
-                enabled = document.RootElement.GetProperty("keepVisible")
-                    .GetBoolean();
+                var root = document.RootElement;
+                if (root.TryGetProperty("minimizeToTray", out var minimize))
+                {
+                    var minimizeToTray = minimize.GetBoolean();
+                    if (_changeMinimizeToTray(minimizeToTray)) _minimizeToTray = minimizeToTray;
+                    PostWindowSettings();
+                    return;
+                }
+                enabled = root.GetProperty("keepVisible").GetBoolean();
             }
             catch (Exception exception)
                 when (exception is JsonException or KeyNotFoundException or
@@ -345,7 +358,8 @@ public partial class MainWindow : Window
         MapView.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(new
         {
             type = "window-settings",
-            keepVisible = _keepWindowVisible
+            keepVisible = _keepWindowVisible,
+            minimizeToTray = _minimizeToTray
         }));
     }
 

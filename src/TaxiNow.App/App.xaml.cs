@@ -27,6 +27,7 @@ public partial class App : System.Windows.Application
     private string _storageRoot = StoragePaths.Default.Root;
     private bool _keepWindowVisible;
     private bool _vmasPresenceEnabled;
+    private bool _minimizeToTray;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -52,14 +53,17 @@ public partial class App : System.Windows.Application
         var desktopSettings = DesktopSettingsStore.Load();
         _keepWindowVisible = desktopSettings.KeepWindowVisible;
         _vmasPresenceEnabled = desktopSettings.EnableVmasPresence;
+        _minimizeToTray = desktopSettings.MinimizeToTray;
         _storageRoot = ResolveStorageRoot(desktopSettings);
         _window = new MainWindow(
             _storageRoot,
             _keepWindowVisible,
             _vmasPresenceEnabled,
+            _minimizeToTray,
             ChangeStorageRootAsync,
             ChangeKeepWindowVisible,
-            ChangeVmasPresenceEnabled);
+            ChangeVmasPresenceEnabled,
+            ChangeMinimizeToTray);
         MainWindow = _window;
         _window.Closing += OnWindowClosing;
         _window.StateChanged += OnWindowStateChanged;
@@ -160,7 +164,8 @@ public partial class App : System.Windows.Application
             DesktopSettingsStore.Save(new DesktopSettings(
                 selected,
                 _keepWindowVisible,
-                _vmasPresenceEnabled));
+                _vmasPresenceEnabled,
+                _minimizeToTray));
         }
         catch (Exception exception)
         {
@@ -202,7 +207,8 @@ public partial class App : System.Windows.Application
             DesktopSettingsStore.Save(new DesktopSettings(
                 _storageRoot,
                 enabled,
-                _vmasPresenceEnabled));
+                _vmasPresenceEnabled,
+                _minimizeToTray));
         }
         catch (Exception exception)
         {
@@ -223,6 +229,24 @@ public partial class App : System.Windows.Application
         return true;
     }
 
+    private bool ChangeMinimizeToTray(bool enabled)
+    {
+        try
+        {
+            DesktopSettingsStore.Save(new DesktopSettings(
+                _storageRoot, _keepWindowVisible, _vmasPresenceEnabled, enabled));
+            _minimizeToTray = enabled;
+            return true;
+        }
+        catch (Exception exception)
+        {
+            System.Windows.MessageBox.Show(
+                $"TaxiNow could not save the minimize setting.\n\n{exception.Message}",
+                "Window setting could not be saved", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+    }
+
     private bool ChangeVmasPresenceEnabled(bool enabled)
     {
         try
@@ -230,7 +254,8 @@ public partial class App : System.Windows.Application
             DesktopSettingsStore.Save(new DesktopSettings(
                 _storageRoot,
                 _keepWindowVisible,
-                enabled));
+                enabled,
+                _minimizeToTray));
         }
         catch (Exception exception)
         {
@@ -373,6 +398,7 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        if (!_minimizeToTray) return;
         _window.Hide();
         if (_trayIcon is not null)
         {

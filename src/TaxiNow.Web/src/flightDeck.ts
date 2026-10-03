@@ -19,6 +19,7 @@ import {
   vatsimTrafficPopupModel
 } from './vatsimTrafficPresentation';
 import './flightDeck.css';
+import { followAircraft } from './aircraftFollow';
 
 const words = {
   flight: ['飞行计划', 'Flight'], route: ['航路信息', 'Route Info'],
@@ -28,7 +29,7 @@ const words = {
   help: ['先在 SimBrief 生成计划，再在这里导入。', 'Generate a plan in SimBrief, then import it here.'],
   empty: ['准备下一段飞行', 'Your next flight starts here'], emptyText: ['从 SimBrief 导入航路，在地球上查看完整旅程。', 'Import from SimBrief to explore your route on the globe.'],
   fit: ['完整航路', 'Fit route'], clear: ['清除计划', 'Clear plan'], north: ['正北向上', 'North Up'],
-  locate: ['定位飞机', 'Locate aircraft'], grid: ['经纬网', 'Grid'], points: ['航路点', 'Waypoints'],
+  locate: ['定位飞机', 'Locate aircraft'], follow: ['持续跟随飞机', 'Follow aircraft'], grid: ['经纬网', 'Grid'], points: ['航路点', 'Waypoints'],
   loading: ['正在导入…', 'Importing…'], failed: ['导入失败。请检查账号、网络，并确认已生成含详细 Navlog 的计划。', 'Import failed. Check your account, connection and a generated plan with a detailed Navlog.'],
   ready: ['导入成功', 'Plan imported'], distance: ['航路距离', 'Route distance'], altitude: ['计划高度', 'Planned altitude'],
   noPosition: ['暂无有效飞机位置', 'No valid aircraft position'], view: ['全球航路', 'Global route'],
@@ -44,6 +45,10 @@ const usernameKey = key + '.username';
 const vatsimTrafficKey = 'taxinow.map.vatsimTraffic';
 const weatherRadarKey = 'taxinow.globe.weatherRadar';
 const gnssInterferenceKey = 'taxinow.globe.gnssInterference';
+const aircraftFollowKey = 'taxinow.globe.aircraftFollow';
+let aircraftFollowEnabled = false;
+let lastFollowCameraAt = 0;
+try { aircraftFollowEnabled = localStorage.getItem(aircraftFollowKey) === 'true'; } catch { /* Use default. */ }
 let terrainEnabled = true;
 try { terrainEnabled = localStorage.getItem('taxinow.terrain') !== 'false'; } catch { /* Use default. */ }
 let globeTrafficEnabled = false, weatherRadarEnabled = false, gnssInterferenceEnabled = false;
@@ -89,7 +94,13 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   if (navigation) groundNavigation = navigation;
   document.body.classList.add('flightdeck');
   const flightNumber = document.createElement('strong'); flightNumber.id = 'fd-flight-number';
-  $('airport-picker-toggle').prepend(flightNumber);
+  const airportName = $('airport-name');
+  const flightIdentity = document.createElement('div'); flightIdentity.className = 'fd-flight-identity';
+  flightIdentity.append(flightNumber, airportName);
+  document.querySelector('.header-primary')!.append(flightIdentity);
+  const airportCaption = document.createElement('small'); airportCaption.textContent = 'AIRPORT ▾';
+  $('airport-picker-toggle').querySelector('[aria-hidden]')?.remove();
+  $('airport-picker-toggle').prepend(airportCaption);
   const nav = document.createElement('nav'); nav.className = 'fd-tabs'; nav.setAttribute('aria-label', 'Flight navigation');
   for (const tab of flightDeckTabs) {
     const b = button(tr(tab), () => { setMode(true); currentTab = tab; $('fd-panel').hidden = false; renderPanel(); });
@@ -100,6 +111,7 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   const rail = document.createElement('nav'); rail.className = 'fd-rail'; rail.setAttribute('aria-label', 'Map views');
   rail.append(button(tr('globe'), () => setMode(true)), button(tr('ground'), () => setMode(false)));
   rail.children[0]!.id = 'fd-globe-mode'; rail.children[1]!.id = 'fd-ground-mode';
+  rail.prepend(document.querySelector('.airport-switcher')!);
   const profileControl = button(tr('profile'), () => profileController?.setOpen(profileControl.getAttribute('aria-pressed') !== 'true'));
   profileControl.id = 'fd-profile-mode';
   profileControl.setAttribute('aria-controls', 'fd-vertical-profile');
@@ -167,7 +179,7 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   $('fd-close').onclick = () => { $('fd-panel').hidden = true; $(`fd-tab-${currentTab}`).focus(); };
   $('fd-import').onclick = () => void importPlan();
   const accountSettings = document.createElement('div'); accountSettings.className = 'fd-account-settings';
-  accountSettings.innerHTML = '<strong>SimBrief</strong><label for="fd-identifier">Username</label><input id="fd-identifier" maxlength="100" placeholder="Navigraph Alias" autocomplete="off" spellcheck="false"><small>' + (getLocale().startsWith('zh') ? '自动保存在此浏览器，无需密码。' : 'Saved in this browser. No password required.') + '</small>';
+  accountSettings.innerHTML = '<strong>SimBrief</strong><label for="fd-identifier">Username</label><input id="fd-identifier" maxlength="100" placeholder="Navigraph Alias" autocomplete="off" spellcheck="false"><small>' + (getLocale().startsWith('zh') ? 'SimBrief用户名会自动保存' : 'Your SimBrief username is saved automatically.') + '</small>';
   settingsMenu.prepend(accountSettings);
   $('fd-identifier').addEventListener('input', () => { try { localStorage.setItem(usernameKey, $<HTMLInputElement>('fd-identifier').value.trim()); } catch { /* Keep usable in memory. */ } });
   $('fd-identifier').addEventListener('keydown', e => { if (e.key === 'Enter') { settingsMenu.hidden = true; $('settings-selector').setAttribute('aria-expanded', 'false'); } });
@@ -211,6 +223,17 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   };
   $('fd-fir').onclick = () => { if (!routeMap?.getLayer('fir-boundary')) return; const on = $('fd-fir').getAttribute('aria-pressed') !== 'true'; $('fd-fir').setAttribute('aria-pressed', String(on)); for (const layer of ['fir-online', 'fir-boundary', 'fir-hit']) routeMap.setLayoutProperty(layer, 'visibility', on ? 'visible' : 'none'); updateFirLabelMarkers(); };
   $('fd-locate').onclick = () => { if (validPosition(lastPosition)) routeMap?.easeTo({ center: [lastPosition!.longitude, lastPosition!.latitude], zoom: 5 }); else feedback(tr('noPosition')); };
+  const follow = button('✈', () => {
+    aircraftFollowEnabled = !aircraftFollowEnabled;
+    follow.setAttribute('aria-pressed', String(aircraftFollowEnabled));
+    try { localStorage.setItem(aircraftFollowKey, String(aircraftFollowEnabled)); } catch { /* Keep session usable. */ }
+    followFlightDeckAircraft(true);
+    if (aircraftFollowEnabled && !validPosition(lastPosition)) feedback(tr('noPosition'));
+  });
+  follow.id = 'fd-follow'; follow.title = tr('follow');
+  follow.setAttribute('aria-label', tr('follow'));
+  follow.setAttribute('aria-pressed', String(aircraftFollowEnabled));
+  $('fd-locate').after(follow);
   $('fd-grid').onclick = () => { if (!routeMap?.getLayer('grid')) return; const on = $('fd-grid').getAttribute('aria-pressed') !== 'true'; $('fd-grid').setAttribute('aria-pressed', String(on)); routeMap.setLayoutProperty('grid', 'visibility', on ? 'visible' : 'none'); };
   $('fd-projection').onclick = () => { globeMode = !globeMode; routeMap?.setProjection({ type: globeMode ? 'globe' : 'mercator' }); $('fd-projection').textContent = globeMode ? '3D' : '2D'; requestAnimationFrame(updateVisibleGlobeTraffic); };
   try {
@@ -796,6 +819,19 @@ function fitRoute(): void {
 function validPosition(value?: TelemetrySnapshot): boolean {
   return !!value && value.hasPosition && value.connected && !value.isStale && Number.isFinite(value.latitude) && Number.isFinite(value.longitude) && Math.abs(value.latitude) <= 90 && Math.abs(value.longitude) <= 180 && Date.now() - Date.parse(value.serverTimestampUtc) < 15000;
 }
+function followFlightDeckAircraft(force = false): void {
+  const now = performance.now();
+  if (!aircraftFollowEnabled || !routeMap || $('fd-root').hidden || !validPosition(lastPosition) ||
+      (!force && now - lastFollowCameraAt < 250)) return;
+  const panel = $('fd-panel');
+  const bounds = routeMap.getCanvas().getBoundingClientRect();
+  const panelBounds = panel.hidden ? undefined : panel.getBoundingClientRect();
+  const covered = panelBounds && panelBounds.width < bounds.width * 0.7
+    ? Math.max(0, Math.min(bounds.width, panelBounds.right - bounds.left)) : 0;
+  followAircraft(routeMap, [lastPosition!.longitude, lastPosition!.latitude], lastPosition!.trueHeadingDegrees,
+    [covered / 2, 0], force ? 5 : 0);
+  lastFollowCameraAt = now;
+}
 export function updateFlightDeckPosition(sample: TelemetrySnapshot): void {
   lastPosition = sample;
   profileController?.setTelemetry(sample);
@@ -809,6 +845,7 @@ export function updateFlightDeckPosition(sample: TelemetrySnapshot): void {
   if (!routeMap || !validPosition(sample)) { ownship?.remove(); ownship = undefined; updateActiveRouteLeg(); if ($('fd-position')) $('fd-position').textContent = tr('noPosition'); return; }
   if (!ownship) { const el = document.createElement('div'); el.className = 'fd-ownship'; el.textContent = '▲'; ownship = new ml.Marker({ element: el, rotationAlignment: 'map' }).setLngLat([sample.longitude, sample.latitude]).addTo(routeMap); }
   ownship.setLngLat([sample.longitude, sample.latitude]).setRotation(sample.trueHeadingDegrees);
+  followFlightDeckAircraft();
   updateActiveRouteLeg();
   $('fd-position').textContent = `${Math.round(sample.trueHeadingDegrees)}°  ·  ${Math.round(sample.groundSpeedKnots)} KT`;
 }
