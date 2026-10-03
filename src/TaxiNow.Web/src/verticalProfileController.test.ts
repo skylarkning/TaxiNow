@@ -26,8 +26,8 @@ function terrain(elevationFeet = 500, cacheState: ElevationProfileResponse['cach
 function telemetry(overrides: Partial<TelemetrySnapshot> = {}): TelemetrySnapshot {
   return {
     sequence: 1, simulator: 'replay', connected: true, onGround: false, latitude: 0, longitude: 0.5,
-    trueHeadingDegrees: 90, groundSpeedKnots: 200, sourceTimestampUtc: '2026-09-12T00:00:00Z',
-    serverTimestampUtc: '2026-09-12T00:00:00Z', sourceMonotonicMilliseconds: 1,
+    trueHeadingDegrees: 90, groundSpeedKnots: 200, sourceTimestampUtc: new Date().toISOString(),
+    serverTimestampUtc: new Date().toISOString(), sourceMonotonicMilliseconds: 1,
     hasPosition: true, isStale: false, altitudeMslFeet: 5000, altitudeAglFeet: 4500, state: 'airborne',
     ...overrides
   };
@@ -54,6 +54,34 @@ function harness(initialOpen = true, preferenceStore?: unknown) {
 }
 
 describe('VerticalProfileController', () => {
+  it('expires live altitude without another sample, retains terrain, and recovers on fresh telemetry', async () => {
+    vi.useFakeTimers();
+    try {
+      const h = harness();
+      const loaded = h.controller.setPlan(plan());
+      h.requests[0]!.resolve(Response.json(terrain()));
+      await loaded;
+      h.controller.setTelemetry(telemetry());
+      expect(h.model?.metrics.currentAltitudeFeet).toBe(5000);
+      vi.advanceTimersByTime(10_000);
+      h.controller.setTelemetry(telemetry({ altitudeMslFeet: 6000 }));
+      vi.advanceTimersByTime(5_000);
+      expect(h.model?.metrics.currentAltitudeFeet).toBe(6000);
+      vi.advanceTimersByTime(10_000);
+      expect(h.model?.aircraft).toBeUndefined();
+      expect(h.model?.metrics.currentAltitudeFeet).toBeNull();
+      expect(h.model?.metrics.currentAglFeet).toBeNull();
+      expect(h.model?.metrics.terrainClearanceFeet).toBeNull();
+      expect(h.model?.terrain).toHaveLength(2);
+      h.controller.setTelemetry(telemetry({ altitudeMslFeet: 7000 }));
+      expect(h.model?.metrics.currentAltitudeFeet).toBe(7000);
+      expect(h.requests).toHaveLength(1);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it('renders plan-only loading immediately and sends one POST for overlapping identical routes', async () => {
     const h = harness();
     const first = h.controller.setPlan(plan());

@@ -1,6 +1,6 @@
 import type { ElevationProfileResponse, TelemetrySnapshot } from './contracts';
 import type { FlightPlan } from './flightPlan';
-import { buildVerticalProfileModel } from './verticalProfile';
+import { buildVerticalProfileModel, hasFreshProfileTelemetry, profileTelemetryFreshnessMilliseconds } from './verticalProfile';
 import type { VerticalProfileView, VerticalProfileViewState } from './verticalProfileView';
 
 interface VerticalProfileControllerOptions {
@@ -41,6 +41,7 @@ const unavailableTerrain: ElevationProfileResponse = {
 export class VerticalProfileController {
   private plan: FlightPlan | undefined;
   private telemetry: TelemetrySnapshot | undefined;
+  private telemetryExpiry: ReturnType<typeof setTimeout> | undefined;
   private routeHash: string | undefined;
   private terrain: ElevationProfileResponse | undefined;
   private readonly terrainCache = new Map<string, ElevationProfileResponse>();
@@ -85,7 +86,17 @@ export class VerticalProfileController {
   }
 
   setTelemetry(sample: TelemetrySnapshot): void {
+    if (this.telemetryExpiry !== undefined) clearTimeout(this.telemetryExpiry);
+    this.telemetryExpiry = undefined;
     this.telemetry = sample;
+    if (hasFreshProfileTelemetry(sample)) {
+      const remaining = profileTelemetryFreshnessMilliseconds - (Date.now() - Date.parse(sample.serverTimestampUtc));
+      this.telemetryExpiry = setTimeout(() => {
+        this.telemetryExpiry = undefined;
+        this.telemetry = undefined;
+        this.render();
+      }, remaining);
+    }
     this.render();
   }
 

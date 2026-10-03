@@ -40,7 +40,7 @@ public sealed class XPlaneTelemetryTests
     }
 
     [Fact]
-    public async Task XPlaneTelemetrySource_ReceivesAnXPlane12PositionOverUdp()
+    public async Task TelemetrySource_ReceivesAnXPlane12PositionOverUdp()
     {
         using var simulator = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
         var port = ((IPEndPoint)simulator.Client.LocalEndPoint!).Port;
@@ -54,17 +54,7 @@ public sealed class XPlaneTelemetryTests
 
         var next = samples.MoveNextAsync().AsTask();
         var request = await simulator.ReceiveAsync(timeout.Token);
-        await simulator.SendAsync(
-            CreateResponse(
-                43.68f,
-                -79.62f,
-                237.5f,
-                10f,
-                0f,
-                3762.756f,
-                914.4f),
-            request.RemoteEndPoint,
-            timeout.Token);
+        await simulator.SendAsync(CreateResponse(43.68f, -79.62f, 237.5f, 10f, 1f, 3762.756f, 914.4f), request.RemoteEndPoint, timeout.Token);
 
         Assert.True(await next);
         Assert.Equal(SimulatorEdition.XPlane12, samples.Current.Simulator);
@@ -72,9 +62,44 @@ public sealed class XPlaneTelemetryTests
         Assert.Equal(-79.62, samples.Current.Longitude, 2);
         Assert.Equal(237.5, samples.Current.TrueHeadingDegrees, 1);
         Assert.Equal(19.44, samples.Current.GroundSpeedKnots, 2);
+        Assert.True(samples.Current.OnGround);
+        Assert.Equal(12345, samples.Current.AltitudeMslFeet!.Value, 0);
+        Assert.Equal(3000, samples.Current.AltitudeAglFeet!.Value, 0);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Reconnection_RequiresFreshCompletePosition(bool partialPacket)
+    {
+        using var simulator = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["TaxiNow:XPlane:Port"] = ((IPEndPoint)simulator.Client.LocalEndPoint!).Port.ToString()
+        }).Build();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var source = new XPlaneTelemetrySource(configuration);
+        await using var samples = source.ReadAllAsync(timeout.Token).GetAsyncEnumerator(timeout.Token);
+        var first = samples.MoveNextAsync().AsTask();
+        var request = await simulator.ReceiveAsync(timeout.Token);
+        await simulator.SendAsync(CreateResponse(43.68f, -79.62f, 237.5f, 10f, 1f, 3762.756f, 914.4f), request.RemoteEndPoint, timeout.Token);
+        Assert.True(await first);
+        Assert.True(samples.Current.HasPosition);
+        Assert.True(await samples.MoveNextAsync());
+        Assert.False(samples.Current.HasPosition);
+
+        var partial = samples.MoveNextAsync().AsTask();
+        await simulator.SendAsync(partialPacket ? CreateResponse(44f) : new byte[] { 1, 2, 3 }, request.RemoteEndPoint, timeout.Token);
+        Assert.True(await partial);
+        Assert.False(samples.Current.HasPosition);
+
+        var recovered = samples.MoveNextAsync().AsTask();
+        await simulator.SendAsync(CreateResponse(44f, -80f, 180f, 5f, 0f, 3000f, 1000f), request.RemoteEndPoint, timeout.Token);
+        Assert.True(await recovered);
+        Assert.True(samples.Current.HasPosition);
+        Assert.Equal(44, samples.Current.Latitude);
+        Assert.Equal(-80, samples.Current.Longitude);
         Assert.False(samples.Current.OnGround);
-        Assert.Equal(12_345, samples.Current.AltitudeMslFeet!.Value, 0);
-        Assert.Equal(3_000, samples.Current.AltitudeAglFeet!.Value, 0);
     }
 
     private static byte[] CreateResponse(params float[] values)

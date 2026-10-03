@@ -3,14 +3,16 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Json;
 using TaxiNow.Core.Airports;
 using TaxiNow.Core.Telemetry;
+using TaxiNow.Core.Traffic;
 using TaxiNow.Server.Airports;
 using TaxiNow.Server.Downloads;
 using TaxiNow.Server.Elevation;
 using TaxiNow.Server.Gnss;
+using TaxiNow.Server.XPlane;
+using TaxiNow.Server.SayIntentions;
 using TaxiNow.Server.Telemetry;
 using TaxiNow.Server.Vatsim;
 using TaxiNow.Server.SimBrief;
-using TaxiNow.Server.XPlane;
 using TaxiNow.SimConnect.Managed;
 using TaxiNow.SimConnect.Replay;
 using TaxiNow.Storage;
@@ -25,6 +27,10 @@ public static class TaxiNowHost
         "/api/v1/integrations/vmas/presence";
     public const string VatsimTrafficPath =
         "/api/v1/integrations/vatsim/traffic";
+    public const string BeyondAtcTrafficPath =
+        "/api/v1/integrations/beyondatc/traffic";
+    public const string SayIntentionsTrafficPath =
+        "/api/v1/integrations/sayintentions/traffic";
     public const string VatsimGlobalTrafficPath =
         "/api/v1/integrations/vatsim/traffic/global";
     public const string GnssInterferencePath =
@@ -32,10 +38,10 @@ public static class TaxiNowHost
     public const string ElevationProfilePath =
         "/api/v1/elevation/profile";
     private const string VmasPresenceCorsPolicy = "VmasPresence";
-    public const string ProductVersion = "1.5.0";
-    public const string DisplayVersion = "V1.5";
-    public const int InternalBuildId = 126;
-    public const string BuildDate = "August 30, 2026";
+    public const string ProductVersion = "1.6.0";
+    public const string DisplayVersion = "V1.6";
+    public const int InternalBuildId = 129;
+    public const string BuildDate = "September 14, 2026";
 
     public static string MapShellUrl =>
         $"http://127.0.0.1:{DefaultPort}/?build={InternalBuildId}";
@@ -96,8 +102,10 @@ public static class TaxiNowHost
         builder.Services.AddSingleton<TaxiNowDatabase>();
         builder.Services.AddSingleton<MapAssetStore>();
         builder.Services.AddSingleton<AirportFixtureService>();
+        builder.Services.AddSingleton<AirportCatalogService>();
         builder.Services.AddSingleton<TelemetryState>();
         builder.Services.AddSingleton<TelemetryRefreshSignal>();
+        builder.Services.AddSingleton<SimulatorTrafficState>();
         builder.Services.AddSingleton<DownloadJobService>();
         builder.Services.AddHttpClient(
             ElevationProfileService.HttpClientName,
@@ -121,6 +129,8 @@ public static class TaxiNowHost
         builder.Services.AddSingleton(
             _ => VatsimTrafficService.CreateDefault(ProductVersion));
         builder.Services.AddSingleton(
+            _ => SayIntentionsTrafficService.CreateDefault(ProductVersion));
+        builder.Services.AddSingleton(
             _ => GnssInterferenceService.CreateDefault(ProductVersion));
         if (ResolveTelemetryMode(builder.Configuration) == "replay")
         {
@@ -139,7 +149,9 @@ public static class TaxiNowHost
         else
         {
             builder.Services.AddSingleton<ITelemetrySource>(services =>
-                new ManagedSimConnectTelemetrySource(services.GetRequiredService<TelemetryRefreshSignal>()));
+                new ManagedSimConnectTelemetrySource(
+                    services.GetRequiredService<TelemetryRefreshSignal>(),
+                    services.GetRequiredService<SimulatorTrafficState>()));
             builder.Services.AddSingleton<ITelemetrySource, XPlaneTelemetrySource>();
         }
         builder.Services.AddHostedService<TelemetryPublisher>();
@@ -298,6 +310,128 @@ public static class TaxiNowHost
             }
         });
 
+        app.MapGet(BeyondAtcTrafficPath, (
+            double? west,
+            double? south,
+            double? east,
+            double? north,
+            SimulatorTrafficState traffic) =>
+        {
+            if (!VatsimTrafficBounds.TryCreate(
+                    west,
+                    south,
+                    east,
+                    north,
+                    out var bounds))
+            {
+                return Results.BadRequest(new
+                {
+                    error = "Provide valid west, south, east, and north bounds no larger than 30 degrees."
+                });
+            }
+
+            traffic.RequestObservation();
+            var snapshot = traffic.Latest;
+            var aircraft = snapshot.Aircraft
+                .Where(item => bounds.Contains(
+                    item.Longitude,
+                    item.Latitude))
+                .ToArray();
+            return Results.Ok(new
+            {
+                snapshot.Sequence,
+                snapshot.Connected,
+                snapshot.RetrievedAtUtc,
+                isStale = !snapshot.Connected ||
+                    DateTimeOffset.UtcNow - snapshot.RetrievedAtUtc >
+                    TimeSpan.FromSeconds(5),
+                count = aircraft.Length,
+                aircraft
+            });
+        });
+
+        app.MapGet(SayIntentionsTrafficPath, async (
+            double? west,
+            double? south,
+            double? east,
+            double? north,
+            SayIntentionsTrafficService sayIntentions,
+            SimulatorTrafficState simulatorTraffic,
+            CancellationToken token) =>
+        {
+            if (!VatsimTrafficBounds.TryCreate(
+                    west,
+                    south,
+                    east,
+                    north,
+                    out var bounds))
+            {
+                return Results.BadRequest(new
+                {
+                    error = "Provide valid west, south, east, and north bounds no larger than 30 degrees."
+                });
+            }
+
+            simulatorTraffic.RequestObservation();
+            try
+            {
+                var feed = await sayIntentions
+                    .GetTrafficAsync(token)
+                    .ConfigureAwait(false);
+                var simulatorSnapshot = simulatorTraffic.Latest;
+                var simulatorAircraft = simulatorSnapshot.Connected &&
+                    DateTimeOffset.UtcNow - simulatorSnapshot.RetrievedAtUtc <=
+                    TimeSpan.FromSeconds(5)
+                    ? simulatorSnapshot.Aircraft.ToDictionary(
+                        item => item.ObjectId)
+                    : [];
+                var aircraft = feed.Aircraft
+                    .Select(item =>
+                    {
+                        if (item.SimConnectId is { } simConnectId &&
+                            simulatorAircraft.TryGetValue(
+                                simConnectId,
+                                out var local))
+                        {
+                            return item with
+                            {
+                                Latitude = local.Latitude,
+                                Longitude = local.Longitude,
+                                HeadingDegrees = local.HeadingDegrees,
+                                AltitudeFeet = local.AltitudeFeet,
+                                GroundSpeedKnots = local.GroundSpeedKnots,
+                                OnGround = local.OnGround
+                            };
+                        }
+                        return item;
+                    })
+                    .Where(item => bounds.Contains(
+                        item.Longitude,
+                        item.Latitude))
+                    .ToArray();
+                return Results.Ok(new
+                {
+                    feed.ClientConnected,
+                    feed.ActiveFlight,
+                    feed.RetrievedAtUtc,
+                    feed.IsStale,
+                    count = aircraft.Length,
+                    aircraft
+                });
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception error) when (
+                error is HttpRequestException or JsonException or TaskCanceledException)
+            {
+                return Results.Problem(
+                    title: "SayIntentions traffic is temporarily unavailable.",
+                    statusCode: StatusCodes.Status502BadGateway);
+            }
+        });
+
         app.MapGet(VatsimGlobalTrafficPath, async (
             VatsimTrafficService traffic,
             CancellationToken token) =>
@@ -372,6 +506,48 @@ public static class TaxiNowHost
             "/api/v1/airports",
             (string? query, AirportFixtureService airports) =>
                 Results.Ok(airports.Search(query)));
+        app.MapGet(
+            "/api/v1/airports/nearest",
+            async (
+                double? latitude,
+                double? longitude,
+                AirportCatalogService catalog,
+                MapAssetStore store,
+                CancellationToken token) =>
+            {
+                if (latitude is null || longitude is null ||
+                    !double.IsFinite(latitude.Value) ||
+                    latitude.Value is < -90 or > 90 ||
+                    !double.IsFinite(longitude.Value) ||
+                    longitude.Value is < -180 or > 180)
+                {
+                    return Results.BadRequest(new
+                    {
+                        error = "Provide valid latitude and longitude coordinates."
+                    });
+                }
+
+                var airport = await catalog.FindNearestAsync(
+                    latitude.Value,
+                    longitude.Value,
+                    cancellationToken: token).ConfigureAwait(false);
+                if (airport is null)
+                {
+                    return Results.Ok(new
+                    {
+                        airport = (AirportCatalogMatch?)null,
+                        installed = false
+                    });
+                }
+
+                return Results.Ok(new
+                    {
+                        airport,
+                        installed = await store.ContainsAsync(
+                            airport.Icao,
+                            token).ConfigureAwait(false)
+                    });
+            });
         app.MapGet(
             "/api/v1/airports/{icao}",
             (string icao, AirportFixtureService airports) =>

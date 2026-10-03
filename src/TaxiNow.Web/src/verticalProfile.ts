@@ -92,6 +92,14 @@ export interface BuildVerticalProfileInput {
 
 const nauticalMilesPerDegree = 60.0405;
 const radians = Math.PI / 180;
+export const profileTelemetryFreshnessMilliseconds = 15_000;
+
+export function hasFreshProfileTelemetry(sample: TelemetrySnapshot | undefined, now = Date.now()): boolean {
+  if (!sample?.connected || !sample.hasPosition || sample.isStale) return false;
+  const timestamp = Date.parse(sample.serverTimestampUtc);
+  const age = now - timestamp;
+  return Number.isFinite(timestamp) && age >= 0 && age < profileTelemetryFreshnessMilliseconds;
+}
 
 function shortLongitudeDelta(from: number, to: number): number {
   return ((to - from + 540) % 360) - 180;
@@ -284,7 +292,7 @@ export function buildVerticalProfileModel(input: BuildVerticalProfileInput): Ver
     }];
   });
 
-  const liveProjection = telemetry?.connected && telemetry.hasPosition && !telemetry.isStale &&
+  const liveProjection = hasFreshProfileTelemetry(telemetry) && telemetry &&
     Number.isFinite(telemetry.latitude) && Number.isFinite(telemetry.longitude) &&
     Number.isFinite(telemetry.altitudeMslFeet)
     ? projectPositionOntoRoute(flightPlan.points, [telemetry.longitude, telemetry.latitude])

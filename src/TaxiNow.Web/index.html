@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#08111d" />
-    <title>TaxiNow V1.5</title>
+    <title>TaxiNow V1.6</title>
   </head>
   <body>
     <main id="app">
@@ -135,6 +135,22 @@
                       role="menuitemcheckbox"
                       aria-checked="false">
                 <span data-i18n="settings.vatsimTraffic">Show VATSIM Traffic</span>
+                <span class="settings-check" aria-hidden="true">✓</span>
+              </button>
+              <button id="show-beyondatc-traffic"
+                      class="settings-check-row"
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked="false">
+                <span data-i18n="settings.beyondAtcTraffic">Show BeyondATC Traffic</span>
+                <span class="settings-check" aria-hidden="true">✓</span>
+              </button>
+              <button id="show-sayintentions-traffic"
+                      class="settings-check-row"
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked="false">
+                <span data-i18n="settings.sayIntentionsTraffic">Show SayIntentions Traffic</span>
                 <span class="settings-check" aria-hidden="true">✓</span>
               </button>
               <button id="enable-vmas-presence"
@@ -755,7 +771,7 @@
             <h1 id="welcome-heading">Welcome to TaxiNow</h1>
             <p class="welcome-subtitle">欢迎使用 TaxiNow</p>
           </div>
-          <span class="welcome-version">V1.5</span>
+          <span class="welcome-version">V1.6</span>
         </div>
         <div class="welcome-languages">
           <section lang="en">
@@ -1015,12 +1031,12 @@
           </section>
           <p class="about-version">
             <span data-i18n="about.versionLabel">Version:</span>
-            <strong id="about-version-localized">V1.5</strong>
+            <strong id="about-version-localized">V1.6</strong>
             (<span data-i18n="about.buildDateLabel">Build date:</span>
-            <span id="about-build-date-localized">August 30, 2026</span>).
+            <span id="about-build-date-localized">September 14, 2026</span>).
             <br />
             <span data-i18n="about.internalBuildLabel">Internal build:</span>
-            <strong id="about-build-id-localized">126</strong>.
+            <strong id="about-build-id-localized">129</strong>.
           </p>
         </div>
         <div class="about-language about-legacy" lang="en">
@@ -1227,10 +1243,10 @@
           </details>
         </section>
         <p class="about-version">
-          Version: <strong id="about-version">V1.5</strong>
-          (Build date: <span id="about-build-date">August 30, 2026</span>).
+          Version: <strong id="about-version">V1.6</strong>
+          (Build date: <span id="about-build-date">September 14, 2026</span>).
           <br />
-          Internal build: <strong id="about-build-id">126</strong>.
+          Internal build: <strong id="about-build-id">129</strong>.
         </p>
         </div>
         <div class="about-chinese about-language about-legacy" lang="zh-Hans">
@@ -1406,10 +1422,10 @@
             </details>
           </section>
           <p class="about-version">
-            版本：<strong id="about-version-zh">V1.5</strong>
-            （构建日期：<span id="about-build-date-zh">2026年8月30日</span>）。
+            版本：<strong id="about-version-zh">V1.6</strong>
+            （构建日期：<span id="about-build-date-zh">2026年9月5日</span>）。
             <br />
-            内部构建号：<strong id="about-build-id-zh">126</strong>。
+            内部构建号：<strong id="about-build-id-zh">129</strong>。
           </p>
         </div>
       </section>
@@ -1419,7 +1435,7 @@
         </span>
         <span id="map-summary"></span>
         <span class="footer-right">
-          <span id="footer-version">V1.5</span>
+          <span id="footer-version">V1.6</span>
           <span id="attribution"
                 data-i18n="footer.fixture">Bundled TaxiNow fixture</span>
         </span>

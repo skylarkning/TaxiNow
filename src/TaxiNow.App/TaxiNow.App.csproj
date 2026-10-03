@@ -33,6 +33,9 @@
     <Content Include="..\..\tools\map_pipeline\skycharts_airport_map.py"
              Link="pipeline\skycharts_airport_map.py"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\tools\map_pipeline\data\airports.csv.gz"
+             Link="pipeline\data\airports.csv.gz"
+             CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\tools\map_pipeline\dist\taxinow-map-pipeline.exe"
              Link="pipeline\taxinow-map-pipeline.exe"
              CopyToOutputDirectory="PreserveNewest"

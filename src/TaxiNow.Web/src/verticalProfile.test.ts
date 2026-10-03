@@ -46,8 +46,8 @@ function telemetry(overrides: Partial<TelemetrySnapshot> = {}): TelemetrySnapsho
     longitude: nmLongitude / 2,
     trueHeadingDegrees: 90,
     groundSpeedKnots: 200,
-    sourceTimestampUtc: '2026-09-12T00:00:00Z',
-    serverTimestampUtc: '2026-09-12T00:00:00Z',
+    sourceTimestampUtc: new Date().toISOString(),
+    serverTimestampUtc: new Date().toISOString(),
     sourceMonotonicMilliseconds: 1,
     hasPosition: true,
     isStale: false,
@@ -253,5 +253,24 @@ describe('terrain clearance bands', () => {
     expect(terrainClearanceBand(1000, true)).toBe('red');
     expect(terrainClearanceBand(500, true)).toBe('red');
     expect(terrainClearanceBand(500, false)).toBe('normal');
+  });
+});
+
+describe('profile telemetry freshness', () => {
+  it.each(['expired', 'invalid', 'future'])('omits %s telemetry even when isStale is false', kind => {
+    const timestamp = kind === 'invalid' ? 'invalid'
+      : new Date(Date.now() + (kind === 'future' ? 60_000 : -60_000)).toISOString();
+    const model = buildVerticalProfileModel({
+      flightPlan: plan([
+        { ident: 'A', position: [0, 0], airway: '' },
+        { ident: 'B', position: [nmLongitude, 0], airway: '' }
+      ]),
+      elevationProfile: terrain([]),
+      telemetry: telemetry({ serverTimestampUtc: timestamp })
+    });
+    expect(model.aircraft).toBeUndefined();
+    expect(model.metrics.currentAltitudeFeet).toBeNull();
+    expect(model.metrics.currentAglFeet).toBeNull();
+    expect(model.metrics.terrainClearanceFeet).toBeNull();
   });
 });

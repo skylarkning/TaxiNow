@@ -24,11 +24,17 @@ internal static class OpenApiDocument
                 "FIRs affected by GNSS interference in EASA's latest seven-day analysis"),
             ["/api/v1/elevation/profile"] = Post(
                 "Sample and cache terrain elevations along a route"),
+            ["/api/v1/integrations/beyondatc/traffic"] = Get(
+                "Nearby AI aircraft injected into MSFS by BeyondATC"),
+            ["/api/v1/integrations/sayintentions/traffic"] = Get(
+                "Nearby SayIntentions AI traffic with official callsigns"),
             ["/api/v1/status"] = Get("Application and simulator status"),
             ["/api/v1/telemetry"] = Get("Latest telemetry snapshot"),
             ["/api/v1/telemetry/refresh"] =
                 Post("Request an immediate aircraft position refresh"),
             ["/api/v1/airports"] = Get("Search installed airports"),
+            ["/api/v1/airports/nearest"] = Get(
+                "Find the airport nearest a ground position and report whether its map is installed"),
             ["/api/v1/airports/{icao}"] = Get("Airport metadata"),
             ["/api/v1/airports/{icao}/map"] = Get("Normalized airport map"),
             ["/api/v1/downloads"] = new

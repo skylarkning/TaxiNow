@@ -304,7 +304,7 @@ describe('profile inspection', () => {
       telemetry: {
         sequence: 1, simulator: 'replay', connected: true, onGround: false,
         latitude: 0, longitude: 0.5, trueHeadingDegrees: 90, groundSpeedKnots: 200,
-        sourceTimestampUtc: '2026-09-12T00:00:00Z', serverTimestampUtc: '2026-09-12T00:00:00Z',
+        sourceTimestampUtc: new Date().toISOString(), serverTimestampUtc: new Date().toISOString(),
         sourceMonotonicMilliseconds: 1, hasPosition: true, isStale: false,
         altitudeMslFeet: 12500, altitudeAglFeet: 11500, state: 'airborne'
       }
