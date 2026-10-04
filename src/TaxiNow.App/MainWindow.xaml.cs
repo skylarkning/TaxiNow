@@ -182,6 +182,13 @@ public partial class MainWindow : Window
             PostWindowSettings();
             return;
         }
+        if (type == "update-install:open-folder")
+        {
+            var directory = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "TaxiNow", "Updates"));
+            Directory.CreateDirectory(directory);
+            Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+            return;
+        }
         if (type == "update-install:start")
         {
             if (_updateInstallInProgress)
@@ -216,13 +223,13 @@ public partial class MainWindow : Window
             {
                 PostUpdateInstallStatus(
                     "downloading",
-                    "Downloading the verified TaxiNow installer…");
+                    "Downloading the verified TaxiNow Pro installer…");
                 var installer = await DownloadUpdateInstallerAsync(
                     downloadUrl,
                     digest);
                 PostUpdateInstallStatus(
                     "launching",
-                    "Download complete. Opening the TaxiNow installer…");
+                    "Download complete. Opening the TaxiNow Pro installer…");
                 Process.Start(new ProcessStartInfo(installer)
                 {
                     UseShellExecute = true
@@ -279,7 +286,7 @@ public partial class MainWindow : Window
             !uri.AbsolutePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "TaxiNow only installs official HTTPS release installers from skylarkning/TaxiNow-Release.");
+                "TaxiNow Pro only installs official HTTPS release installers from skylarkning/TaxiNow-Release.");
         }
 
         var expected = digest?.StartsWith(

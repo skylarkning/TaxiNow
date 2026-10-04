@@ -411,7 +411,7 @@ function applyTheme(theme: "dark" | "light"): void {
       applyMapTheme(map, theme);
       map.triggerRepaint();
     } catch (error) {
-      console.warn("TaxiNow could not immediately update the map theme.", error);
+      console.warn("TaxiNow Pro could not immediately update the map theme.", error);
     }
   }
 }
@@ -536,7 +536,7 @@ async function refreshVatsimTraffic(): Promise<void> {
     }
     reconcileVatsimTrafficMarkers(response, targetMap);
   } catch (error) {
-    console.warn("TaxiNow could not refresh VATSIM traffic.", error);
+    console.warn("TaxiNow Pro could not refresh VATSIM traffic.", error);
   } finally {
     vatsimTrafficRefreshInFlight = false;
   }
@@ -695,7 +695,7 @@ async function refreshBeyondAtcTraffic(): Promise<void> {
     }
     reconcileBeyondAtcTrafficMarkers(response, targetMap);
   } catch (error) {
-    console.warn("TaxiNow could not refresh BeyondATC traffic.", error);
+    console.warn("TaxiNow Pro could not refresh BeyondATC traffic.", error);
   } finally {
     beyondAtcTrafficRefreshInFlight = false;
   }
@@ -855,7 +855,7 @@ async function refreshSayIntentionsTraffic(): Promise<void> {
     reconcileSayIntentionsTrafficMarkers(response, targetMap);
   } catch (error) {
     clearSayIntentionsTrafficMarkers();
-    console.warn("TaxiNow could not refresh SayIntentions traffic.", error);
+    console.warn("TaxiNow Pro could not refresh SayIntentions traffic.", error);
   } finally {
     sayIntentionsTrafficRefreshInFlight = false;
   }
@@ -967,6 +967,9 @@ function setupUpdateExperience(appStatus: AppStatus): void {
   const bridge = (
     window as typeof window & { chrome?: { webview?: DesktopWebViewBridge } }
   ).chrome?.webview;
+  const cleanup = document.querySelector<HTMLButtonElement>("#cleanup-updates")!;
+  cleanup.hidden = !bridge;
+  cleanup.addEventListener("click", () => bridge?.postMessage({ type: "update-install:open-folder" }));
   let enabled = true;
   try {
     enabled = window.localStorage.getItem(autoUpdateStorageKey) !== "false";
@@ -1894,7 +1897,7 @@ function currentAircraftHeading(): number | null {
 }
 
 function applyProductMetadata(status: AppStatus): void {
-  document.title = `TaxiNow ${status.displayVersion}`;
+  document.title = `TaxiNow Pro ${status.displayVersion}`;
   document.querySelector("#footer-version")!.textContent =
     status.displayVersion;
   const localizedVersion = document.querySelector("#about-version-localized");

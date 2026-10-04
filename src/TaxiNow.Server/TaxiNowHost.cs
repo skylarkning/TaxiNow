@@ -465,7 +465,7 @@ public static class TaxiNowHost
             var mode = ResolveTelemetryMode(configuration);
             return Results.Ok(new
             {
-                product = "TaxiNow",
+                product = "TaxiNow Pro",
                 version = ProductVersion,
                 displayVersion = DisplayVersion,
                 internalBuildId = InternalBuildId,

@@ -41,8 +41,8 @@ public partial class App : System.Windows.Application
             _instanceMutex.Dispose();
             _instanceMutex = null;
             System.Windows.MessageBox.Show(
-                "TaxiNow is already running.",
-                "TaxiNow",
+                "TaxiNow Pro is already running.",
+                "TaxiNow Pro",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             Shutdown();
@@ -333,7 +333,7 @@ public partial class App : System.Windows.Application
     private void CreateTrayIcon()
     {
         var menu = new Forms.ContextMenuStrip();
-        var restore = menu.Items.Add("Open TaxiNow");
+        var restore = menu.Items.Add("Open TaxiNow Pro");
         restore.Click += (_, _) => Dispatcher.BeginInvoke(RestoreWindow);
         menu.Items.Add(new Forms.ToolStripSeparator());
         var quit = menu.Items.Add("Quit");
@@ -344,7 +344,7 @@ public partial class App : System.Windows.Application
         {
             ContextMenuStrip = menu,
             Icon = _applicationIcon,
-            Text = "TaxiNow",
+            Text = "TaxiNow Pro",
             Visible = false
         };
         _trayIcon.MouseClick += (_, args) =>
@@ -405,7 +405,7 @@ public partial class App : System.Windows.Application
             _trayIcon.Visible = true;
             _trayIcon.ShowBalloonTip(
                 2500,
-                "TaxiNow is still running",
+                "TaxiNow Pro is still running",
                 "Click the tray icon to reopen the airport map.",
                 Forms.ToolTipIcon.Info);
         }
