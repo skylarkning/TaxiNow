@@ -99,3 +99,16 @@ html[data-theme] body.flightdeck #fd-root:has(#fd-panel:not([hidden])) .fd-north
 
 html[data-theme] body.flightdeck #fd-panel[data-tab="flight"] #fd-form { padding:14px 18px 4px; }
 html[data-theme] body.flightdeck #fd-locate { display:grid; place-items:center; }
+/* Light mode applies to the frame as well as the map and drawers. */
+html[data-theme="light"] body.flightdeck :is(header,.fd-rail,footer) { background:var(--fd-panel); color:var(--fd-text); border-color:var(--fd-line); }
+html[data-theme="light"] body.flightdeck :is(#fd-flight-number,#airport-name,.connection-state,#fd-title) { color:var(--fd-text); }
+html[data-theme="light"] body.flightdeck :is(.fd-tabs button,.fd-rail > button,.fd-airport-shortcut,.fd-rail #airport-picker-toggle) { background:var(--fd-card); color:var(--fd-text); border-color:var(--fd-line); }
+html[data-theme="light"] body.flightdeck :is(.fd-tabs button[aria-pressed="true"],.fd-rail > button[aria-current="true"]) { background:var(--fd-accent); color:#fff; }
+html[data-theme="light"] body.flightdeck .fd-rail :is(#airport-picker-toggle small,#airport-code,.fd-airport-shortcut small,.fd-airport-shortcut strong) { color:var(--fd-text); }
+html[data-theme="light"] body.flightdeck header .server-url,html[data-theme="light"] body.flightdeck footer a,html[data-theme="light"] body.flightdeck footer .fd-map-bottom a { color:#006ea6!important; }
+html[data-theme="light"] body.flightdeck header .server-url:hover { color:#004f78!important; }
+html[data-theme="light"] body.flightdeck footer .fd-map-bottom { color:var(--fd-muted); }
+html[data-theme="light"] body.flightdeck #fd-root { background:#edf3f6; }
+html[data-theme="light"] body.flightdeck .fd-airport-status { color:#08784c; }
+html[data-theme="light"] body.flightdeck .fd-airport-shortcut[data-status="failed"] .fd-airport-status { color:#a52d28; }
+html[data-theme="light"] body.flightdeck .fd-airport-shortcut:is([data-status="downloading"],[data-status="checking"],[data-status="opening"]) .fd-airport-status { color:#006ea6; }

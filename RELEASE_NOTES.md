@@ -1,5 +1,6 @@
 # TaxiNow V2.0 — Build 203
 
+- Apply light mode to the header, navigation rail, airport controls and footer as well as map panels.
 - Add spacing above the import button and redraw aircraft location as a consistent SVG icon.
 - Add a manual fallback-source action for stalled or failed airport downloads, bypassing OSM and map packs for X-Plane Gateway, with OurAirports as the final runway fallback.
 - Merge the two header rows and move flight-plan tabs to the top right.
