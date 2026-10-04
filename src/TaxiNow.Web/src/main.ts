@@ -3060,6 +3060,23 @@ function renderDownloadJobs(jobs: DownloadJob[]): void {
       });
       row.append(cancel);
     }
+    if (job.currentIcao && (stalled || job.state === "failed" || job.state === "cancelled")) {
+      const fallback = document.createElement("button");
+      fallback.type = "button";
+      fallback.className = "text-button";
+      fallback.textContent = t("job.tryFallback");
+      fallback.addEventListener("click", async () => {
+        fallback.disabled = true;
+        try {
+          await requestJson<DownloadJob>(`/api/v1/downloads/${encodeURIComponent(job.jobId)}/fallback`, { method: "POST" });
+          await refreshAssetManager();
+        } catch (error) {
+          fallback.disabled = false;
+          document.querySelector<HTMLElement>("#download-feedback")!.textContent = String(error);
+        }
+      });
+      row.append(fallback);
+    }
     list.append(row);
   }
 }

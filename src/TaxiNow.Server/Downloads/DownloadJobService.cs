@@ -9,7 +9,8 @@ public sealed record DownloadRequest(
     string? Icao,
     string? CountryCode,
     string? RegionCode = null,
-    int MaxParallel = 1);
+    int MaxParallel = 1,
+    bool FallbackOnly = false);
 
 public sealed record DownloadJob(
     Guid JobId,
@@ -160,6 +161,14 @@ public sealed class DownloadJobService(
         });
     }
 
+    public DownloadJob? TryFallback(Guid id)
+    {
+        var job = Get(id);
+        if (job is null || job.State == "completed" || string.IsNullOrWhiteSpace(job.CurrentIcao)) return null;
+        Cancel(id);
+        return Create(new DownloadRequest("icao", job.CurrentIcao, null, FallbackOnly: true));
+    }
+
     public ValueTask DisposeAsync()
     {
         foreach (var cancellation in _cancellations.Values)
@@ -209,7 +218,8 @@ public sealed class DownloadJobService(
                 CacheDirectory: storagePaths.SourceCachePath,
                 RegionCode: request.RegionCode,
                 ExcludeIcaos: excludedIcaos,
-                MaxParallel: request.MaxParallel);
+                MaxParallel: request.MaxParallel,
+                FallbackOnly: request.FallbackOnly);
 
             PipelineEvent? completed = null;
             await foreach (var pipelineEvent in client.RunAsync(

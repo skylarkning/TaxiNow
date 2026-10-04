@@ -25,6 +25,21 @@ class CapturingProtocol(pipeline.Protocol):
 
 
 class DownloadProgressTests(unittest.TestCase):
+    def test_manual_fallback_bypasses_osm_builder(self):
+        airport = pipeline.Airport("CYYZ", "Toronto", "CA", "CA-ON", "Toronto", 43.67, -79.63, "large_airport")
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            with mock.patch.object(skycharts, "build_airport_map") as osm, \
+                 mock.patch.object(skycharts, "xplane_gateway_raw", return_value={"elements": []}) as gateway, \
+                 mock.patch.object(skycharts, "airport_record", return_value={}), \
+                 mock.patch.object(skycharts, "normalize", return_value={}) as normalize, \
+                 mock.patch.object(pipeline, "upgrade_skycharts_data", return_value={"features": []}):
+                path, _ = pipeline.download_airport(airport, root, pipeline.SourceCache(root / "cache"), fallback_only=True)
+                osm.assert_not_called()
+                gateway.assert_called_once()
+                self.assertEqual(normalize.call_args.kwargs["source"], "X-Plane Scenery Gateway")
+                self.assertTrue(path.exists())
+
     def test_country_eta_waits_for_multiple_completed_airports(self):
         protocol = CapturingProtocol()
 

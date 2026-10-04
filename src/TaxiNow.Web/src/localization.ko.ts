@@ -64,7 +64,7 @@ export const koreanTranslations: Record<string, string> = {
   "storage.confirmAirport": "{icao}의 다운로드 지도를 삭제하시겠습니까?", "storage.confirmGroup": "{name} 아래의 지도 {count}개를 모두 삭제하시겠습니까?",
   "storage.deleted": "다운로드 지도 {count}개를 삭제했습니다.",
   "job.queued": "대기", "job.running": "진행 중", "job.completed": "완료", "job.failed": "실패",
-  "job.cancelled": "취소됨", "job.stalled": "멈춤", "job.cancel": "취소", "job.active": "활성",
+  "job.cancelled": "취소됨", "job.stalled": "멈춤", "job.cancel": "취소", "job.tryFallback": "대체 소스 시도", "job.active": "활성",
   "job.waiting": "지도 소스 응답 대기 · {elapsed} 동안 활성", "job.stalledDetail": "{elapsed} 동안 의미 있는 진행 없음; 자동 시간 초과는 계속 작동 중",
   "job.waitingSource": "소스 대기", "job.warning": "경고 {count}개와 함께 완료: {warning}",
   "job.airports": "공항 {completed}/{total}", "job.parallel": "{count}개 병렬", "job.bytes": "{downloaded} / {total}",

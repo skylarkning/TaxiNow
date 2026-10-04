@@ -223,7 +223,7 @@ export const japaneseTranslations: Record<string, string> = {
   "storage.deleted": "ダウンロード済みマップを{count}件削除しました。",
   "job.queued": "待機中", "job.running": "実行中", "job.completed": "完了",
   "job.failed": "失敗", "job.cancelled": "キャンセル済み", "job.stalled": "停滞",
-  "job.cancel": "キャンセル", "job.active": "処理中", "job.waiting": "マップソースの応答待ち・{elapsed}経過",
+  "job.cancel": "キャンセル", "job.tryFallback": "代替ソースを試す", "job.active": "処理中", "job.waiting": "マップソースの応答待ち・{elapsed}経過",
   "job.stalledDetail": "{elapsed}の間、有意な進捗がありません。自動タイムアウトは有効です",
   "job.waitingSource": "ソース待ち", "job.warning": "{count}件の警告付きで完了：{warning}",
   "job.airports": "{completed}/{total}空港", "job.parallel": "{count}並列",

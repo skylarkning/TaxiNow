@@ -13,7 +13,8 @@ public sealed record PipelineRequest(
     string CacheDirectory,
     string? RegionCode,
     IReadOnlyList<string>? ExcludeIcaos,
-    int MaxParallel);
+    int MaxParallel,
+    bool FallbackOnly = false);
 
 public sealed record PipelineEvent(
     string ProtocolVersion,

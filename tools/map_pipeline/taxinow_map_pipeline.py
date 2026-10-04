@@ -1053,7 +1053,7 @@ def normalize(airport: Airport, overpass: dict[str, Any]) -> dict[str, Any]:
                 "widthMeters": parse_width(tags.get("width")),
                 "headingDegrees": None,
                 "closed": tags.get("access") == "no" or tags.get("closed") == "yes",
-                "source": "OpenStreetMap",
+                "source": "X-Plane Scenery Gateway" if fallback_only else "OpenStreetMap",
             }
         )
 
@@ -1204,17 +1204,26 @@ def download_airport(
     output_directory: pathlib.Path,
     cache: SourceCache,
     progress_callback=None,
+    fallback_only=False,
 ) -> tuple[pathlib.Path, int]:
     # Reuse SkyCharts' mature source coordination and normalization. It issues
     # smaller OSM requests, reconstructs relations, and can fall back to the
     # X-Plane Scenery Gateway before TaxiNow's runway-only last resort.
     skycharts_map.ROOT = cache.root
     try:
-        source, _ = skycharts_map.build_airport_map(
-            airport.icao,
-            cache_dir=cache.root / "airport-map-cache",
-            progress=progress_callback,
-        )
+        if fallback_only:
+            raw = skycharts_map.xplane_gateway_raw(airport.icao, progress_callback)
+            source = skycharts_map.normalize(
+                raw, skycharts_map.airport_record(airport.icao, progress=progress_callback),
+                source="X-Plane Scenery Gateway",
+                source_url=skycharts_map.XPLANE_GATEWAY_SOURCE_URL,
+            )
+        else:
+            source, _ = skycharts_map.build_airport_map(
+                airport.icao,
+                cache_dir=cache.root / "airport-map-cache",
+                progress=progress_callback,
+            )
     except skycharts_map.AirportMapError as error:
         raise PipelineError(str(error)) from error
     normalized = upgrade_skycharts_data(
@@ -1241,6 +1250,7 @@ def download_airport_with_progress(
     total: int,
     bytes_written: int,
     warnings: list[str],
+    fallback_only=False,
 ) -> tuple[pathlib.Path, int]:
     state: dict[str, Any] = {
         "phase": "acquiring",
@@ -1265,6 +1275,7 @@ def download_airport_with_progress(
                 output_directory,
                 cache,
                 update_progress,
+                **({"fallback_only": True} if fallback_only else {}),
             )
         except BaseException as error:
             outcome["error"] = error
@@ -1607,7 +1618,7 @@ def handle(request: dict[str, Any]) -> None:
         if request.get("command") == "download_country"
         else 1
     )
-    if request.get("command") == "download_icao" and selected:
+    if request.get("command") == "download_icao" and selected and not request.get("fallbackOnly"):
         try:
             pack_index = load_map_pack_index(cache)
             packs = select_map_packs_for_icao(
@@ -1727,7 +1738,7 @@ def handle(request: dict[str, Any]) -> None:
                 completed,
                 total,
                 airport.icao,
-                "OpenStreetMap",
+                "X-Plane Scenery Gateway" if request.get("fallbackOnly") else "OpenStreetMap",
                 bytes_written,
                 warnings,
             )
@@ -1741,6 +1752,7 @@ def handle(request: dict[str, Any]) -> None:
                     total,
                     bytes_written,
                     warnings,
+                    fallback_only=bool(request.get("fallbackOnly")),
                 )
                 outputs.append(str(path))
                 bytes_written += written
@@ -1767,7 +1779,7 @@ def handle(request: dict[str, Any]) -> None:
                 completed,
                 total,
                 airport.icao,
-                "OpenStreetMap",
+                "X-Plane Scenery Gateway" if request.get("fallbackOnly") else "OpenStreetMap",
                 bytes_written,
                 warnings,
             )
