@@ -55,8 +55,16 @@ public partial class MainWindow : Window
                 "TaxiNow",
                 "WebView2");
             Directory.CreateDirectory(webViewData);
+            // WebView2 154 can misinterpret wide-gamut SDR display primaries and tint
+            // neutral UI colours yellow. Keep this app's web content in sRGB rather
+            // than changing the user's display profile or global WebView2 settings.
+            var webViewOptions = new CoreWebView2EnvironmentOptions
+            {
+                AdditionalBrowserArguments = "--force-color-profile=srgb"
+            };
             var environment = await CoreWebView2Environment.CreateAsync(
-                userDataFolder: webViewData);
+                userDataFolder: webViewData,
+                options: webViewOptions);
             await MapView.EnsureCoreWebView2Async(environment);
             MapView.CoreWebView2.Settings.AreDevToolsEnabled = true;
             MapView.CoreWebView2.Settings.IsStatusBarEnabled = false;
