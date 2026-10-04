@@ -76,6 +76,19 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*.pdb,*.map"
 Source: "{#PrerequisiteDir}\MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
 
+[InstallDelete]
+Type: files; Name: "{autodesktop}\TaxiNow.lnk"
+Type: files; Name: "{group}\TaxiNow.lnk"
+Type: files; Name: "{group}\TaxiNow EULA.lnk"
+Type: files; Name: "{group}\TaxiNow License.lnk"
+Type: files; Name: "{group}\TaxiNow official releases.lnk"
+Type: files; Name: "{group}\Uninstall TaxiNow.lnk"
+Type: files; Name: "{userprograms}\TaxiNow\TaxiNow.lnk"
+Type: files; Name: "{userprograms}\TaxiNow\TaxiNow EULA.lnk"
+Type: files; Name: "{userprograms}\TaxiNow\TaxiNow License.lnk"
+Type: files; Name: "{userprograms}\TaxiNow\TaxiNow official releases.lnk"
+Type: files; Name: "{userprograms}\TaxiNow\Uninstall TaxiNow.lnk"
+
 [Icons]
 Name: "{group}\TaxiNow Pro"; Filename: "{app}\{#ProductExeName}"; WorkingDir: "{app}"
 Name: "{group}\TaxiNow Pro EULA"; Filename: "{app}\EULA.txt"

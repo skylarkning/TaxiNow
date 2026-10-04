@@ -1,5 +1,6 @@
 # TaxiNow Pro V2.0 — Build 205
 
+- Fix the runtime window title override and migrate old TaxiNow shortcuts during installation.
 - Rename product branding to TaxiNow Pro without changing V2.0 / Build 205 or existing data and installation identifiers.
 - Add a manual update installer folder button; no files are deleted automatically.
 - Use Profile title casing and clarify X-Plane 12 telemetry support in all FAQ languages.

@@ -41,7 +41,7 @@ public partial class MainWindow : Window
         _changeKeepWindowVisible = changeKeepWindowVisible;
         _changeVmasPresenceEnabled = changeVmasPresenceEnabled;
         InitializeComponent();
-        Title = $"TaxiNow {TaxiNowHost.DisplayVersion}";
+        Title = $"TaxiNow Pro {TaxiNowHost.DisplayVersion}";
         Topmost = keepWindowVisible;
     }
 
