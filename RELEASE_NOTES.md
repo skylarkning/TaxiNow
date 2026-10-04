@@ -1,3 +1,7 @@
+# TaxiNow Pro V2.0 — Build 207
+
+- Restore the TaxiNow logo at the top left of the application header, including narrow screens.
+
 # TaxiNow Pro V2.0 — Build 206
 
 - Fix the runtime window title and migrate legacy TaxiNow shortcuts to TaxiNow Pro.
