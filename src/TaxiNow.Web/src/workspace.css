@@ -126,3 +126,8 @@ html[data-theme] body.flightdeck .fd-map-tools #fd-plus::before { background:lin
 .fd-import-actions { display:flex; align-items:center; gap:8px; }
 html[data-theme] body.flightdeck #fd-panel .fd-import-actions button { flex:1; min-width:0; margin:0; height:36px; padding:6px 10px; font-size:12px; }
 html[data-theme] body.flightdeck .fd-airport-shortcuts { padding-top:8px; border-color:var(--fd-line); }
+/* Explicit frame text tokens override legacy colour declarations. */
+html[data-theme="light"] body.flightdeck :is(#airport-name,#status,#map-summary) { color:#24343e!important; opacity:1; }
+html[data-theme="dark"] body.flightdeck :is(#airport-name,#status,#map-summary) { color:#d7e2e9!important; opacity:1; }
+html[data-theme="light"] body.flightdeck #footer-version { background:#e4efe9; border-color:#7b9e8d; color:#1b6045; }
+html[data-theme="dark"] body.flightdeck #footer-version { background:#243c32; border-color:#6c9b86; color:#b7f0d3; }

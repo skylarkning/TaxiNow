@@ -1,5 +1,6 @@
 # TaxiNow V2.0 — Build 205
 
+- Document mobile browser requirements in FAQ and improve frame text contrast in both themes.
 - Add required Bug Report / Feature Request forms and an in-app report button.
 - Keep VATSIM aircraft orange in both themes.
 - Unify map controls at 44px and centre zoom symbols.
