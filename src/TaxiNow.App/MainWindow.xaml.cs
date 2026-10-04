@@ -69,6 +69,13 @@ public partial class MainWindow : Window
             MapView.CoreWebView2.Settings.AreDevToolsEnabled = true;
             MapView.CoreWebView2.Settings.IsStatusBarEnabled = false;
             MapView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+            MapView.CoreWebView2.NewWindowRequested += (_, args) =>
+            {
+                if (args.Uri != "https://github.com/skylarkning/TaxiNow-Release/issues/new/choose") return;
+                args.Handled = true;
+                try { Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true }); }
+                catch (Exception error) { System.Diagnostics.Debug.WriteLine(error); }
+            };
             MapView.NavigationCompleted += OnNavigationCompleted;
             MapView.Source = new Uri(TaxiNowHost.MapShellUrl);
         }

@@ -13,7 +13,7 @@ export const koreanTranslations: Record<string, string> = {
   "status.flightStopped": "비행이 시작되지 않았습니다.", "status.refreshing": "항공기 위치 새로 고치는 중…",
   "status.refreshFailed": "항공기 위치를 새로 고칠 수 없습니다.",
   "actions.assets": "지도 및 저장소", "actions.language": "한국어", "actions.languageAria": "언어 선택",
-  "actions.languageMenu": "언어", "actions.about": "정보",
+  "actions.languageMenu": "언어", "actions.about": "정보", "actions.reportIssue": "문제 보고",
   "settings.title": "설정", "settings.aria": "설정 열기", "settings.menu": "설정",
   "settings.keepVisible": "창을 항상 위에 표시",
   "taxi.open": "택시 계획", "taxi.eyebrow": "지상 내비게이션", "taxi.title": "택시 계획",

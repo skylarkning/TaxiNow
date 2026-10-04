@@ -112,3 +112,17 @@ html[data-theme="light"] body.flightdeck #fd-root { background:#edf3f6; }
 html[data-theme="light"] body.flightdeck .fd-airport-status { color:#08784c; }
 html[data-theme="light"] body.flightdeck .fd-airport-shortcut[data-status="failed"] .fd-airport-status { color:#a52d28; }
 html[data-theme="light"] body.flightdeck .fd-airport-shortcut:is([data-status="downloading"],[data-status="checking"],[data-status="opening"]) .fd-airport-status { color:#006ea6; }
+
+html[data-theme] body.flightdeck .fd-vatsim-aircraft { color:#ff9f43!important; }
+html[data-theme] body.flightdeck .fd-vatsim-aircraft svg { fill:#ff9f43; }
+html[data-theme] body.flightdeck #settings-menu #report-issue { width:100%; margin-top:6px; text-align:left; }
+html[data-theme] body.flightdeck :is(.fd-map-tools button,#fd-projection,.fd-north-control) { width:44px; height:44px; min-width:44px; min-height:44px; padding:0; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; line-height:1; }
+html[data-theme] body.flightdeck .fd-map-tools button svg { flex-shrink:0; }
+html[data-theme] body.flightdeck .fd-map-tools button span { line-height:11px; }
+html[data-theme] body.flightdeck .fd-map-tools :is(#fd-plus,#fd-minus) { font-size:0; }
+html[data-theme] body.flightdeck .fd-map-tools #fd-plus::before,html[data-theme] body.flightdeck .fd-map-tools #fd-minus::before { content:""; width:18px; height:18px; background:linear-gradient(currentColor,currentColor) center/16px 2px no-repeat; }
+html[data-theme] body.flightdeck .fd-map-tools #fd-plus::before { background:linear-gradient(currentColor,currentColor) center/16px 2px no-repeat,linear-gradient(currentColor,currentColor) center/2px 16px no-repeat; }
+
+.fd-import-actions { display:flex; align-items:center; gap:8px; }
+html[data-theme] body.flightdeck #fd-panel .fd-import-actions button { flex:1; min-width:0; margin:0; height:36px; padding:6px 10px; font-size:12px; }
+html[data-theme] body.flightdeck .fd-airport-shortcuts { padding-top:8px; border-color:var(--fd-line); }

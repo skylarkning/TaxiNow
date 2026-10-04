@@ -1,5 +1,15 @@
+# TaxiNow V2.0 — Build 205
+
+- Add required Bug Report / Feature Request forms and an in-app report button.
+- Keep VATSIM aircraft orange in both themes.
+- Unify map controls at 44px and centre zoom symbols.
+- Move Clear plan next to Import and align airport shortcut spacing.
+
 # TaxiNow V2.0 — Build 203
 
+- Use consistent 44px map controls and centred zoom symbols.
+- Add Report an issue above About, opening the release repository Bug Report / Feature Request forms.
+- Keep VATSIM traffic aircraft orange in both themes.
 - Apply light mode to the header, navigation rail, airport controls and footer as well as map panels.
 - Add spacing above the import button and redraw aircraft location as a consistent SVG icon.
 - Add a manual fallback-source action for stalled or failed airport downloads, bypassing OSM and map packs for X-Plane Gateway, with OurAirports as the final runway fallback.
