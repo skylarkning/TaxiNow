@@ -96,3 +96,6 @@ html[data-theme] body.flightdeck #fd-root:has(#fd-panel:not([hidden])) .fd-north
  html[data-theme] body.flightdeck #fd-panel { width:min(350px,calc(100% - 54px)); }
  html[data-theme] body.flightdeck #fd-root:has(#fd-panel:not([hidden])) .fd-north-control { left:calc(min(350px,100% - 54px) + 7px); }
 }
+
+html[data-theme] body.flightdeck #fd-panel[data-tab="flight"] #fd-form { padding:14px 18px 4px; }
+html[data-theme] body.flightdeck #fd-locate { display:grid; place-items:center; }

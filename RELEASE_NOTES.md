@@ -1,5 +1,6 @@
 # TaxiNow V2.0 — Build 203
 
+- Add spacing above the import button and redraw aircraft location as a consistent SVG icon.
 - Add a manual fallback-source action for stalled or failed airport downloads, bypassing OSM and map packs for X-Plane Gateway, with OurAirports as the final runway fallback.
 - Merge the two header rows and move flight-plan tabs to the top right.
 - Use identical drawer geometry and transitions for flight plan and route information.
