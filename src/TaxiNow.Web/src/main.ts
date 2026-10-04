@@ -411,7 +411,7 @@ function applyTheme(theme: "dark" | "light"): void {
       applyMapTheme(map, theme);
       map.triggerRepaint();
     } catch (error) {
-      console.warn("TaxiNow could not immediately update the map theme.", error);
+      console.warn("TaxiNow Pro could not immediately update the map theme.", error);
     }
   }
 }
@@ -536,7 +536,7 @@ async function refreshVatsimTraffic(): Promise<void> {
     }
     reconcileVatsimTrafficMarkers(response, targetMap);
   } catch (error) {
-    console.warn("TaxiNow could not refresh VATSIM traffic.", error);
+    console.warn("TaxiNow Pro could not refresh VATSIM traffic.", error);
   } finally {
     vatsimTrafficRefreshInFlight = false;
   }
@@ -695,7 +695,7 @@ async function refreshBeyondAtcTraffic(): Promise<void> {
     }
     reconcileBeyondAtcTrafficMarkers(response, targetMap);
   } catch (error) {
-    console.warn("TaxiNow could not refresh BeyondATC traffic.", error);
+    console.warn("TaxiNow Pro could not refresh BeyondATC traffic.", error);
   } finally {
     beyondAtcTrafficRefreshInFlight = false;
   }
@@ -855,7 +855,7 @@ async function refreshSayIntentionsTraffic(): Promise<void> {
     reconcileSayIntentionsTrafficMarkers(response, targetMap);
   } catch (error) {
     clearSayIntentionsTrafficMarkers();
-    console.warn("TaxiNow could not refresh SayIntentions traffic.", error);
+    console.warn("TaxiNow Pro could not refresh SayIntentions traffic.", error);
   } finally {
     sayIntentionsTrafficRefreshInFlight = false;
   }
@@ -967,6 +967,9 @@ function setupUpdateExperience(appStatus: AppStatus): void {
   const bridge = (
     window as typeof window & { chrome?: { webview?: DesktopWebViewBridge } }
   ).chrome?.webview;
+  const cleanup = document.querySelector<HTMLButtonElement>("#cleanup-updates")!;
+  cleanup.hidden = !bridge;
+  cleanup.addEventListener("click", () => bridge?.postMessage({ type: "update-install:open-folder" }));
   let enabled = true;
   try {
     enabled = window.localStorage.getItem(autoUpdateStorageKey) !== "false";
@@ -1074,12 +1077,12 @@ async function checkForUpdates(
     if (userInitiated) {
       showUpdateDialog(null, error instanceof Error
         ? error.message
-        : t("updates.checkFailed"));
+        : t("updates.checkFailed"), true);
     }
   }
 }
 
-function showUpdateDialog(release: UpdateRelease | null, message = ""): void {
+function showUpdateDialog(release: UpdateRelease | null, message = "", failed = false): void {
   const dialog = document.querySelector<HTMLElement>("#update-dialog")!;
   const backdrop = document.querySelector<HTMLButtonElement>("#update-backdrop")!;
   const version = document.querySelector<HTMLElement>("#update-version")!;
@@ -1087,12 +1090,23 @@ function showUpdateDialog(release: UpdateRelease | null, message = ""): void {
   const feedback = document.querySelector<HTMLElement>("#update-feedback")!;
   const actions = document.querySelector<HTMLElement>(".update-actions")!;
   const github = document.querySelector<HTMLAnchorElement>("#update-github-link")!;
+  const heading = document.querySelector<HTMLElement>("#update-heading")!;
+  const eyebrow = dialog.querySelector<HTMLElement>(".eyebrow")!;
+  const headingKey = release ? "updates.title" : failed ? "updates.errorTitle" : "updates.none";
+  const eyebrowKey = release ? "updates.available" : "updates.checkNow";
+  heading.dataset.i18n = headingKey;
+  heading.textContent = t(headingKey);
+  eyebrow.dataset.i18n = eyebrowKey;
+  eyebrow.textContent = t(eyebrowKey);
+  version.hidden = !release;
   version.textContent = release
     ? t("updates.version", { version: release.version, build: release.build })
     : t("updates.none");
   changelog.textContent = release?.changelog ?? "";
+  changelog.hidden = !release?.changelog.trim();
   feedback.textContent = message;
-  feedback.className = message ? "feedback" : "feedback";
+  feedback.className = failed ? "feedback error" : "feedback";
+  feedback.hidden = !message;
   actions.hidden = !release;
   if (release) {
     github.href = release.pageUrl;
@@ -1894,7 +1908,7 @@ function currentAircraftHeading(): number | null {
 }
 
 function applyProductMetadata(status: AppStatus): void {
-  document.title = `TaxiNow ${status.displayVersion}`;
+  document.title = `TaxiNow Pro ${status.displayVersion}`;
   document.querySelector("#footer-version")!.textContent =
     status.displayVersion;
   const localizedVersion = document.querySelector("#about-version-localized");
@@ -3059,6 +3073,23 @@ function renderDownloadJobs(jobs: DownloadJob[]): void {
         await refreshAssetManager();
       });
       row.append(cancel);
+    }
+    if (job.currentIcao && (stalled || job.state === "failed" || job.state === "cancelled")) {
+      const fallback = document.createElement("button");
+      fallback.type = "button";
+      fallback.className = "text-button";
+      fallback.textContent = t("job.tryFallback");
+      fallback.addEventListener("click", async () => {
+        fallback.disabled = true;
+        try {
+          await requestJson<DownloadJob>(`/api/v1/downloads/${encodeURIComponent(job.jobId)}/fallback`, { method: "POST" });
+          await refreshAssetManager();
+        } catch (error) {
+          fallback.disabled = false;
+          document.querySelector<HTMLElement>("#download-feedback")!.textContent = String(error);
+        }
+      });
+      row.append(fallback);
     }
     list.append(row);
   }

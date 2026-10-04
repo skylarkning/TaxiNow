@@ -9,10 +9,10 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <Version>2.0.0</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.202</FileVersion>
-    <InformationalVersion>2.0.0+build.202</InformationalVersion>
+    <FileVersion>2.0.0.206</FileVersion>
+    <InformationalVersion>2.0.0+build.206</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-    <Product>TaxiNow</Product>
+    <Product>TaxiNow Pro</Product>
     <Authors>Sky Ning</Authors>
     <Company>Sky Ning</Company>
     <Copyright>Copyright © 2026 Sky Ning</Copyright>

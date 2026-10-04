@@ -12,13 +12,14 @@ import { parseFirLabels, type FirLabel } from './firLabels';
 import { isOnVisibleHemisphere } from './globeVisibility';
 import { loadGnssInterference, type GnssInterferenceRegion } from './gnssInterference';
 import { TouchdownAirportSelector, airportStatusAfterActivation, clearFlightPlanState, handleFlightDeckEscape, normalizeIcao, flightDeckAuxiliaryControls, type FlightPlanAirportStatus, type PlanAirportPair } from './flightPlanGround';
-import { VerticalProfileController, createSessionProfileOpenPreference } from './verticalProfileController';
+import { VerticalProfileController } from './verticalProfileController';
 import { createVerticalProfileView } from './verticalProfileView';
 import {
   vatsimTrafficPopupHeaderElement,
   vatsimTrafficPopupModel
 } from './vatsimTrafficPresentation';
 import './flightDeck.css';
+import './workspace.css';
 import { followAircraft } from './aircraftFollow';
 
 function tr(key: string, parameters?: Record<string, string | number>): string { return t('flightdeck.' + key, parameters); }
@@ -80,7 +81,7 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   const flightIdentity = document.createElement('div'); flightIdentity.className = 'fd-flight-identity';
   flightIdentity.append(flightNumber, airportName);
   document.querySelector('.header-primary')!.append(flightIdentity);
-  const airportCaption = document.createElement('small'); airportCaption.textContent = tr('airport') + ' ▾';
+  const airportCaption = document.createElement('small'); airportCaption.textContent = tr('airport');
   $('airport-picker-toggle').querySelector('[aria-hidden]')?.remove();
   $('airport-picker-toggle').prepend(airportCaption);
   const nav = document.createElement('nav'); nav.className = 'fd-tabs'; nav.setAttribute('aria-label', tr('navigation'));
@@ -88,8 +89,8 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
     const b = button(tr(tab), () => { setMode(true); currentTab = tab; $('fd-panel').hidden = false; renderPanel(); });
     b.id = `fd-tab-${tab}`; nav.append(b);
   }
-  const title = document.createElement('div'); title.id = 'fd-title'; title.textContent = 'TaxiNow · ' + tr('view'); nav.append(title);
-  document.querySelector('header')!.append(nav);
+  const title = document.createElement('div'); title.id = 'fd-title'; title.textContent = 'TaxiNow Pro · ' + tr('view'); nav.append(title);
+  document.querySelector('header .actions')!.prepend(nav);
   const rail = document.createElement('nav'); rail.className = 'fd-rail'; rail.setAttribute('aria-label', tr('mapViews'));
   rail.append(button(tr('globe'), () => setMode(true)), button(tr('ground'), () => setMode(false)));
   rail.children[0]!.id = 'fd-globe-mode'; rail.children[1]!.id = 'fd-ground-mode';
@@ -128,22 +129,31 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   const about = $('open-about'), settingsMenu = $('settings-menu');
   about.classList.add('settings-check-row');
   about.setAttribute('role', 'menuitem');
-  settingsMenu.append(about);
+  const report = button(t('actions.reportIssue'), () => {
+    window.open('https://github.com/skylarkning/TaxiNow-Release/issues/new/choose', '_blank', 'noopener,noreferrer');
+    settingsMenu.hidden = true;
+    $('settings-selector').setAttribute('aria-expanded', 'false');
+  }, 'settings-check-row');
+  report.id = 'report-issue';
+  report.setAttribute('role', 'menuitem');
+  settingsMenu.append(report, about);
   about.addEventListener('click', () => {
     settingsMenu.hidden = true;
     $('settings-selector').setAttribute('aria-expanded', 'false');
   });
   document.getElementById('app')!.append(rail);
   const root = document.createElement('section'); root.id = 'fd-root'; root.setAttribute('aria-label', tr('view'));
-  root.innerHTML = `<div id="fd-map"></div><aside id="fd-panel"><div class="fd-panel-head"><strong id="fd-panel-title"></strong><button id="fd-close" type="button" aria-label="${tr('close')}">×</button></div><div id="fd-form"><div class="fd-service">SimBrief <span>${tr('planning')}</span></div><button id="fd-import" type="button" class="fd-primary">${tr('import')}</button><p id="fd-feedback" role="status"></p></div><div id="fd-content"></div></aside><div class="fd-map-top"><button id="fd-north" type="button">↑ &nbsp;${tr('north')}</button><button id="fd-projection" type="button">3D</button></div><div class="fd-map-tools"><button id="fd-fit" type="button" title="${tr('fit')}" aria-label="${tr('fit')}">⛶</button><button id="fd-locate" type="button" title="${tr('locate')}" aria-label="${tr('locate')}">⌖</button><button id="fd-grid" type="button" title="${tr('grid')}" aria-label="${tr('grid')}" aria-pressed="true">⊞</button><button id="fd-fir" type="button" title="${tr('fir')}" aria-label="${tr('fir')}" aria-pressed="true">FIR</button><button id="fd-gnss" type="button" title="${tr('gnss')}" aria-label="${tr('gnss')}" aria-pressed="${gnssInterferenceEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="14" cy="11" r="3"/><path d="M14 3v3m0 10v3M6 11h3m10 0h3M8.3 5.3l2.1 2.1m7.2 7.2 2.1 2.1m0-11.4-2.1 2.1m-7.2 7.2-2.1 2.1"/></svg><span>GNSS</span></button><button id="fd-traffic" type="button" title="VATSIM ${tr('aircraft')}" aria-label="VATSIM ${tr('aircraft')}" aria-pressed="${globeTrafficEnabled}"><span class="fd-tool-icon">✈</span><span>VATSIM</span></button><button id="fd-weather" type="button" title="${tr('weather')}" aria-label="${tr('weather')}" aria-pressed="${weatherRadarEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 14h14a4 4 0 0 0 0-8 7 7 0 0 0-13-1 4.5 4.5 0 0 0-1 9Z"/><path d="m10 17-2 3m7-3-2 3m7-3-2 3"/></svg><span>${tr('radar')}</span></button><button id="fd-terrain" type="button" title="${tr('terrain')}" aria-label="${tr('terrain')}" aria-pressed="${terrainEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 19 11 3l6 10 3-5 6 11H2Z"/><path d="m8 8 3 3 3-3"/></svg><span>${tr('terrain')}</span></button><button id="fd-plus" type="button" aria-label="${tr('zoomIn')}">+</button><button id="fd-minus" type="button" aria-label="${tr('zoomOut')}">−</button></div><div class="fd-map-bottom"><span>${tr('local')} · <a href="https://github.com/vatsimnetwork/vatspy-data-project" target="_blank" rel="noopener">FIR/ATC: VAT-Spy · CC BY-SA 4.0</a></span><span id="fd-gnss-credit" hidden><span class="fd-gnss-legend"><i class="interference"></i>${tr('interference')} <i class="spoofing"></i>${tr('spoofing')}</span> · <a href="https://www.easa.europa.eu/en/domains/air-operations/global-navigation-satellite-system-outages-and-alterations" target="_blank" rel="noopener">EASA Data4Safety</a></span><span id="fd-radar-credit" hidden><a href="https://www.rainviewer.com/" target="_blank" rel="noopener">${tr('radar')}: RainViewer</a> · <a href="https://open-meteo.com/" target="_blank" rel="noopener">${tr('motion')}: Open-Meteo 700 hPa</a></span><span id="fd-terrain-credit"><a href="https://goto.arcgisonline.com/maps/World_Physical_Map" target="_blank" rel="noopener">${tr('terrain')}: Esri · U.S. National Park Service</a></span><span id="fd-position">${tr('noPosition')}</span></div><p id="fd-map-error" role="alert" hidden></p></section>`;
+  root.innerHTML = `<div id="fd-map"></div><aside id="fd-panel"><div class="fd-panel-head"><strong id="fd-panel-title"></strong><button id="fd-close" type="button" aria-label="${tr('close')}">×</button></div><div id="fd-form"><div class="fd-service">SimBrief <span>${tr('planning')}</span></div><button id="fd-import" type="button" class="fd-primary">${tr('import')}</button><p id="fd-feedback" role="status"></p></div><div id="fd-content"></div></aside><div class="fd-map-top"><button id="fd-north" type="button" title="${tr('north')}" aria-label="${tr('north')}"><svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><text x="16" y="8" text-anchor="middle" fill="currentColor" font-size="8" font-weight="700">N</text><path d="m16 10-6 16 6-4Z" fill="currentColor"/><path d="m16 10 6 16-6-4Z" fill="currentColor" opacity=".4"/></svg></button><button id="fd-projection" type="button">3D</button></div><div class="fd-map-tools"><button id="fd-fit" type="button" title="${tr('fit')}" aria-label="${tr('fit')}">⛶</button><button id="fd-locate" type="button" title="${tr('locate')}" aria-label="${tr('locate')}"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3"/><path d="m12 6 1.2 4.2 4.8 3v1.4l-4.8-1.4v3l1.8 1.2v1L12 17.6l-3 1.2v-1l1.8-1.2v-3L6 14.6v-1.4l4.8-3Z"/></svg></button><button id="fd-grid" type="button" title="${tr('grid')}" aria-label="${tr('grid')}" aria-pressed="true">⊞</button><button id="fd-fir" type="button" title="${tr('fir')}" aria-label="${tr('fir')}" aria-pressed="true">FIR</button><button id="fd-gnss" type="button" title="${tr('gnss')}" aria-label="${tr('gnss')}" aria-pressed="${gnssInterferenceEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="14" cy="11" r="3"/><path d="M14 3v3m0 10v3M6 11h3m10 0h3M8.3 5.3l2.1 2.1m7.2 7.2 2.1 2.1m0-11.4-2.1 2.1m-7.2 7.2-2.1 2.1"/></svg><span>GNSS</span></button><button id="fd-traffic" type="button" title="VATSIM ${tr('aircraft')}" aria-label="VATSIM ${tr('aircraft')}" aria-pressed="${globeTrafficEnabled}"><span class="fd-tool-icon">✈</span><span>VATSIM</span></button><button id="fd-weather" type="button" title="${tr('weather')}" aria-label="${tr('weather')}" aria-pressed="${weatherRadarEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 14h14a4 4 0 0 0 0-8 7 7 0 0 0-13-1 4.5 4.5 0 0 0-1 9Z"/><path d="m10 17-2 3m7-3-2 3m7-3-2 3"/></svg><span>${tr('radar')}</span></button><button id="fd-terrain" type="button" title="${tr('terrain')}" aria-label="${tr('terrain')}" aria-pressed="${terrainEnabled}"><svg viewBox="0 0 28 22" width="28" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 19 11 3l6 10 3-5 6 11H2Z"/><path d="m8 8 3 3 3-3"/></svg><span>${tr('terrain')}</span></button><button id="fd-plus" type="button" aria-label="${tr('zoomIn')}">+</button><button id="fd-minus" type="button" aria-label="${tr('zoomOut')}">−</button></div><div class="fd-map-bottom"><span>${tr('local')} · <a href="https://github.com/vatsimnetwork/vatspy-data-project" target="_blank" rel="noopener">FIR/ATC: VAT-Spy · CC BY-SA 4.0</a></span><span id="fd-gnss-credit" hidden><span class="fd-gnss-legend"><i class="interference"></i>${tr('interference')} <i class="spoofing"></i>${tr('spoofing')}</span> · <a href="https://www.easa.europa.eu/en/domains/air-operations/global-navigation-satellite-system-outages-and-alterations" target="_blank" rel="noopener">EASA Data4Safety</a></span><span id="fd-radar-credit" hidden><a href="https://www.rainviewer.com/" target="_blank" rel="noopener">${tr('radar')}: RainViewer</a> · <a href="https://open-meteo.com/" target="_blank" rel="noopener">${tr('motion')}: Open-Meteo 700 hPa</a></span><span id="fd-terrain-credit"><a href="https://goto.arcgisonline.com/maps/World_Physical_Map" target="_blank" rel="noopener">${tr('terrain')}: Esri · U.S. National Park Service</a></span><span id="fd-position">${tr('noPosition')}</span></div><p id="fd-map-error" role="alert" hidden></p></section>`;
   document.getElementById('app')!.append(root);
+  document.querySelector('footer')!.insertBefore(root.querySelector('.fd-map-bottom')!, $('map-summary'));
+  $('fd-panel').hidden = true;
+  const planButtons = document.createElement('div'); planButtons.className = 'fd-import-actions';
+  const importButton = $('fd-import'); importButton.before(planButtons);
+  const clearButton = button(tr('clear'), clearPlan); clearButton.id = 'fd-clear-plan'; clearButton.hidden = true;
+  planButtons.append(importButton, clearButton);
   const profileView = createVerticalProfileView(root);
-  let profilePreference;
-  try { profilePreference = createSessionProfileOpenPreference(sessionStorage); }
-  catch { profilePreference = createSessionProfileOpenPreference(); }
   profileController = new VerticalProfileController(profileView, {
-    initialOpen: !matchMedia('(max-width: 620px)').matches,
-    preferenceStore: profilePreference,
+    initialOpen: false,
     onOpenChange: open => {
       profileControl.setAttribute('aria-pressed', String(open));
       profileControl.setAttribute('aria-current', String(open));
@@ -158,6 +168,7 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   // Resizing never calls fitRoute, so opening a panel preserves pan and zoom.
   new ResizeObserver(() => routeMap?.resize()).observe($('fd-map'));
   if (lastPosition) profileController.setTelemetry(lastPosition);
+  const northControl = $('fd-north'); northControl.classList.add('fd-north-control'); root.append(northControl);
   $('fd-close').onclick = () => { $('fd-panel').hidden = true; $(`fd-tab-${currentTab}`).focus(); };
   $('fd-import').onclick = () => void importPlan();
   const accountSettings = document.createElement('div'); accountSettings.className = 'fd-account-settings';
@@ -278,6 +289,7 @@ function renderPanel(): void {
   $('airport-picker-toggle').setAttribute('aria-label', tr('selectAirport'));
   $('airport-picker-toggle').title = tr('selectAirport');
   for (const tab of flightDeckTabs) $(`fd-tab-${tab}`).setAttribute('aria-pressed', String(tab === currentTab));
+  $('fd-clear-plan').hidden = !plan;
   $('fd-panel').dataset.tab = currentTab;
   $('fd-panel-title').textContent = tr(currentTab); $('fd-form').hidden = currentTab !== 'flight';
   renderAirportShortcuts();
@@ -302,13 +314,13 @@ function renderPanel(): void {
     row.title = `${p.position[1].toFixed(4)}, ${p.position[0].toFixed(4)}`; row.append(number, name, meta); list.append(row);
   }); content.append(list);
   const actions = document.createElement('div'); actions.className = 'fd-plan-actions';
-  actions.append(button(tr('fit'), fitRoute), button(tr('clear'), clearPlan));
+  actions.append(button(tr('fit'), fitRoute));
   const stamp = document.createElement('small'); stamp.textContent = `${tr('imported')} ${new Date(plan.importedAt).toLocaleTimeString()}`; actions.append(stamp); content.append(actions);
 }
 function clearPlan(): void {
   plan = clearFlightPlanState(profileController);
   store({ identifier: $<HTMLInputElement>('fd-identifier').value, kind: 'username' });
-  $('fd-title').textContent = 'TaxiNow · ' + tr('view');
+  $('fd-title').textContent = 'TaxiNow Pro · ' + tr('view');
   renderPanel();
   drawRoute();
   feedback('');
@@ -358,7 +370,7 @@ function createGlobe(): void {
     });
     routeMap.once('style.load', () => { applyGlobeTheme(); drawRoute(); if (plan) fitRoute(); void loadFirLabels(); void refreshOnlineFirHighlights(); if (gnssInterferenceEnabled) void refreshGnssInterference(); if (globeTrafficEnabled) void refreshGlobeTraffic(); if (weatherRadarEnabled) void refreshWeatherRadar(); });
     routeMap.on('zoom', updateGlobeTrafficLabelVisibility);
-    routeMap.on('rotate', () => { updateGlobeTrafficHeadings(); updateWeatherMotionHeadings(); });
+    routeMap.on('rotate', () => { $('fd-north').style.setProperty('--north-bearing', `${-routeMap!.getBearing()}deg`); updateGlobeTrafficHeadings(); updateWeatherMotionHeadings(); });
     routeMap.on('moveend', () => { updateFirLabelMarkers(); updateVisibleGlobeTraffic(); scheduleWeatherMotionRefresh(); });
   } catch { $('fd-map-error').hidden = false; $('fd-map-error').textContent = tr('mapError'); }
 }
@@ -901,5 +913,5 @@ function renderFlightOverview(content: HTMLElement): void {
   content.append(details);
   const actions = document.createElement('div'); actions.className = 'fd-plan-actions';
   const stamp = document.createElement('small'); stamp.textContent = tr('imported') + ' ' + new Date(current.importedAt).toLocaleTimeString();
-  actions.append(stamp, button(tr('clear'), clearPlan)); content.append(actions);
+  actions.append(stamp); content.append(actions);
 }

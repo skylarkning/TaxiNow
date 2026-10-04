@@ -15,7 +15,7 @@
         document.querySelector('meta[name="color-scheme"]').content = theme === 'light' ? 'only light' : 'dark';
       })();
     </script>
-    <title>TaxiNow V2.0</title>
+    <title>TaxiNow Pro V2.0</title>
   </head>
   <body>
     <main id="app">
@@ -23,7 +23,7 @@
         <div class="header-primary">
           <img class="wordmark"
                src="/branding/taxinow-logo.png"
-               alt="TaxiNow" />
+               alt="TaxiNow Pro" />
           <div class="airport-switcher">
             <button id="airport-picker-toggle"
                     class="airport-picker-toggle"
@@ -69,7 +69,7 @@
             <span class="info-bubble network-info">
               <button class="info-trigger"
                       type="button"
-                      aria-label="How to access TaxiNow on another device"
+                      aria-label="How to access TaxiNow Pro on another device"
                       data-i18n-aria-label="access.helpAria"
                       aria-describedby="network-access-help">i</button>
               <span id="network-access-help"
@@ -183,7 +183,7 @@
                       role="menuitemcheckbox"
                       aria-checked="false"
                       hidden>
-                <span data-i18n="settings.vmasPresence">Allow vMAS to check whether TaxiNow is online</span>
+                <span data-i18n="settings.vmasPresence">Allow vMAS to check whether TaxiNow Pro is online</span>
                 <span class="settings-check" aria-hidden="true">✓</span>
               </button>
               <button id="theme-selector"
@@ -217,6 +217,7 @@
                       type="button"
                       role="menuitem"
                       data-i18n="updates.checkNow">Check for updates</button>
+              <button id="cleanup-updates" type="button" role="menuitem" data-i18n="updates.cleanup">Open update installer folder</button>
               <button id="language-selector"
                       class="settings-submenu-toggle"
                       type="button"
@@ -309,7 +310,7 @@
       </section>
       <div id="map"
            role="application"
-            aria-label="TaxiNow airport map"
+            aria-label="TaxiNow Pro airport map"
             data-i18n-aria-label="map.aria"></div>
       <button id="taxi-plan-backdrop"
               class="taxi-plan-backdrop"
@@ -498,7 +499,7 @@
                     <span data-i18n="download.typical">Typical: 5–30 seconds</span>
                     <span data-i18n="download.busy">Busy or complex airport: 30–90 seconds</span>
                     <span data-i18n="download.rate">OSM server processing normally takes longer than the actual data transfer.</span>
-                    <span data-i18n="download.osmLimit">TaxiNow stops waiting for OSM after 120 seconds and then tries fallback sources.</span>
+                    <span data-i18n="download.osmLimit">TaxiNow Pro stops waiting for OSM after 120 seconds and then tries fallback sources.</span>
                     <span data-i18n="download.normal">An animated progress bar is normal while OSM calculates the map.</span>
                     <span class="china-network-note" data-i18n="download.chinaNetwork"></span>
                   </span>
@@ -517,7 +518,7 @@
                       actual data transfer.
                     </span>
                     <span data-i18n="download.osmLimit">
-                      TaxiNow stops waiting for OSM after 120 seconds and then
+                      TaxiNow Pro stops waiting for OSM after 120 seconds and then
                       tries fallback sources.
                     </span>
                     <span data-i18n="download.normal">
@@ -534,7 +535,7 @@
                       服务器计算，而不是文件传输。开始接收数据后，传输通常会在数秒内完成。
                     </span>
                     <span>
-                      TaxiNow 等待 OSM 最长 120 秒，之后会尝试后备来源。
+                      TaxiNow Pro 等待 OSM 最长 120 秒，之后会尝试后备来源。
                       一个机场通常会在约 3 分钟内完成或明确失败。
                     </span>
                     <span>
@@ -575,7 +576,7 @@
             <div class="country-download-notice full-row">
               <div class="localized-download-copy">
                 <strong data-i18n="download.batchTitle">Large batch downloads take time.</strong>
-                <p data-i18n="download.batchBody">For the fastest setup, download only the airports you need by ICAO, or enter a province/state to narrow a country batch. Already installed airports are skipped automatically. When an official TaxiNow regional pack is available, it is verified and installed first; only missing airports use on-demand sources.</p>
+                <p data-i18n="download.batchBody">For the fastest setup, download only the airports you need by ICAO, or enter a province/state to narrow a country batch. Already installed airports are skipped automatically. When an official TaxiNow Pro regional pack is available, it is verified and installed first; only missing airports use on-demand sources.</p>
                 <p data-i18n="download.batchEstimate">Typical planning range using public OSM: US 8–40 hours; CA/AU 1–8 hours; DE/FR 30 minutes–3 hours; CN/GB 20 minutes–2 hours; JP 15–75 minutes. Actual time varies with OSM load, airport complexity, and network conditions. One parallel task is normally fastest for OSM.</p>
               </div>
               <div class="download-copy-legacy" lang="en">
@@ -584,7 +585,7 @@
                   For the fastest setup, download only the airports you need
                   by ICAO, or enter a province/state to narrow a country batch.
                   Already installed airports are skipped automatically.
-                  When an official TaxiNow regional pack is available, it is
+                  When an official TaxiNow Pro regional pack is available, it is
                   verified and installed first; only missing airports use
                   on-demand sources.
                 </p>
@@ -600,7 +601,7 @@
                 <strong>大批量下载需要一定时间。</strong>
                 <p>
                   建议优先按 ICAO 下载实际需要的机场，也可以填写省/州来缩小整国批量范围；
-                  已经安装的机场会自动跳过。如有官方 TaxiNow 地区地图包，应用会先校验并
+                  已经安装的机场会自动跳过。如有官方 TaxiNow Pro 地区地图包，应用会先校验并
                   安装地图包，仅对包内缺少的机场使用在线按需来源。
                 </p>
                 <p>
@@ -676,11 +677,11 @@
                   <span id="parallel-download-help"
                         class="info-tooltip"
                         role="tooltip">
-                    <span class="localized-download-copy" data-i18n="download.parallelHelp">Public OSM servers use per-user request slots and cooldowns, so several simultaneous OSM queries are often slower than one. TaxiNow serializes OSM requests to avoid self-throttling. Regional map-pack files can be downloaded safely in parallel. Higher values can overlap cached work, conversion, and fallback sources, but use more CPU and memory. Use 1 for on-demand OSM; higher values are useful when regional packs are listed.</span>
+                    <span class="localized-download-copy" data-i18n="download.parallelHelp">Public OSM servers use per-user request slots and cooldowns, so several simultaneous OSM queries are often slower than one. TaxiNow Pro serializes OSM requests to avoid self-throttling. Regional map-pack files can be downloaded safely in parallel. Higher values can overlap cached work, conversion, and fallback sources, but use more CPU and memory. Use 1 for on-demand OSM; higher values are useful when regional packs are listed.</span>
                     <span class="download-copy-legacy" lang="en">
                       Public OSM servers use per-user request slots and
                       cooldowns, so several simultaneous OSM queries are often
-                      slower than one. TaxiNow now serializes OSM requests to
+                      slower than one. TaxiNow Pro now serializes OSM requests to
                       avoid self-throttling. Regional map-pack files can be
                       downloaded safely in parallel. Higher values can also
                       overlap cached work, conversion, and fallback sources,
@@ -689,7 +690,7 @@
                     </span>
                     <span class="download-copy-legacy" lang="zh-Hans">
                       公共 OSM 服务器按用户分配请求槽位并设置冷却时间，因此多个 OSM
-                      请求同时运行往往比单个请求更慢。TaxiNow 现在会串行发送 OSM
+                      请求同时运行往往比单个请求更慢。TaxiNow Pro 现在会串行发送 OSM
                       请求以避免自我限流；地区地图包文件可以安全地并行下载。较高数值还可
                       并行处理缓存、数据转换和后备来源，但会占用更多 CPU 和内存。按需
                       OSM 建议选择 1；存在地区地图包时可提高该数值。
@@ -764,7 +765,7 @@
           </div>
           <div class="storage-stats">
             <div><strong id="storage-used">—</strong><span
-              data-i18n="storage.maps">TaxiNow maps</span></div>
+              data-i18n="storage.maps">TaxiNow Pro maps</span></div>
             <div><strong id="storage-free">—</strong><span
               data-i18n="storage.free">Disk free</span></div>
             <div><strong id="storage-count">—</strong><span
@@ -779,7 +780,7 @@
       <button id="welcome-backdrop"
               class="welcome-backdrop"
               type="button"
-              aria-label="TaxiNow welcome information"
+              aria-label="TaxiNow Pro welcome information"
               tabindex="-1"
               hidden></button>
       <section id="welcome-dialog"
@@ -792,8 +793,8 @@
         <div class="welcome-heading">
           <div>
             <span class="welcome-badge">100% FREE · 完全免费</span>
-            <h1 id="welcome-heading">Welcome to TaxiNow</h1>
-            <p class="welcome-subtitle">欢迎使用 TaxiNow</p>
+            <h1 id="welcome-heading">Welcome to TaxiNow Pro</h1>
+            <p class="welcome-subtitle">欢迎使用 TaxiNow Pro</p>
           </div>
           <span class="welcome-version">V2.0</span>
         </div>
@@ -801,11 +802,11 @@
           <section lang="en">
             <h2>Important information</h2>
             <p>
-              TaxiNow is a completely free, public-benefit project provided for
+              TaxiNow Pro is a completely free, public-benefit project provided for
               personal flight-simulator use.
             </p>
             <p>
-              <strong>If you paid for TaxiNow, you have been scammed.</strong>
+              <strong>If you paid for TaxiNow Pro, you have been scammed.</strong>
             </p>
             <p>
               The only official releases are published by
@@ -825,11 +826,11 @@
             </p>
             <p>
               Except for third-party data used by the software, such as map
-              data, the TaxiNow software and its original content are
+              data, the TaxiNow Pro software and its original content are
               copyrighted. Derivative works and modification are prohibited.
             </p>
             <p>
-              TaxiNow is provided <strong>“AS IS”</strong>, without warranties
+              TaxiNow Pro is provided <strong>“AS IS”</strong>, without warranties
               of any kind. Its source code is not publicly available.
               Qualified independent security or privacy experts may request
               limited review access solely to verify its security and privacy.
@@ -837,10 +838,10 @@
           </section>
           <section lang="zh-Hans">
             <h2>重要说明</h2>
-            <p>TaxiNow 是一个纯免费、公益提供的个人飞行模拟器项目。</p>
+            <p>TaxiNow Pro 是一个纯免费、公益提供的个人飞行模拟器项目。</p>
             <p><strong>如果你为本软件付费购买，说明你已经上当受骗。</strong></p>
             <p>
-              TaxiNow 仅由 <strong>skylarkning</strong> 通过
+              TaxiNow Pro 仅由 <strong>skylarkning</strong> 通过
               <a href="https://flightsim.to/addon/112712/taxinow"
                  target="_blank"
                  rel="noopener noreferrer">flightsim.to</a>
@@ -852,11 +853,11 @@
             </p>
             <p>严禁商业使用，严禁用于真实飞行或真实导航。</p>
             <p>
-              除软件使用的第三方数据（例如地图数据）外，TaxiNow
+              除软件使用的第三方数据（例如地图数据）外，TaxiNow Pro
               软件及原创内容均受版权保护，禁止二次创作，禁止修改。
             </p>
             <p>
-              TaxiNow 按<strong>“现状”</strong>提供，不作任何形式的担保。
+              TaxiNow Pro 按<strong>“现状”</strong>提供，不作任何形式的担保。
               源代码不公开；符合条件的独立安全或隐私专家，可仅以核验软件安全与隐私为目的，
               向开发者申请有限审查访问。
             </p>
@@ -869,7 +870,7 @@
           </label>
           <button id="close-welcome"
                   class="primary-button"
-                  type="button">Enter TaxiNow / 进入 TaxiNow</button>
+                  type="button">Enter TaxiNow Pro / 进入 TaxiNow Pro</button>
         </div>
       </section>
       <button id="update-backdrop"
@@ -888,7 +889,7 @@
         <div class="about-heading">
           <div>
             <span class="eyebrow" data-i18n="updates.available">Update available</span>
-            <h1 id="update-heading" data-i18n="updates.title">A new TaxiNow version is available</h1>
+            <h1 id="update-heading" data-i18n="updates.title">A new TaxiNow Pro version is available</h1>
           </div>
           <button id="close-update" class="icon-button" type="button"
                   aria-label="Close update information"
@@ -906,13 +907,13 @@
              target="_blank" rel="noopener noreferrer"
              data-i18n="updates.github">Download from GitHub</a>
           <button id="install-update" class="primary-button" type="button"
-                  data-i18n="updates.install">Download and install in TaxiNow</button>
+                  data-i18n="updates.install">Download and install in TaxiNow Pro</button>
         </div>
       </section>
       <button id="about-backdrop"
               class="about-backdrop"
               type="button"
-              aria-label="Close About TaxiNow"
+              aria-label="Close About TaxiNow Pro"
               data-i18n-aria-label="about.close"
               hidden></button>
       <section id="about-dialog"
@@ -928,19 +929,19 @@
                   data-i18n="about.info">Application information</span>
             <img class="about-brand-logo"
                  src="/branding/taxinow-logo.png"
-                 alt="TaxiNow" />
+                 alt="TaxiNow Pro" />
             <h1 id="about-heading"
                 data-i18n="about.title">About</h1>
           </div>
           <button id="close-about"
                   class="icon-button"
                   type="button"
-                  aria-label="Close About TaxiNow"
+                  aria-label="Close About TaxiNow Pro"
                   data-i18n-aria-label="about.close">×</button>
         </div>
         <div class="about-localized">
           <p>
-            <span data-i18n="about.developedBy">TaxiNow developed by Sky Ning</span>
+            <span data-i18n="about.developedBy">TaxiNow Pro developed by Sky Ning</span>
             (GitHub:
             <a href="https://github.com/skylarkning"
                target="_blank"
@@ -970,66 +971,70 @@
                rel="noopener noreferrer">中文</a>
           </p>
           <p data-i18n="about.free">
-            TaxiNow is a 100% free application for personal flight simulator use only.
+            TaxiNow Pro is a 100% free application for personal flight simulator use only.
           </p>
           <div class="about-warning">
             <strong data-i18n="about.warning">
-              Commercial use/real-world navigation using TaxiNow is strictly prohibited.
+              Commercial use/real-world navigation using TaxiNow Pro is strictly prohibited.
             </strong>
             <p data-i18n="about.scammed">You have been scammed if you paid for this app.</p>
-            <p data-i18n="about.asIs">TaxiNow is provided “AS IS”, without warranties of any kind.</p>
+            <p data-i18n="about.asIs">TaxiNow Pro is provided “AS IS”, without warranties of any kind.</p>
           </div>
           <p data-i18n="about.sourceReview">
-            Source code is not publicly available. Qualified independent security or privacy experts may request limited review access solely to verify TaxiNow's security and privacy. Review access does not grant modification, disclosure, or redistribution rights.
+            Source code is not publicly available. Qualified independent security or privacy experts may request limited review access solely to verify TaxiNow Pro's security and privacy. Review access does not grant modification, disclosure, or redistribution rights.
           </p>
           <section class="about-faq" aria-label="Frequently asked questions"
                    data-i18n-aria-label="faq.aria">
             <h2 data-i18n="faq.heading">Frequently asked questions and technical limitations</h2>
             <details>
+              <summary data-i18n="faq.mobileRequirements.q">What are the minimum Android and iOS requirements?</summary>
+              <p data-i18n="faq.mobileRequirements.a">Android 10+ with up-to-date Firefox (114+), or iOS/iPadOS 16.4+ with Safari. WebGL 2.0 is required. Use the same local network as the PC.</p>
+            </details>
+            <details>
               <summary data-i18n="faq.platform.q">Which simulator platforms are supported?</summary>
-              <p data-i18n="faq.platform.a">TaxiNow supports Microsoft Flight Simulator 2020 and Microsoft Flight Simulator 2024 on Windows.</p>
+              <p data-i18n="faq.platform.a">TaxiNow Pro supports Microsoft Flight Simulator 2020 and Microsoft Flight Simulator 2024 on Windows.</p>
             </details>
             <details>
               <summary data-i18n="faq.xplane.q">Why is X-Plane not supported?</summary>
-              <p data-i18n="faq.xplane.a">I do not fly with X-Plane regularly and I am not familiar enough with the X-Plane SDK to provide reliable support. I currently have no plans for X-Plane simulator integration, but I may consider it in the future if there is sufficient demand. This is separate from TaxiNow using selected X-Plane Scenery Gateway data as a fallback map-data source.</p>
+              <p data-i18n="faq.xplane.a">I do not fly with X-Plane regularly and I am not familiar enough with the X-Plane SDK to provide reliable support. I currently have no plans for X-Plane simulator integration, but I may consider it in the future if there is sufficient demand. This is separate from TaxiNow Pro using selected X-Plane Scenery Gateway data as a fallback map-data source.</p>
             </details>
             <details>
               <summary data-i18n="faq.feedback.q">How do I report an issue or submit feedback?</summary>
               <p>
-                <span data-i18n="faq.feedback.before">Please leave a comment on TaxiNow's official</span>
+                <span data-i18n="faq.feedback.before">Please leave a comment on TaxiNow Pro's official</span>
                 <a href="https://flightsim.to/addon/112712/taxinow"
                    target="_blank"
                    rel="noopener noreferrer">flightsim.to</a>
-                <span data-i18n="faq.feedback.after">page. Include the airport ICAO, simulator version, TaxiNow version and internal build number, and a screenshot when useful.</span>
+                <span data-i18n="faq.feedback.after">page. Include the airport ICAO, simulator version, TaxiNow Pro version and internal build number, and a screenshot when useful.</span>
               </p>
             </details>
             <details>
-              <summary data-i18n="faq.free.q">Will you charge me for TaxiNow in the future?</summary>
-              <p data-i18n="faq.free.a">No. TaxiNow is 100% free and I intend to keep it free. TaxiNow uses open-source data and technology, and charging for access could constitute commercial use. I created TaxiNow as a free tool and a gift to my fellow flight-simulation enthusiasts, and I will keep it free to the best of my ability.</p>
+              <summary data-i18n="faq.free.q">Will you charge me for TaxiNow Pro in the future?</summary>
+              <p data-i18n="faq.free.a">No. TaxiNow Pro is 100% free and I intend to keep it free. TaxiNow Pro uses open-source data and technology, and charging for access could constitute commercial use. I created TaxiNow Pro as a free tool and a gift to my fellow flight-simulation enthusiasts, and I will keep it free to the best of my ability.</p>
             </details>
             <details>
-              <summary data-i18n="faq.privacy.q">Do you collect any data? Is TaxiNow safe to use?</summary>
-              <p data-i18n="faq.privacy.a1">I do not collect or upload personal information, simulator telemetry, usage analytics, crash reports, or diagnostic data. Aircraft position remains on your computer and local network. TaxiNow does not need a continuous internet connection; internet access is required only when downloading map assets. During a download, TaxiNow sends the requested airport or region to the relevant third-party map-data provider or official TaxiNow map-pack host.</p>
-              <p data-i18n="faq.privacy.a2">I do not currently make the source code public in order to reduce unauthorized modification and redistribution. Qualified independent security or privacy experts may request limited source-review access solely to verify TaxiNow's security and privacy. This does not grant modification, disclosure, or redistribution rights.</p>
+              <summary data-i18n="faq.privacy.q">Do you collect any data? Is TaxiNow Pro safe to use?</summary>
+              <p data-i18n="faq.privacy.a1">I do not collect or upload personal information, simulator telemetry, usage analytics, crash reports, or diagnostic data. Aircraft position remains on your computer and local network. TaxiNow Pro does not need a continuous internet connection; internet access is required only when downloading map assets. During a download, TaxiNow Pro sends the requested airport or region to the relevant third-party map-data provider or official TaxiNow Pro map-pack host.</p>
+              <p data-i18n="faq.privacy.a2">I do not currently make the source code public in order to reduce unauthorized modification and redistribution. Qualified independent security or privacy experts may request limited source-review access solely to verify TaxiNow Pro's security and privacy. This does not grant modification, disclosure, or redistribution rights.</p>
             </details>
             <details>
               <summary data-i18n="faq.donate.q">Thank you for making TaxiNow. Can I donate to you?</summary>
-              <p data-i18n="faq.donate.a">Thank you for your kindness. I do not currently accept donations, so TaxiNow can remain a purely free project. A five-star review and constructive feedback are always greatly appreciated.</p>
+              <p data-i18n="faq.donate.a">Thank you for your kindness. I do not currently accept donations, so TaxiNow Pro can remain a purely free project. A five-star review and constructive feedback are always greatly appreciated.</p>
             </details>
             <details id="faq-map-correctness-localized">
-              <summary data-i18n="faq.map.q">Can TaxiNow guarantee every airport map is correct?</summary>
-              <p data-i18n="faq.map.a">No. TaxiNow combines OpenStreetMap, official aviation GIS where available, open global building footprints, OurAirports, and selected X-Plane operational details. Source coverage, age, and precision vary by airport and country. TaxiNow cannot guarantee that every runway, taxiway, stand, terminal outline, or label is complete or correct. TaxiNow does not maintain manual per-airport drawing corrections.</p>
+              <summary data-i18n="faq.map.q">Can TaxiNow Pro guarantee every airport map is correct?</summary>
+              <p data-i18n="faq.map.a">No. TaxiNow Pro combines OpenStreetMap, official aviation GIS where available, open global building footprints, OurAirports, and selected X-Plane operational details. Source coverage, age, and precision vary by airport and country. TaxiNow Pro cannot guarantee that every runway, taxiway, stand, terminal outline, or label is complete or correct. TaxiNow Pro does not maintain manual per-airport drawing corrections.</p>
             </details>
             <details>
               <summary data-i18n="faq.terminal.q">Why can a terminal shape or “Terminal X” label be missing?</summary>
-              <p data-i18n="faq.terminal.a">Some source datasets contain only an unnamed building footprint, only a terminal name point, or neither. TaxiNow attempts to match buildings to gates, aprons, terminal labels, and nearby accepted terminal geometry, but it will not invent a terminal number when no reliable name or number exists.</p>
+              <p data-i18n="faq.terminal.a">Some source datasets contain only an unnamed building footprint, only a terminal name point, or neither. TaxiNow Pro attempts to match buildings to gates, aprons, terminal labels, and nearby accepted terminal geometry, but it will not invent a terminal number when no reliable name or number exists.</p>
             </details>
             <details>
               <summary data-i18n="faq.broken.q">Why do I see missing or broken terminal buildings?</summary>
-              <p data-i18n="faq.broken.a1">First check the map source shown at the bottom of the map. If it shows X-Plane Scenery Gateway, TaxiNow used fallback data because it could not obtain usable OpenStreetMap data. Delete the airport from Downloaded Asset and download it again; a retry can sometimes obtain more complete OSM terminal geometry.</p>
+              <p data-i18n="faq.broken.a1">First check the map source shown at the bottom of the map. If it shows X-Plane Scenery Gateway, TaxiNow Pro used fallback data because it could not obtain usable OpenStreetMap data. Delete the airport from Downloaded Asset and download it again; a retry can sometimes obtain more complete OSM terminal geometry.</p>
               <p>
                 <span data-i18n="faq.broken.a2">If several downloads still use X-Plane Scenery Gateway, usable OSM airport data is probably unavailable. X-Plane airport data may contain missing, unnamed, or fragmented terminal shapes. See also</span>
-                <a href="#faq-map-correctness-localized" data-i18n="faq.map.q">Can TaxiNow guarantee every airport map is correct?</a>
+                <a href="#faq-map-correctness-localized" data-i18n="faq.map.q">Can TaxiNow Pro guarantee every airport map is correct?</a>
               </p>
             </details>
             <details>
@@ -1038,15 +1043,15 @@
             </details>
             <details>
               <summary data-i18n="faq.vatsimRefresh.q">Why is VATSIM traffic only refreshed once in a while?</summary>
-              <p data-i18n="faq.vatsimRefresh.a">The official VATSIM network-data feed is regenerated about every 15 seconds. TaxiNow follows that cadence and shares one PC-side cache across the desktop and iPad views to avoid redundant requests. Network latency can make a refresh appear slightly later; this is normal.</p>
+              <p data-i18n="faq.vatsimRefresh.a">The official VATSIM network-data feed is regenerated about every 15 seconds. TaxiNow Pro follows that cadence and shares one PC-side cache across the desktop and iPad views to avoid redundant requests. Network latency can make a refresh appear slightly later; this is normal.</p>
             </details>
             <details>
               <summary data-i18n="faq.routing.q">Can I treat a planned taxi route as an ATC clearance?</summary>
               <p data-i18n="faq.routing.a">No. Automatic routes use a generic pathfinding algorithm and might not reflect the real taxi route. The planner cannot reliably account for taxiway direction, wingspan and aircraft-size limits, temporary closures, local procedures, or live ATC instructions. Always follow ATC and airport signage. If you do not like an automatic route, use Enter Customized Taxi Route to highlight the route you intend to follow.</p>
             </details>
             <details>
-              <summary data-i18n="faq.real.q">Is TaxiNow suitable for real-world navigation?</summary>
-              <p data-i18n="faq.real.a">No. Maps may be incomplete, outdated, inferred, or inaccurate. TaxiNow is exclusively for personal flight-simulator use.</p>
+              <summary data-i18n="faq.real.q">Is TaxiNow Pro suitable for real-world navigation?</summary>
+              <p data-i18n="faq.real.a">No. Maps may be incomplete, outdated, inferred, or inaccurate. TaxiNow Pro is exclusively for personal flight-simulator use.</p>
             </details>
           </section>
           <p class="about-version">
@@ -1061,7 +1066,7 @@
         </div>
         <div class="about-language about-legacy" lang="en">
         <p>
-          TaxiNow Developed by Sky Ning
+          TaxiNow Pro Developed by Sky Ning
           (GitHub:
           <a href="https://github.com/skylarkning"
              target="_blank"
@@ -1089,29 +1094,33 @@
              rel="noopener noreferrer">中文</a>
         </p>
         <p>
-          TaxiNow is a 100% free application, for personal flight simulator use
+          TaxiNow Pro is a 100% free application, for personal flight simulator use
           only.
         </p>
         <div class="about-warning">
           <strong>
-            Commercial use/real-world navigation using TaxiNow is strictly
+            Commercial use/real-world navigation using TaxiNow Pro is strictly
             prohibited.
           </strong>
           <p>You have been scammed if you paid for this app.</p>
-          <p>TaxiNow is provided “AS IS”, without warranties of any kind.</p>
+          <p>TaxiNow Pro is provided “AS IS”, without warranties of any kind.</p>
         </div>
         <p>
           Source code is not publicly available. Qualified independent
           security or privacy experts may request limited review access solely
-          to verify TaxiNow's security and privacy. Review access does not
+          to verify TaxiNow Pro's security and privacy. Review access does not
           grant modification, disclosure, or redistribution rights.
         </p>
         <section class="about-faq" aria-label="Frequently asked questions">
           <h2>Frequently asked questions and technical limitations</h2>
+            <details>
+              <summary data-i18n="faq.mobileRequirements.q">What are the minimum Android and iOS requirements?</summary>
+              <p data-i18n="faq.mobileRequirements.a">Android 10+ with up-to-date Firefox (114+), or iOS/iPadOS 16.4+ with Safari. WebGL 2.0 is required. Use the same local network as the PC.</p>
+            </details>
           <details>
             <summary>Which simulator platforms are supported?</summary>
             <p>
-              TaxiNow supports Microsoft Flight Simulator 2020 and Microsoft
+              TaxiNow Pro supports Microsoft Flight Simulator 2020 and Microsoft
               Flight Simulator 2024 on Windows.
             </p>
           </details>
@@ -1122,50 +1131,50 @@
               with the X-Plane SDK to provide reliable support. I currently
               have no plans for X-Plane simulator integration, but I may
               consider it in the future if there is sufficient demand.
-              This is separate from TaxiNow using selected X-Plane Scenery
+              This is separate from TaxiNow Pro using selected X-Plane Scenery
               Gateway data as a fallback map-data source.
             </p>
           </details>
           <details>
             <summary>How do I report an issue or submit feedback?</summary>
             <p>
-              Please leave a comment on TaxiNow's official
+              Please leave a comment on TaxiNow Pro's official
               <a href="https://flightsim.to/addon/112712/taxinow"
                  target="_blank"
                  rel="noopener noreferrer">flightsim.to</a>
-              page. Include the airport ICAO, simulator version, TaxiNow
+              page. Include the airport ICAO, simulator version, TaxiNow Pro
               version and internal build number, and a screenshot when useful.
             </p>
           </details>
           <details>
-            <summary>Will you charge me for TaxiNow in the future?</summary>
+            <summary>Will you charge me for TaxiNow Pro in the future?</summary>
             <p>
-              No. TaxiNow is 100% free and I intend to keep it free. TaxiNow
+              No. TaxiNow Pro is 100% free and I intend to keep it free. TaxiNow Pro
               uses open-source data and technology, and charging for access
-              could constitute commercial use. I created TaxiNow as a free
+              could constitute commercial use. I created TaxiNow Pro as a free
               tool and a gift to my fellow flight-simulation enthusiasts, and
               I will keep it free to the best of my ability.
             </p>
           </details>
           <details>
-            <summary>Do you collect any data? Is TaxiNow safe to use?</summary>
+            <summary>Do you collect any data? Is TaxiNow Pro safe to use?</summary>
             <p>
               I do not collect or upload personal information, simulator
               telemetry, usage analytics, crash reports, or diagnostic data.
               Aircraft position remains on your computer and local network.
-              TaxiNow does not need a continuous internet connection; internet
+              TaxiNow Pro does not need a continuous internet connection; internet
               access is required only when downloading map assets. During a
-              download, TaxiNow sends the requested
+              download, TaxiNow Pro sends the requested
               airport or region to the relevant third-party map-data provider
-              or official TaxiNow map-pack host.
+              or official TaxiNow Pro map-pack host.
             </p>
             <p>
-              I have invested considerable time in TaxiNow, and I do not
+              I have invested considerable time in TaxiNow Pro, and I do not
               currently make its source code public in order to reduce
               unauthorized modification and redistribution. Qualified
               independent security or privacy experts may use the contact
               information above to request limited source-review access from
-              me. Review access is solely for verifying TaxiNow's security and
+              me. Review access is solely for verifying TaxiNow Pro's security and
               privacy and does not grant modification, disclosure, or
               redistribution rights.
             </p>
@@ -1174,19 +1183,19 @@
             <summary>Thank you for making TaxiNow. Can I donate to you?</summary>
             <p>
               Thank you for your kindness. I do not currently accept donations,
-              so TaxiNow can remain a purely free project. A five-star review
+              so TaxiNow Pro can remain a purely free project. A five-star review
               and constructive feedback are always greatly appreciated.
             </p>
           </details>
           <details id="faq-map-correctness">
-            <summary>Can TaxiNow guarantee every airport map is correct?</summary>
+            <summary>Can TaxiNow Pro guarantee every airport map is correct?</summary>
             <p>
-              No. TaxiNow combines OpenStreetMap, official aviation GIS where
+              No. TaxiNow Pro combines OpenStreetMap, official aviation GIS where
               available, open global building footprints, OurAirports, and
               selected X-Plane operational details. Source coverage, age, and
-              precision vary by airport and country. TaxiNow cannot guarantee
+              precision vary by airport and country. TaxiNow Pro cannot guarantee
               that every runway, taxiway, stand, terminal outline, or label is
-              complete or correct. TaxiNow does not maintain manual
+              complete or correct. TaxiNow Pro does not maintain manual
               per-airport drawing corrections.
             </p>
           </details>
@@ -1194,7 +1203,7 @@
             <summary>Why can a terminal shape or “Terminal X” label be missing?</summary>
             <p>
               Some source datasets contain only an unnamed building footprint,
-              only a terminal name point, or neither. TaxiNow attempts to match
+              only a terminal name point, or neither. TaxiNow Pro attempts to match
               buildings to gates, aprons, terminal labels, and nearby accepted
               terminal geometry, but it will not invent a terminal number when
               no reliable name or number exists.
@@ -1204,7 +1213,7 @@
             <summary>Why do I see missing or broken terminal buildings?</summary>
             <p>
               First check the map source shown in the attribution at the
-              bottom of the map. If it shows X-Plane Scenery Gateway, TaxiNow
+              bottom of the map. If it shows X-Plane Scenery Gateway, TaxiNow Pro
               fell back because it could not obtain usable OpenStreetMap data
               for that download. Delete the airport from Downloaded Asset and
               download it again. A retry can sometimes reach the OSM service
@@ -1216,7 +1225,7 @@
               X-Plane airport data is primarily operational scenery data and
               may contain missing, unnamed, or fragmented terminal shapes.
               See also
-              <a href="#faq-map-correctness">Can TaxiNow guarantee every
+              <a href="#faq-map-correctness">Can TaxiNow Pro guarantee every
               airport map is correct?</a>
             </p>
           </details>
@@ -1235,7 +1244,7 @@
             <summary>Why is VATSIM traffic only refreshed once in a while?</summary>
             <p>
               The official VATSIM network-data feed is regenerated about every
-              15 seconds. TaxiNow follows that cadence and shares one PC-side
+              15 seconds. TaxiNow Pro follows that cadence and shares one PC-side
               cache across the desktop and iPad views to avoid redundant
               requests. Network latency can make a refresh appear slightly
               later; this is normal.
@@ -1255,10 +1264,10 @@
             </p>
           </details>
           <details>
-            <summary>Is TaxiNow suitable for real-world navigation?</summary>
+            <summary>Is TaxiNow Pro suitable for real-world navigation?</summary>
             <p>
               No. Maps may be incomplete, outdated, inferred, or inaccurate.
-              TaxiNow is exclusively for personal flight-simulator use.
+              TaxiNow Pro is exclusively for personal flight-simulator use.
             </p>
           </details>
         </section>
@@ -1271,7 +1280,7 @@
         </div>
         <div class="about-chinese about-language about-legacy" lang="zh-Hans">
           <p>
-            TaxiNow 由 Sky Ning 开发
+            TaxiNow Pro 由 Sky Ning 开发
             （GitHub：
             <a href="https://github.com/skylarkning"
                target="_blank"
@@ -1299,26 +1308,30 @@
                rel="noopener noreferrer">中文</a>
           </p>
           <p>
-            TaxiNow 是一款 100% 免费的应用，仅供个人飞行模拟器使用。
+            TaxiNow Pro 是一款 100% 免费的应用，仅供个人飞行模拟器使用。
           </p>
           <div class="about-warning">
             <strong>
-              严禁将 TaxiNow 用于商业用途或真实飞行/导航。
+              严禁将 TaxiNow Pro 用于商业用途或真实飞行/导航。
             </strong>
             <p>如果您为本软件付费，说明您已经上当受骗。</p>
-            <p>TaxiNow 按“现状”提供，不作任何形式的担保。</p>
+            <p>TaxiNow Pro 按“现状”提供，不作任何形式的担保。</p>
           </div>
           <p>
-            源代码不公开；符合条件的独立安全或隐私专家，可仅以核验 TaxiNow
+            源代码不公开；符合条件的独立安全或隐私专家，可仅以核验 TaxiNow Pro
             安全与隐私为目的，向开发者申请有限审查访问。
             审查权限不包含修改、披露或再发布授权。
           </p>
           <section class="about-faq" aria-label="常见问题与技术限制">
             <h2>常见问题与技术限制</h2>
             <details>
-              <summary>TaxiNow 支持哪些模拟器平台？</summary>
+              <summary data-i18n="faq.mobileRequirements.q">What are the minimum Android and iOS requirements?</summary>
+              <p data-i18n="faq.mobileRequirements.a">Android 10+ with up-to-date Firefox (114+), or iOS/iPadOS 16.4+ with Safari. WebGL 2.0 is required. Use the same local network as the PC.</p>
+            </details>
+            <details>
+              <summary>TaxiNow Pro 支持哪些模拟器平台？</summary>
               <p>
-                TaxiNow 支持 Windows 平台上的 Microsoft Flight Simulator 2020
+                TaxiNow Pro 支持 Windows 平台上的 Microsoft Flight Simulator 2020
                 和 Microsoft Flight Simulator 2024。
               </p>
             </details>
@@ -1327,66 +1340,66 @@
               <p>
                 我平时较少使用 X-Plane，对 X-Plane SDK 也不够熟悉，现阶段无法
                 提供可靠支持，因此目前没有接入 X-Plane 模拟器的计划。如果未来
-                用户需求较高，我会考虑增加支持。这与 TaxiNow 将部分 X-Plane
+                用户需求较高，我会考虑增加支持。这与 TaxiNow Pro 将部分 X-Plane
                 Scenery Gateway 数据用作后备地图数据源并不冲突。
               </p>
             </details>
             <details>
               <summary>如何报告问题或提交意见？</summary>
               <p>
-                请在 TaxiNow 官方
+                请在 TaxiNow Pro 官方
                 <a href="https://flightsim.to/addon/112712/taxinow"
                    target="_blank"
                    rel="noopener noreferrer">flightsim.to</a>
-                页面下留言。建议同时提供机场 ICAO、模拟器版本、TaxiNow 版本及
+                页面下留言。建议同时提供机场 ICAO、模拟器版本、TaxiNow Pro 版本及
                 内部构建号，并在有帮助时附上截图。
               </p>
             </details>
             <details>
-              <summary>您以后会对 TaxiNow 收费吗？</summary>
+              <summary>您以后会对 TaxiNow Pro 收费吗？</summary>
               <p>
-                不会。TaxiNow 是 100% 免费软件，我也计划始终保持免费。项目使用了
-                开源数据和技术，收费可能构成商业行为。我希望将 TaxiNow 作为送给
+                不会。TaxiNow Pro 是 100% 免费软件，我也计划始终保持免费。项目使用了
+                开源数据和技术，收费可能构成商业行为。我希望将 TaxiNow Pro 作为送给
                 广大模拟飞行爱好者的免费工具，并会尽最大努力保持免费。
               </p>
             </details>
             <details>
-              <summary>您会收集任何数据吗？TaxiNow 使用安全吗？</summary>
+              <summary>您会收集任何数据吗？TaxiNow Pro 使用安全吗？</summary>
               <p>
                 我不会收集或上传个人信息、模拟器遥测、使用分析、崩溃报告或诊断
-                数据。飞机位置只保留在您的电脑和本地网络中。TaxiNow 不需要
-                持续联网，仅在下载地图资源时需要互联网连接。下载时，TaxiNow
+                数据。飞机位置只保留在您的电脑和本地网络中。TaxiNow Pro 不需要
+                持续联网，仅在下载地图资源时需要互联网连接。下载时，TaxiNow Pro
                 会将所请求的机场或地区发送给相应的第三方地图数据提供方，或官方
-                TaxiNow 地图包托管服务。
+                TaxiNow Pro 地图包托管服务。
               </p>
               <p>
-                我在 TaxiNow 上投入了大量时间。目前我暂不公开源代码，以减少未经
+                我在 TaxiNow Pro 上投入了大量时间。目前我暂不公开源代码，以减少未经
                 授权的修改和再发布。符合条件的独立安全或隐私专家，可以使用上方
-                联系方式向我申请有限的源代码审查权限。该权限仅用于核验 TaxiNow
+                联系方式向我申请有限的源代码审查权限。该权限仅用于核验 TaxiNow Pro
                 的安全与隐私，不包含修改、披露或再发布授权。
               </p>
             </details>
             <details>
-              <summary>非常感谢您制作 TaxiNow，我可以捐赠吗？</summary>
+              <summary>非常感谢您制作 TaxiNow Pro，我可以捐赠吗？</summary>
               <p>
-                感谢您的好意。为了让 TaxiNow 保持纯粹免费的公益项目，我目前不
+                感谢您的好意。为了让 TaxiNow Pro 保持纯粹免费的公益项目，我目前不
                 接受捐赠。不过，五星好评和有建设性的反馈始终非常受欢迎！
               </p>
             </details>
             <details id="faq-map-correctness-zh">
-              <summary>TaxiNow 能保证全球每一座机场都正确绘制吗？</summary>
+              <summary>TaxiNow Pro 能保证全球每一座机场都正确绘制吗？</summary>
               <p>
-                不能。TaxiNow 会融合 OpenStreetMap、可用的官方航空 GIS、开放的全球
+                不能。TaxiNow Pro 会融合 OpenStreetMap、可用的官方航空 GIS、开放的全球
                 建筑轮廓、OurAirports 及部分 X-Plane 运行细节。不同国家和机场的数据
                 覆盖、更新时间与精度并不一致，因此无法保证每一条跑道、滑行道、机位、
-                航站楼轮廓或文字标注都完整且正确。TaxiNow 不维护逐机场的人工绘图修正。
+                航站楼轮廓或文字标注都完整且正确。TaxiNow Pro 不维护逐机场的人工绘图修正。
               </p>
             </details>
             <details>
               <summary>为什么航站楼形状或“Terminal X”标注仍可能缺失？</summary>
               <p>
                 部分来源只有无名称的建筑轮廓，部分只有航站楼名称点，也可能两者都没有。
-                TaxiNow 会根据登机口、机坪、航站楼名称及相邻可信轮廓自动匹配，但在没有
+                TaxiNow Pro 会根据登机口、机坪、航站楼名称及相邻可信轮廓自动匹配，但在没有
                 可靠名称或编号时不会凭空编造“Terminal X”。
               </p>
             </details>
@@ -1394,7 +1407,7 @@
               <summary>为什么航站楼会缺失、破碎或显示不完整？</summary>
               <p>
                 请先查看地图底部版权信息中显示的数据源。如果其中显示
-                X-Plane Scenery Gateway，说明 TaxiNow 本次下载未能取得可用的
+                X-Plane Scenery Gateway，说明 TaxiNow Pro 本次下载未能取得可用的
                 OpenStreetMap 数据，因此使用了后备数据。请先在“已下载资源”中
                 删除该机场并重新下载。有时重试可以成功连接 OSM 服务，并获得
                 更完整的航站楼图形。
@@ -1404,7 +1417,7 @@
                 表示该机场目前没有可用的 OSM 机场数据。X-Plane 机场数据主要
                 用于运行和场景设施，航站楼图形可能缺失、无名称或由多个碎片
                 组成。另请参阅
-                <a href="#faq-map-correctness-zh">“TaxiNow 能保证全球每一座机场
+                <a href="#faq-map-correctness-zh">“TaxiNow Pro 能保证全球每一座机场
                 都正确绘制吗？”</a>
               </p>
             </details>
@@ -1420,7 +1433,7 @@
             <details>
               <summary>为什么VATSIM交通不是持续刷新，而是隔一段时间才更新？</summary>
               <p>
-                VATSIM官方网络数据源大约每15秒生成一次。TaxiNow遵循这一更新
+                VATSIM官方网络数据源大约每15秒生成一次。TaxiNow Pro遵循这一更新
                 频率，并让桌面端和iPad共用PC端缓存，避免重复请求。网络延迟
                 有时会让刷新稍晚一些，这是正常现象。
               </p>
@@ -1435,9 +1448,9 @@
               </p>
             </details>
             <details>
-              <summary>TaxiNow 可以用于真实飞行导航吗？</summary>
+              <summary>TaxiNow Pro 可以用于真实飞行导航吗？</summary>
               <p>
-                不可以。地图可能不完整、过时、包含推断或存在误差；TaxiNow 仅限个人模拟飞行。
+                不可以。地图可能不完整、过时、包含推断或存在误差；TaxiNow Pro 仅限个人模拟飞行。
               </p>
             </details>
           </section>
@@ -1457,7 +1470,7 @@
         <span class="footer-right">
           <span id="footer-version">V2.0</span>
           <span id="attribution"
-                data-i18n="footer.fixture">Bundled TaxiNow fixture</span>
+                data-i18n="footer.fixture">Bundled TaxiNow Pro fixture</span>
         </span>
       </footer>
       <output id="map-diagnostics" hidden aria-hidden="true"></output>

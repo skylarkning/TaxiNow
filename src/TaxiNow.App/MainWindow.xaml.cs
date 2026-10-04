@@ -41,7 +41,7 @@ public partial class MainWindow : Window
         _changeKeepWindowVisible = changeKeepWindowVisible;
         _changeVmasPresenceEnabled = changeVmasPresenceEnabled;
         InitializeComponent();
-        Title = $"TaxiNow {TaxiNowHost.DisplayVersion}";
+        Title = $"TaxiNow Pro {TaxiNowHost.DisplayVersion}";
         Topmost = keepWindowVisible;
     }
 
@@ -55,12 +55,27 @@ public partial class MainWindow : Window
                 "TaxiNow",
                 "WebView2");
             Directory.CreateDirectory(webViewData);
+            // WebView2 154 can misinterpret wide-gamut SDR display primaries and tint
+            // neutral UI colours yellow. Keep this app's web content in sRGB rather
+            // than changing the user's display profile or global WebView2 settings.
+            var webViewOptions = new CoreWebView2EnvironmentOptions
+            {
+                AdditionalBrowserArguments = "--force-color-profile=srgb"
+            };
             var environment = await CoreWebView2Environment.CreateAsync(
-                userDataFolder: webViewData);
+                userDataFolder: webViewData,
+                options: webViewOptions);
             await MapView.EnsureCoreWebView2Async(environment);
             MapView.CoreWebView2.Settings.AreDevToolsEnabled = true;
             MapView.CoreWebView2.Settings.IsStatusBarEnabled = false;
             MapView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+            MapView.CoreWebView2.NewWindowRequested += (_, args) =>
+            {
+                if (args.Uri != "https://github.com/skylarkning/TaxiNow-Release/issues/new/choose") return;
+                args.Handled = true;
+                try { Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true }); }
+                catch (Exception error) { System.Diagnostics.Debug.WriteLine(error); }
+            };
             MapView.NavigationCompleted += OnNavigationCompleted;
             MapView.Source = new Uri(TaxiNowHost.MapShellUrl);
         }
@@ -167,6 +182,13 @@ public partial class MainWindow : Window
             PostWindowSettings();
             return;
         }
+        if (type == "update-install:open-folder")
+        {
+            var directory = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "TaxiNow", "Updates"));
+            Directory.CreateDirectory(directory);
+            Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+            return;
+        }
         if (type == "update-install:start")
         {
             if (_updateInstallInProgress)
@@ -201,13 +223,13 @@ public partial class MainWindow : Window
             {
                 PostUpdateInstallStatus(
                     "downloading",
-                    "Downloading the verified TaxiNow installer…");
+                    "Downloading the verified TaxiNow Pro installer…");
                 var installer = await DownloadUpdateInstallerAsync(
                     downloadUrl,
                     digest);
                 PostUpdateInstallStatus(
                     "launching",
-                    "Download complete. Opening the TaxiNow installer…");
+                    "Download complete. Opening the TaxiNow Pro installer…");
                 Process.Start(new ProcessStartInfo(installer)
                 {
                     UseShellExecute = true
@@ -264,7 +286,7 @@ public partial class MainWindow : Window
             !uri.AbsolutePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "TaxiNow only installs official HTTPS release installers from skylarkning/TaxiNow-Release.");
+                "TaxiNow Pro only installs official HTTPS release installers from skylarkning/TaxiNow-Release.");
         }
 
         var expected = digest?.StartsWith(
