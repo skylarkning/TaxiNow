@@ -129,7 +129,14 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   const about = $('open-about'), settingsMenu = $('settings-menu');
   about.classList.add('settings-check-row');
   about.setAttribute('role', 'menuitem');
-  settingsMenu.append(about);
+  const report = button(t('actions.reportIssue'), () => {
+    window.open('https://github.com/skylarkning/TaxiNow-Release/issues/new/choose', '_blank', 'noopener,noreferrer');
+    settingsMenu.hidden = true;
+    $('settings-selector').setAttribute('aria-expanded', 'false');
+  }, 'settings-check-row');
+  report.id = 'report-issue';
+  report.setAttribute('role', 'menuitem');
+  settingsMenu.append(report, about);
   about.addEventListener('click', () => {
     settingsMenu.hidden = true;
     $('settings-selector').setAttribute('aria-expanded', 'false');
@@ -140,6 +147,10 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   document.getElementById('app')!.append(root);
   document.querySelector('footer')!.insertBefore(root.querySelector('.fd-map-bottom')!, $('map-summary'));
   $('fd-panel').hidden = true;
+  const planButtons = document.createElement('div'); planButtons.className = 'fd-import-actions';
+  const importButton = $('fd-import'); importButton.before(planButtons);
+  const clearButton = button(tr('clear'), clearPlan); clearButton.id = 'fd-clear-plan'; clearButton.hidden = true;
+  planButtons.append(importButton, clearButton);
   const profileView = createVerticalProfileView(root);
   profileController = new VerticalProfileController(profileView, {
     initialOpen: false,
@@ -278,6 +289,7 @@ function renderPanel(): void {
   $('airport-picker-toggle').setAttribute('aria-label', tr('selectAirport'));
   $('airport-picker-toggle').title = tr('selectAirport');
   for (const tab of flightDeckTabs) $(`fd-tab-${tab}`).setAttribute('aria-pressed', String(tab === currentTab));
+  $('fd-clear-plan').hidden = !plan;
   $('fd-panel').dataset.tab = currentTab;
   $('fd-panel-title').textContent = tr(currentTab); $('fd-form').hidden = currentTab !== 'flight';
   renderAirportShortcuts();
@@ -302,7 +314,7 @@ function renderPanel(): void {
     row.title = `${p.position[1].toFixed(4)}, ${p.position[0].toFixed(4)}`; row.append(number, name, meta); list.append(row);
   }); content.append(list);
   const actions = document.createElement('div'); actions.className = 'fd-plan-actions';
-  actions.append(button(tr('fit'), fitRoute), button(tr('clear'), clearPlan));
+  actions.append(button(tr('fit'), fitRoute));
   const stamp = document.createElement('small'); stamp.textContent = `${tr('imported')} ${new Date(plan.importedAt).toLocaleTimeString()}`; actions.append(stamp); content.append(actions);
 }
 function clearPlan(): void {
@@ -901,5 +913,5 @@ function renderFlightOverview(content: HTMLElement): void {
   content.append(details);
   const actions = document.createElement('div'); actions.className = 'fd-plan-actions';
   const stamp = document.createElement('small'); stamp.textContent = tr('imported') + ' ' + new Date(current.importedAt).toLocaleTimeString();
-  actions.append(stamp, button(tr('clear'), clearPlan)); content.append(actions);
+  actions.append(stamp); content.append(actions);
 }

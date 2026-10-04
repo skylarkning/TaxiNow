@@ -175,7 +175,7 @@ export const japaneseTranslations: Record<string, string> = {
   "actions.language": "日本語",
   "actions.languageAria": "言語を選択",
   "actions.languageMenu": "言語",
-  "actions.about": "TaxiNowについて",
+  "actions.about": "TaxiNowについて", "actions.reportIssue": "問題を報告",
   "panel.offlineMaps": "オフラインマップ",
   "panel.title": "マップとストレージ",
   "panel.close": "マップ管理を閉じる",
