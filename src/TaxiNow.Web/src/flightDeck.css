@@ -94,7 +94,7 @@ body.flightdeck .taxi-plan-panel { top:116px; left:88px; bottom:44px; max-height
 body.flightdeck .asset-panel { top:116px; bottom:44px; max-height:calc(100% - 160px); border-radius:6px; box-shadow:none; }
 body.flightdeck button { cursor:pointer; }body.flightdeck button:focus-visible,body.flightdeck input:focus-visible,body.flightdeck select:focus-visible { outline:2px solid #269fdf; outline-offset:3px; }
 @media(max-width:1000px) { #fd-title { display:none; } body.flightdeck header #airport-name { display:none; } #fd-panel { width:310px; } body.flightdeck header .wordmark { width:90px; } }
-@media(max-width:620px) { body.flightdeck header { padding-left:10px; padding-right:10px; } body.flightdeck header #open-assets,body.flightdeck header .wordmark { display:none; } .fd-rail { width:55px; }.fd-rail > button { font-size:10px; }.fd-airport-shortcut strong { font-size:11px; } #fd-root { left:55px; }body.flightdeck #map { left:55px; } .fd-tabs { left:8px; gap:5px; }.fd-tabs button { min-width:78px; padding:4px 8px; } #fd-panel { left:8px; right:8px; width:auto; top:68px; bottom:40px; max-height:70%; }.fd-map-top { right:8px; }.fd-map-tools { right:8px; }.fd-map-bottom span:first-child { display:none; } body.flightdeck .taxi-plan-panel { left:63px; width:calc(100% - 71px); } body.flightdeck footer #map-summary { display:none; } }
+@media(max-width:620px) { body.flightdeck header { padding-left:10px; padding-right:10px; } body.flightdeck header #open-assets { display:none; } .fd-rail { width:55px; }.fd-rail > button { font-size:10px; }.fd-airport-shortcut strong { font-size:11px; } #fd-root { left:55px; }body.flightdeck #map { left:55px; } .fd-tabs { left:8px; gap:5px; }.fd-tabs button { min-width:78px; padding:4px 8px; } #fd-panel { left:8px; right:8px; width:auto; top:68px; bottom:40px; max-height:70%; }.fd-map-top { right:8px; }.fd-map-tools { right:8px; }.fd-map-bottom span:first-child { display:none; } body.flightdeck .taxi-plan-panel { left:63px; width:calc(100% - 71px); } body.flightdeck footer #map-summary { display:none; } }
 @media(prefers-reduced-motion:reduce) { .flightdeck * { scroll-behavior:auto!important; transition:none!important; } }
 html[data-theme] body.flightdeck .fd-tabs button { background:#414854; color:#eef3f8; border:0; }
 html[data-theme] body.flightdeck .fd-tabs button[aria-pressed="true"],html[data-theme] body.flightdeck .fd-rail > button[aria-current="true"] { background:#087fbd; color:#fff; }
@@ -117,8 +117,8 @@ html[data-theme] body.flightdeck .secondary-button { background:var(--fd-field);
 html[data-theme] body.flightdeck .text-button,html[data-theme] body.flightdeck .eyebrow { color:#147eb6; }
 html[data-theme] body.flightdeck .taxi-plan-disclaimer,html[data-theme] body.flightdeck .taxi-map-hint { color:var(--fd-muted); }
 body.flightdeck header,body.flightdeck footer { backdrop-filter:none!important; }
-body.flightdeck header .wordmark { display:none; }
-body.flightdeck header .header-primary { gap:0; }
+body.flightdeck header .wordmark { display:block; width:112px; max-height:32px; object-fit:contain; flex-shrink:0; }
+body.flightdeck header .header-primary { gap:14px; min-width:0; }
 body.flightdeck .fd-rail #open-taxi-plan { margin-top:8px; border-top:1px solid #59616d; }
 body.flightdeck #settings-menu #open-about { width:100%; margin-top:6px; border-top:1px solid var(--fd-line); text-align:left; }
 
@@ -287,3 +287,6 @@ body.flightdeck .fd-fir-popup small { color:var(--fd-muted); }
 
 html[data-theme] body.flightdeck .fd-rail #airport-picker-toggle { background:#3c4550; color:#eef3f8; }
 html[data-theme] body.flightdeck .fd-rail #airport-picker-toggle:hover,html[data-theme] body.flightdeck .fd-rail #airport-picker-toggle[aria-expanded="true"] { background:#4b5867; border-color:#69b5dd; }
+
+/* Keep the brand visible beside the flight identity on narrow screens too. */
+@media(max-width:620px) { body.flightdeck header .wordmark { display:block; width:72px; max-height:24px; } body.flightdeck header .header-primary { gap:8px; } }
