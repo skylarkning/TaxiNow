@@ -1,5 +1,6 @@
 # TaxiNow V2.0 — Build 205
 
+- Use Profile title casing and clarify X-Plane 12 telemetry support in all FAQ languages.
 - Document mobile browser requirements in FAQ and improve frame text contrast in both themes.
 - Add required Bug Report / Feature Request forms and an in-app report button.
 - Keep VATSIM aircraft orange in both themes.

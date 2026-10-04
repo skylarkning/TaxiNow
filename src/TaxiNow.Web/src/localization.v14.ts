@@ -2,6 +2,10 @@ import type { AppLocale } from "./regionNames";
 
 export const v14Translations: Record<AppLocale, Record<string, string>> = {
   en: {
+    "faq.platform.q": "Which simulator platforms are supported?",
+    "faq.platform.a": "TaxiNow supports Microsoft Flight Simulator 2020, Microsoft Flight Simulator 2024 and X-Plane 12 on Windows.",
+    "faq.xplane.q": "Does TaxiNow support X-Plane 12?",
+    "faq.xplane.a": "Yes. TaxiNow receives local aircraft position, heading, ground speed, on-ground state and altitude through the X-Plane 12 UDP DataRef interface. Run X-Plane and TaxiNow on the same PC; the default UDP port is 49000. This is separate from X-Plane Scenery Gateway map data.",
     "faq.mobileRequirements.q": "What are the minimum Android and iOS requirements?",
     "faq.mobileRequirements.a": "Supported baseline: Android 10 or later with up-to-date Firefox (114 or later); iOS/iPadOS 16.4 or later with Safari. The browser and GPU must support WebGL 2.0. Older systems or embedded app browsers are not guaranteed. Keep TaxiNow running on the PC and connect the mobile device to the same local network using the address shown in the header.",
     "taxi.mapHint": "You can pan and zoom the map while planning. Right-click, or touch and hold on a touchscreen, to quickly add a starting point or taxi destination.",
@@ -47,6 +51,10 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "faq.vatsimRefresh.a": "The official VATSIM network-data feed is regenerated about every 15 seconds. TaxiNow follows that cadence and shares one PC-side cache across the desktop and iPad views to avoid redundant requests. Network latency can make a refresh appear slightly later; this is normal."
   },
   "zh-Hans": {
+    "faq.platform.q": "TaxiNow 支持哪些模拟器平台？",
+    "faq.platform.a": "TaxiNow 支持 Windows 平台上的 Microsoft Flight Simulator 2020、Microsoft Flight Simulator 2024 和 X-Plane 12。",
+    "faq.xplane.q": "TaxiNow 支持 X-Plane 12 吗？",
+    "faq.xplane.a": "支持。TaxiNow 通过 X-Plane 12 的 UDP DataRef 接口接收本机飞机的位置、航向、地速、接地状态和高度。请在同一台电脑上运行 X-Plane 与 TaxiNow；默认 UDP 端口为 49000。这与使用 X-Plane Scenery Gateway 地图数据是两项独立功能。",
     "faq.mobileRequirements.q": "移动设备的 Android 和 iOS 最低版本要求是什么？",
     "faq.mobileRequirements.a": "支持基线：Android 10 及以上，使用更新的 Firefox（至少 114）；iOS/iPadOS 16.4 及以上，使用 Safari。浏览器和设备 GPU 必须支持 WebGL 2.0。旧系统或应用内置浏览器不保证兼容。PC 端 TaxiNow 需保持运行，移动设备连接同一局域网，并访问顶部显示的地址。",
     "taxi.mapHint": "规划滑行时仍可平移和缩放地图。右键点击地图；使用触摸屏时长按地图，可快速添加起点或滑行目的地。",
@@ -92,6 +100,10 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "faq.vatsimRefresh.a": "VATSIM官方网络数据源大约每15秒生成一次。TaxiNow遵循这一更新频率，并让桌面端和iPad共用PC端缓存，避免重复请求。网络延迟有时会让刷新稍晚一些，这是正常现象。"
   },
   "zh-Hant": {
+    "faq.platform.q": "TaxiNow 支援哪些模擬器平台？",
+    "faq.platform.a": "TaxiNow 支援 Windows 平台上的 Microsoft Flight Simulator 2020、Microsoft Flight Simulator 2024 和 X-Plane 12。",
+    "faq.xplane.q": "TaxiNow 支援 X-Plane 12 嗎？",
+    "faq.xplane.a": "支援。TaxiNow 透過 X-Plane 12 的 UDP DataRef 介面接收本機飛機的位置、航向、地速、接地狀態和高度。請在同一台電腦上執行 X-Plane 與 TaxiNow；預設 UDP 連接埠為 49000。這與使用 X-Plane Scenery Gateway 地圖資料是兩項獨立功能。",
     "faq.mobileRequirements.q": "行動裝置的 Android 和 iOS 最低版本要求是什麼？",
     "faq.mobileRequirements.a": "支援基線：Android 10 以上，使用更新的 Firefox（至少 114）；iOS/iPadOS 16.4 以上，使用 Safari。瀏覽器及裝置 GPU 必須支援 WebGL 2.0。舊系統或應用程式內建瀏覽器不保證相容。PC 端 TaxiNow 需保持執行，行動裝置連接同一區域網路，並開啟頂部顯示的位址。",
     "taxi.mapHint": "規劃滑行時仍可平移及縮放地圖。在地圖上按右鍵；使用觸控螢幕時長按地圖，可快速新增起點或滑行目的地。",
@@ -137,6 +149,10 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "faq.vatsimRefresh.a": "VATSIM官方網路資料來源大約每15秒產生一次。TaxiNow遵循此更新頻率，並讓桌面端與iPad共用PC端快取，避免重複要求。網路延遲有時會讓更新稍晚一些，這是正常現象。"
   },
   ja: {
+    "faq.platform.q": "対応するシミュレーターは？",
+    "faq.platform.a": "Windows の Microsoft Flight Simulator 2020、Microsoft Flight Simulator 2024、X-Plane 12 に対応します。",
+    "faq.xplane.q": "X-Plane 12 に対応していますか？",
+    "faq.xplane.a": "はい。UDP DataRef で自機の位置、方位、対地速度、接地状態、高度を受信します。X-Plane 12 と TaxiNow を同じ PC で起動してください。既定の UDP ポートは 49000 です。Scenery Gateway の地図データ利用とは別の機能です。",
     "faq.mobileRequirements.q": "Android と iOS の最低バージョンは？",
     "faq.mobileRequirements.a": "対応基準：Android 10 以降と更新済み Firefox（114 以降）、または iOS/iPadOS 16.4 以降と Safari。ブラウザーと GPU は WebGL 2.0 対応が必要です。旧 OS やアプリ内ブラウザーの互換性は保証しません。PC の TaxiNow を起動したまま、同じ LAN に接続し、上部のアドレスを開いてください。",
     "taxi.mapHint": "計画中も地図を移動・拡大縮小できます。地図を右クリックするか、タッチ画面で長押しすると、出発地点またはタキシング目的地をすばやく追加できます。",
@@ -182,6 +198,10 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "faq.vatsimRefresh.a": "VATSIM公式ネットワークデータは約15秒ごとに生成されます。TaxiNowもこの周期に合わせ、デスクトップとiPadでPC側キャッシュを共有して重複リクエストを避けます。通信遅延で少し遅れて見えることがありますが正常です。"
   },
   fr: {
+    "faq.platform.q": "Quels simulateurs sont pris en charge ?",
+    "faq.platform.a": "TaxiNow prend en charge Microsoft Flight Simulator 2020, Microsoft Flight Simulator 2024 et X-Plane 12 sous Windows.",
+    "faq.xplane.q": "TaxiNow prend-il en charge X-Plane 12 ?",
+    "faq.xplane.a": "Oui. TaxiNow reçoit position, cap, vitesse sol, état au sol et altitude via UDP DataRef. Lancez X-Plane 12 et TaxiNow sur le même PC ; le port UDP par défaut est 49000. Les données cartographiques Scenery Gateway sont une fonction distincte.",
     "faq.mobileRequirements.q": "Quelles versions minimales Android et iOS sont requises ?",
     "faq.mobileRequirements.a": "Base prise en charge : Android 10 ou ultérieur avec Firefox à jour (114 minimum) ; iOS/iPadOS 16.4 ou ultérieur avec Safari. Le navigateur et le GPU doivent prendre en charge WebGL 2.0. Les anciens systèmes et navigateurs intégrés ne sont pas garantis. Laissez TaxiNow ouvert sur le PC et connectez le mobile au même réseau local à l’adresse affichée en haut.",
     "taxi.mapHint": "Vous pouvez déplacer et zoomer la carte pendant la planification. Faites un clic droit, ou appuyez longuement sur un écran tactile, pour ajouter rapidement un point de départ ou une destination de roulage.",
@@ -227,6 +247,10 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "faq.vatsimRefresh.a": "Le flux réseau officiel de VATSIM est régénéré environ toutes les 15 secondes. TaxiNow suit ce rythme et partage un cache sur le PC entre les vues ordinateur et iPad afin d’éviter les requêtes en double. La latence réseau peut parfois retarder légèrement l’affichage ; c’est normal."
   },
   de: {
+    "faq.platform.q": "Welche Simulatoren werden unterstützt?",
+    "faq.platform.a": "TaxiNow unterstützt Microsoft Flight Simulator 2020, Microsoft Flight Simulator 2024 und X-Plane 12 unter Windows.",
+    "faq.xplane.q": "Unterstützt TaxiNow X-Plane 12?",
+    "faq.xplane.a": "Ja. TaxiNow empfängt Position, Kurs, Bodengeschwindigkeit, Bodenkontakt und Höhe über UDP DataRef. Starten Sie X-Plane 12 und TaxiNow auf demselben PC; der Standard-UDP-Port ist 49000. Scenery-Gateway-Kartendaten sind eine separate Funktion.",
     "faq.mobileRequirements.q": "Welche Mindestversionen von Android und iOS werden benötigt?",
     "faq.mobileRequirements.a": "Unterstützte Basis: Android 10 oder neuer mit aktuellem Firefox (mindestens 114); iOS/iPadOS 16.4 oder neuer mit Safari. Browser und GPU müssen WebGL 2.0 unterstützen. Ältere Systeme und eingebettete Browser sind nicht garantiert. TaxiNow muss auf dem PC laufen; verbinden Sie das Mobilgerät mit demselben lokalen Netzwerk und öffnen Sie die oben angezeigte Adresse.",
     "taxi.mapHint": "Sie können die Karte während der Planung verschieben und zoomen. Mit einem Rechtsklick oder durch längeres Berühren auf einem Touchscreen fügen Sie schnell einen Startpunkt oder ein Rollziel hinzu.",
@@ -272,6 +296,10 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
     "faq.vatsimRefresh.a": "Der offizielle VATSIM-Netzwerkdatenfeed wird ungefähr alle 15 Sekunden neu erzeugt. TaxiNow folgt diesem Intervall und verwendet für Desktop- und iPad-Ansicht einen gemeinsamen PC-Cache, um doppelte Anfragen zu vermeiden. Durch Netzwerklatenz kann die Anzeige etwas später aktualisiert werden; das ist normal."
   },
   ko: {
+    "faq.platform.q": "어떤 시뮬레이터를 지원하나요?",
+    "faq.platform.a": "Windows의 Microsoft Flight Simulator 2020, Microsoft Flight Simulator 2024, X-Plane 12를 지원합니다.",
+    "faq.xplane.q": "X-Plane 12를 지원하나요?",
+    "faq.xplane.a": "예. UDP DataRef로 자 기체의 위치, 방위, 지상 속도, 접지 상태와 고도를 수신합니다. X-Plane 12와 TaxiNow를 같은 PC에서 실행하세요. 기본 UDP 포트는 49000입니다. Scenery Gateway 지도 데이터와는 별도 기능입니다.",
     "faq.mobileRequirements.q": "Android와 iOS의 최소 버전은 무엇인가요?",
     "faq.mobileRequirements.a": "지원 기준: Android 10 이상 및 최신 Firefox(최소 114), 또는 iOS/iPadOS 16.4 이상 및 Safari. 브라우저와 GPU는 WebGL 2.0을 지원해야 합니다. 이전 시스템과 앱 내 브라우저는 호환성을 보장하지 않습니다. PC에서 TaxiNow를 실행하고 모바일 기기를 같은 로컬 네트워크에 연결한 후 상단 주소를 여세요.",
     "taxi.mapHint": "계획 중에도 지도를 이동하고 확대·축소할 수 있습니다. 지도를 우클릭하거나 터치스크린에서 길게 누르면 시작 지점이나 택시 목적지를 빠르게 추가할 수 있습니다.",
