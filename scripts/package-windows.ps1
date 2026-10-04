@@ -15,7 +15,7 @@ $publishRoot = Join-Path $artifactsRoot 'publish\win-x64'
 $installerRoot = Join-Path $artifactsRoot 'installer'
 $prerequisiteRoot = Join-Path $installerRoot 'prerequisites'
 $installerOutput = Join-Path $installerRoot 'output'
-$portableOutput = Join-Path $installerRoot 'TaxiNow-Pro-V2.0-Build-205-Portable.zip'
+$portableOutput = Join-Path $installerRoot 'TaxiNow-Pro-V2.0-Build-206-Portable.zip'
 $project = Join-Path $repositoryRoot 'src\TaxiNow.App\TaxiNow.App.csproj'
 $solution = Join-Path $repositoryRoot 'TaxiNow.sln'
 $innoCompiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
@@ -114,7 +114,7 @@ Compress-Archive `
 
 $installerPath = Join-Path `
     $installerOutput `
-    'TaxiNow-Pro-V2.0-Build-205-Setup.exe'
+    'TaxiNow-Pro-V2.0-Build-206-Setup.exe'
 if (-not (Test-Path -LiteralPath $installerPath)) {
     throw 'The expected TaxiNow installer was not created.'
 }

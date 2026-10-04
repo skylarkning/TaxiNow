@@ -1,3 +1,9 @@
+# TaxiNow Pro V2.0 — Build 206
+
+- Fix the runtime window title and migrate legacy TaxiNow shortcuts to TaxiNow Pro.
+- Show update dialog headings matching the result and hide empty release notes.
+- Keep only the update installer folder button in settings; remove the explanatory paragraph.
+
 # TaxiNow Pro V2.0 — Build 205
 
 - Fix the runtime window title override and migrate old TaxiNow shortcuts during installation.

@@ -40,7 +40,7 @@ public static class TaxiNowHost
     private const string VmasPresenceCorsPolicy = "VmasPresence";
     public const string ProductVersion = "2.0.0";
     public const string DisplayVersion = "V2.0";
-    public const int InternalBuildId = 205;
+    public const int InternalBuildId = 206;
     public const string BuildDate = "October 3, 2026";
 
     public static string MapShellUrl =>
