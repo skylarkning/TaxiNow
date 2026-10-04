@@ -3,7 +3,7 @@ import type { AppLocale } from "./regionNames";
 export const v14Translations: Record<AppLocale, Record<string, string>> = {
   en: {
     "faq.mobileRequirements.q": "What are the minimum Android and iOS requirements?",
-    "faq.mobileRequirements.a": "Supported baseline: Android 10 or later with up-to-date Chrome (111 or later); iOS/iPadOS 16.4 or later with Safari. The browser and GPU must support WebGL 2.0. Older systems or embedded app browsers are not guaranteed. Keep TaxiNow running on the PC and connect the mobile device to the same local network using the address shown in the header.",
+    "faq.mobileRequirements.a": "Supported baseline: Android 10 or later with up-to-date Firefox (114 or later); iOS/iPadOS 16.4 or later with Safari. The browser and GPU must support WebGL 2.0. Older systems or embedded app browsers are not guaranteed. Keep TaxiNow running on the PC and connect the mobile device to the same local network using the address shown in the header.",
     "taxi.mapHint": "You can pan and zoom the map while planning. Right-click, or touch and hold on a touchscreen, to quickly add a starting point or taxi destination.",
     "settings.autoUpdates": "Automatically check for updates",
     "settings.vatsimTraffic": "Show VATSIM Traffic",
@@ -48,7 +48,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   },
   "zh-Hans": {
     "faq.mobileRequirements.q": "移动设备的 Android 和 iOS 最低版本要求是什么？",
-    "faq.mobileRequirements.a": "支持基线：Android 10 及以上，使用更新的 Chrome（至少 111）；iOS/iPadOS 16.4 及以上，使用 Safari。浏览器和设备 GPU 必须支持 WebGL 2.0。旧系统或应用内置浏览器不保证兼容。PC 端 TaxiNow 需保持运行，移动设备连接同一局域网，并访问顶部显示的地址。",
+    "faq.mobileRequirements.a": "支持基线：Android 10 及以上，使用更新的 Firefox（至少 114）；iOS/iPadOS 16.4 及以上，使用 Safari。浏览器和设备 GPU 必须支持 WebGL 2.0。旧系统或应用内置浏览器不保证兼容。PC 端 TaxiNow 需保持运行，移动设备连接同一局域网，并访问顶部显示的地址。",
     "taxi.mapHint": "规划滑行时仍可平移和缩放地图。右键点击地图；使用触摸屏时长按地图，可快速添加起点或滑行目的地。",
     "settings.autoUpdates": "自动检查更新",
     "settings.vatsimTraffic": "显示VATSIM交通",
@@ -93,7 +93,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   },
   "zh-Hant": {
     "faq.mobileRequirements.q": "行動裝置的 Android 和 iOS 最低版本要求是什麼？",
-    "faq.mobileRequirements.a": "支援基線：Android 10 以上，使用更新的 Chrome（至少 111）；iOS/iPadOS 16.4 以上，使用 Safari。瀏覽器及裝置 GPU 必須支援 WebGL 2.0。舊系統或應用程式內建瀏覽器不保證相容。PC 端 TaxiNow 需保持執行，行動裝置連接同一區域網路，並開啟頂部顯示的位址。",
+    "faq.mobileRequirements.a": "支援基線：Android 10 以上，使用更新的 Firefox（至少 114）；iOS/iPadOS 16.4 以上，使用 Safari。瀏覽器及裝置 GPU 必須支援 WebGL 2.0。舊系統或應用程式內建瀏覽器不保證相容。PC 端 TaxiNow 需保持執行，行動裝置連接同一區域網路，並開啟頂部顯示的位址。",
     "taxi.mapHint": "規劃滑行時仍可平移及縮放地圖。在地圖上按右鍵；使用觸控螢幕時長按地圖，可快速新增起點或滑行目的地。",
     "settings.autoUpdates": "自動檢查更新",
     "settings.vatsimTraffic": "顯示VATSIM交通",
@@ -138,7 +138,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   },
   ja: {
     "faq.mobileRequirements.q": "Android と iOS の最低バージョンは？",
-    "faq.mobileRequirements.a": "対応基準：Android 10 以降と更新済み Chrome（111 以降）、または iOS/iPadOS 16.4 以降と Safari。ブラウザーと GPU は WebGL 2.0 対応が必要です。旧 OS やアプリ内ブラウザーの互換性は保証しません。PC の TaxiNow を起動したまま、同じ LAN に接続し、上部のアドレスを開いてください。",
+    "faq.mobileRequirements.a": "対応基準：Android 10 以降と更新済み Firefox（114 以降）、または iOS/iPadOS 16.4 以降と Safari。ブラウザーと GPU は WebGL 2.0 対応が必要です。旧 OS やアプリ内ブラウザーの互換性は保証しません。PC の TaxiNow を起動したまま、同じ LAN に接続し、上部のアドレスを開いてください。",
     "taxi.mapHint": "計画中も地図を移動・拡大縮小できます。地図を右クリックするか、タッチ画面で長押しすると、出発地点またはタキシング目的地をすばやく追加できます。",
     "settings.autoUpdates": "更新を自動的に確認",
     "settings.vatsimTraffic": "VATSIMトラフィックを表示",
@@ -183,7 +183,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   },
   fr: {
     "faq.mobileRequirements.q": "Quelles versions minimales Android et iOS sont requises ?",
-    "faq.mobileRequirements.a": "Base prise en charge : Android 10 ou ultérieur avec Chrome à jour (111 minimum) ; iOS/iPadOS 16.4 ou ultérieur avec Safari. Le navigateur et le GPU doivent prendre en charge WebGL 2.0. Les anciens systèmes et navigateurs intégrés ne sont pas garantis. Laissez TaxiNow ouvert sur le PC et connectez le mobile au même réseau local à l’adresse affichée en haut.",
+    "faq.mobileRequirements.a": "Base prise en charge : Android 10 ou ultérieur avec Firefox à jour (114 minimum) ; iOS/iPadOS 16.4 ou ultérieur avec Safari. Le navigateur et le GPU doivent prendre en charge WebGL 2.0. Les anciens systèmes et navigateurs intégrés ne sont pas garantis. Laissez TaxiNow ouvert sur le PC et connectez le mobile au même réseau local à l’adresse affichée en haut.",
     "taxi.mapHint": "Vous pouvez déplacer et zoomer la carte pendant la planification. Faites un clic droit, ou appuyez longuement sur un écran tactile, pour ajouter rapidement un point de départ ou une destination de roulage.",
     "settings.autoUpdates": "Rechercher automatiquement les mises à jour",
     "settings.vatsimTraffic": "Afficher le trafic VATSIM",
@@ -228,7 +228,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   },
   de: {
     "faq.mobileRequirements.q": "Welche Mindestversionen von Android und iOS werden benötigt?",
-    "faq.mobileRequirements.a": "Unterstützte Basis: Android 10 oder neuer mit aktuellem Chrome (mindestens 111); iOS/iPadOS 16.4 oder neuer mit Safari. Browser und GPU müssen WebGL 2.0 unterstützen. Ältere Systeme und eingebettete Browser sind nicht garantiert. TaxiNow muss auf dem PC laufen; verbinden Sie das Mobilgerät mit demselben lokalen Netzwerk und öffnen Sie die oben angezeigte Adresse.",
+    "faq.mobileRequirements.a": "Unterstützte Basis: Android 10 oder neuer mit aktuellem Firefox (mindestens 114); iOS/iPadOS 16.4 oder neuer mit Safari. Browser und GPU müssen WebGL 2.0 unterstützen. Ältere Systeme und eingebettete Browser sind nicht garantiert. TaxiNow muss auf dem PC laufen; verbinden Sie das Mobilgerät mit demselben lokalen Netzwerk und öffnen Sie die oben angezeigte Adresse.",
     "taxi.mapHint": "Sie können die Karte während der Planung verschieben und zoomen. Mit einem Rechtsklick oder durch längeres Berühren auf einem Touchscreen fügen Sie schnell einen Startpunkt oder ein Rollziel hinzu.",
     "settings.autoUpdates": "Automatisch nach Updates suchen",
     "settings.vatsimTraffic": "VATSIM-Verkehr anzeigen",
@@ -273,7 +273,7 @@ export const v14Translations: Record<AppLocale, Record<string, string>> = {
   },
   ko: {
     "faq.mobileRequirements.q": "Android와 iOS의 최소 버전은 무엇인가요?",
-    "faq.mobileRequirements.a": "지원 기준: Android 10 이상 및 최신 Chrome(최소 111), 또는 iOS/iPadOS 16.4 이상 및 Safari. 브라우저와 GPU는 WebGL 2.0을 지원해야 합니다. 이전 시스템과 앱 내 브라우저는 호환성을 보장하지 않습니다. PC에서 TaxiNow를 실행하고 모바일 기기를 같은 로컬 네트워크에 연결한 후 상단 주소를 여세요.",
+    "faq.mobileRequirements.a": "지원 기준: Android 10 이상 및 최신 Firefox(최소 114), 또는 iOS/iPadOS 16.4 이상 및 Safari. 브라우저와 GPU는 WebGL 2.0을 지원해야 합니다. 이전 시스템과 앱 내 브라우저는 호환성을 보장하지 않습니다. PC에서 TaxiNow를 실행하고 모바일 기기를 같은 로컬 네트워크에 연결한 후 상단 주소를 여세요.",
     "taxi.mapHint": "계획 중에도 지도를 이동하고 확대·축소할 수 있습니다. 지도를 우클릭하거나 터치스크린에서 길게 누르면 시작 지점이나 택시 목적지를 빠르게 추가할 수 있습니다.",
     "settings.autoUpdates": "업데이트 자동 확인",
     "settings.vatsimTraffic": "VATSIM 트래픽 표시",
