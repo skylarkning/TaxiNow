@@ -9,7 +9,7 @@ export const flightDeckTranslations: Record<AppLocale, Record<string, string>> =
     "flightdeck.maps": "Maps",
     "flightdeck.planner": "Plan Taxi",
     "flightdeck.terrain": "Terrain",
-    "flightdeck.profile": "PROFILE",
+    "flightdeck.profile": "Profile",
     "flightdeck.import": "Import",
     "flightdeck.alias": "Username",
     "flightdeck.pilot": "Pilot ID",
