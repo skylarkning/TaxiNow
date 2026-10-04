@@ -2,6 +2,7 @@
 
 - Completed flight deck and vertical profile localization for all seven supported languages (Issue #6).
 - Restored the sun/moon theme shortcut beside Settings.
+- Forced sRGB in the desktop WebView2 to work around the WebView2 154 yellow tint on wide-gamut SDR displays.
 - Fixed light theme initialization, airport list style leakage, and light control/profile colours (Issue #7).
 
 # TaxiNow V2.0 — Build 201
