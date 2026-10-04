@@ -1,6 +1,8 @@
 # TaxiNow V2.0 — Build 202
 
 - Completed flight deck and vertical profile localization for all seven supported languages (Issue #6).
+- Moved North Up to a compact rotating compass at the top left of the map.
+- Unified legacy panel surfaces, backdrop colours, button corners and transitions; compacted the airport selector and fixed light-mode storage contrast.
 - Restored the sun/moon theme shortcut beside Settings.
 - Forced sRGB in the desktop WebView2 to work around the WebView2 154 yellow tint on wide-gamut SDR displays.
 - Fixed light theme initialization, airport list style leakage, and light control/profile colours (Issue #7).
