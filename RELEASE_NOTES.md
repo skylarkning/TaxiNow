@@ -1,3 +1,12 @@
+# TaxiNow V2.0 — Build 203
+
+- Add a manual fallback-source action for stalled or failed airport downloads, bypassing OSM and map packs for X-Plane Gateway, with OurAirports as the final runway fallback.
+- Merge the two header rows and move flight-plan tabs to the top right.
+- Use identical drawer geometry and transitions for flight plan and route information.
+- Start on the globe route view with the flight-plan and vertical-profile panels closed.
+- Rename Chart/Map to Route in all seven UI languages.
+- Combine map credits and application status into one compact footer, keeping all source links.
+
 # TaxiNow V2.0 — Build 202
 
 - Completed flight deck and vertical profile localization for all seven supported languages (Issue #6).

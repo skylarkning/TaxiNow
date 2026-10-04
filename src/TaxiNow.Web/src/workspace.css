@@ -7,12 +7,12 @@ html[data-theme] body.flightdeck .fd-rail #airport-picker-toggle small { font-si
 html[data-theme] body.flightdeck .fd-rail #airport-code { font-size:17px; line-height:22px; }
 html[data-theme] body.flightdeck .fd-tabs button[aria-pressed="true"],html[data-theme] body.flightdeck .fd-rail > button[aria-current="true"],html[data-theme] body.flightdeck .fd-map-tools button[aria-pressed="true"] { background:var(--fd-accent); color:#fff; }
 html[data-theme] body.flightdeck :is(.asset-panel,.taxi-plan-panel,.about-dialog,.update-dialog,.welcome-dialog,.settings-menu,.airport-picker-panel) { background:var(--fd-panel); color:var(--fd-text); border-color:var(--fd-line); border-radius:var(--fd-radius); box-shadow:0 12px 32px rgba(8,17,26,.2); font-family:inherit; }
-html[data-theme] body.flightdeck :is(.asset-panel,.taxi-plan-panel) { top:104px; bottom:30px; max-height:none; padding:16px; border-radius:0; }
+html[data-theme] body.flightdeck :is(.asset-panel,.taxi-plan-panel) { top:64px; bottom:30px; max-height:none; padding:16px; border-radius:0; }
 html[data-theme] body.flightdeck .asset-panel { width:min(430px,calc(100vw - 74px)); border-left:1px solid var(--fd-line); }
 html[data-theme] body.flightdeck :is(.asset-panel,.taxi-plan-panel):not(.open) { visibility:hidden; pointer-events:none; transition:transform 180ms ease,visibility 0s 180ms; }
 html[data-theme] body.flightdeck :is(.asset-panel,.taxi-plan-panel).open { visibility:visible; transition:transform 180ms ease,visibility 0s; }
 html[data-theme] body.flightdeck :is(.asset-backdrop,.taxi-plan-backdrop,.about-backdrop,.welcome-backdrop),html[data-theme] body.flightdeck :is(.asset-backdrop,.taxi-plan-backdrop,.about-backdrop,.welcome-backdrop):is(:hover,:focus-visible,:active) { background:var(--fd-overlay); border:0; border-radius:0; box-shadow:none; backdrop-filter:none; }
-html[data-theme] body.flightdeck .asset-backdrop { top:104px; bottom:30px; left:74px; }
+html[data-theme] body.flightdeck .asset-backdrop { top:64px; bottom:30px; left:74px; }
 html[data-theme] body.flightdeck :is(.download-form,.manager-section,.taxi-search-card,.taxi-route-section,.taxiway-builder,.update-changelog,.welcome-languages,.about-faq details,.asset-group,.asset-row,.job-row,.desktop-storage-location,.storage-stats > div) { background:var(--fd-card); color:var(--fd-text); border-color:var(--fd-line); border-radius:var(--fd-radius); box-shadow:none; }
 html[data-theme] body.flightdeck :is(.asset-panel,.taxi-plan-panel,.about-dialog,.update-dialog,.welcome-dialog) :is(h1,h2,h3,strong,summary) { color:var(--fd-text); }
 html[data-theme] body.flightdeck :is(.asset-panel,.taxi-plan-panel,.about-dialog,.update-dialog,.welcome-dialog) :is(p,small,label,.form-field,.empty-state,.feedback,.job-metrics,.storage-stats span,.desktop-storage-location span,.about-version) { color:var(--fd-muted); }
@@ -59,3 +59,40 @@ html[data-theme] body.flightdeck .about-warning { background:#442f1a; border-col
 html[data-theme] body.flightdeck .about-warning :is(strong,p) { color:#ffe1a6; }
 html[data-theme="light"] body.flightdeck .about-warning { background:#fff4e5; border-color:#d2b787; }
 html[data-theme="light"] body.flightdeck .about-warning :is(strong,p) { color:#744c00; }
+
+/* One shared status and source-credit row leaves more room for the route. */
+html[data-theme] body.flightdeck footer { display:flex; align-items:center; gap:12px; padding:0 12px; overflow-x:auto; white-space:nowrap; }
+html[data-theme] body.flightdeck footer .fd-map-bottom { position:static; display:flex; align-items:center; justify-content:flex-start; gap:12px; padding:0; background:transparent; flex:1; min-width:0; }
+html[data-theme] body.flightdeck footer > span:first-child { font-size:9px; }
+html[data-theme] body.flightdeck footer #map-summary { flex-shrink:0; }
+html[data-theme] body.flightdeck footer .footer-right { flex-shrink:0; }
+html[data-theme] body.flightdeck #fd-map { bottom:0; }
+html[data-theme] body.flightdeck footer .fd-map-bottom a { color:#9fdcff; }
+@media(max-width:1000px) { html[data-theme] body.flightdeck footer > span:first-child { display:none; } }
+@media(max-width:620px) { html[data-theme] body.flightdeck footer .fd-map-bottom span:first-child { display:inline; } }
+
+html[data-theme] body.flightdeck[data-map-view="ground"] footer .fd-map-bottom { display:none; }
+
+/* One header row and one shared drawer geometry for both flight-plan tabs. */
+html[data-theme] body.flightdeck header { height:64px; min-height:64px; padding:8px 18px; gap:12px; }
+html[data-theme] body.flightdeck .fd-tabs { position:static; flex-shrink:0; height:34px; gap:6px; }
+html[data-theme] body.flightdeck .fd-tabs button { min-width:88px; padding:6px 10px; }
+html[data-theme] body.flightdeck #fd-title { display:none; }
+html[data-theme] body.flightdeck .fd-rail { top:64px; }
+html[data-theme] body.flightdeck #fd-root { top:64px; }
+html[data-theme] body.flightdeck #map { top:64px; }
+html[data-theme] body.flightdeck #fd-panel { top:0; bottom:0; left:0; width:350px; max-height:none; border-radius:0; border-width:0 1px 0 0; animation:fd-drawer-in 180ms ease-out; }
+html[data-theme] body.flightdeck #fd-panel .fd-panel-head { height:58px; padding:0 18px; border-bottom:1px solid var(--fd-line); }
+html[data-theme] body.flightdeck #fd-panel .fd-panel-head strong { font-size:18px; font-weight:600; }
+html[data-theme] body.flightdeck #fd-close { width:30px; height:30px; padding:0; font-size:21px; border-radius:var(--fd-radius); }
+html[data-theme] body.flightdeck #fd-root:has(#fd-panel:not([hidden])) .fd-north-control { left:364px; }
+@keyframes fd-drawer-in { from { opacity:0; transform:translateX(-12px); } to { opacity:1; transform:translateX(0); } }
+@media(max-width:1100px) { html[data-theme] body.flightdeck header .network-access { display:none; } }
+@media(max-width:800px) { html[data-theme] body.flightdeck header .connection-state { display:none; } }
+@media(max-width:620px) {
+ html[data-theme] body.flightdeck header { padding:6px 8px; gap:6px; }
+ html[data-theme] body.flightdeck .fd-tabs button { min-width:0; font-size:11px; padding:6px; }
+ html[data-theme] body.flightdeck header .actions { gap:4px; }
+ html[data-theme] body.flightdeck #fd-panel { width:min(350px,calc(100% - 54px)); }
+ html[data-theme] body.flightdeck #fd-root:has(#fd-panel:not([hidden])) .fd-north-control { left:calc(min(350px,100% - 54px) + 7px); }
+}

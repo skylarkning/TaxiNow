@@ -40,7 +40,7 @@ public static class TaxiNowHost
     private const string VmasPresenceCorsPolicy = "VmasPresence";
     public const string ProductVersion = "2.0.0";
     public const string DisplayVersion = "V2.0";
-    public const int InternalBuildId = 202;
+    public const int InternalBuildId = 203;
     public const string BuildDate = "October 3, 2026";
 
     public static string MapShellUrl =>
@@ -603,6 +603,13 @@ public static class TaxiNowHost
             "/api/v1/downloads/{jobId:guid}/cancel",
             (Guid jobId, DownloadJobService jobs) =>
                 jobs.Cancel(jobId) is { } job ? Results.Ok(job) : Results.NotFound());
+
+        app.MapPost(
+            "/api/v1/downloads/{jobId:guid}/fallback",
+            (Guid jobId, DownloadJobService jobs) =>
+                jobs.TryFallback(jobId) is { } job
+                    ? Results.Accepted($"/api/v1/downloads/{job.JobId}", job)
+                    : Results.NotFound());
 
         app.MapGet("/openapi/v1.json", () => Results.Json(OpenApiDocument.Value));
 
