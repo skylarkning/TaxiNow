@@ -3,7 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#08111d" />
+    <meta name="theme-color" content="#eaf2f6" />
+    <meta name="color-scheme" content="only light" />
+    <script>
+      // Resolve appearance before the first paint, including when storage is unavailable.
+      (() => {
+        let theme = 'light';
+        try { if (localStorage.getItem('taxinow.theme') === 'dark') theme = 'dark'; } catch {}
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme === 'light' ? 'only light' : 'dark';
+        document.querySelector('meta[name="color-scheme"]').content = theme === 'light' ? 'only light' : 'dark';
+      })();
+    </script>
     <title>TaxiNow V2.0</title>
   </head>
   <body>
@@ -91,6 +102,10 @@
           <button id="open-assets"
                   type="button"
                   data-i18n="actions.assets">Maps &amp; storage</button>
+          <button id="quick-theme-toggle" class="quick-theme-toggle" type="button" data-current-theme="light" aria-label="Switch to dark appearance">
+            <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg>
+            <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"/></svg>
+          </button>
           <div class="settings-picker">
             <button id="settings-selector"
                     class="settings-selector"
@@ -1041,7 +1056,7 @@
             <span id="about-build-date-localized">October 3, 2026</span>).
             <br />
             <span data-i18n="about.internalBuildLabel">Internal build:</span>
-            <strong id="about-build-id-localized">201</strong>.
+            <strong id="about-build-id-localized">202</strong>.
           </p>
         </div>
         <div class="about-language about-legacy" lang="en">
@@ -1251,7 +1266,7 @@
           Version: <strong id="about-version">V2.0</strong>
           (Build date: <span id="about-build-date">October 3, 2026</span>).
           <br />
-          Internal build: <strong id="about-build-id">201</strong>.
+          Internal build: <strong id="about-build-id">202</strong>.
         </p>
         </div>
         <div class="about-chinese about-language about-legacy" lang="zh-Hans">
@@ -1430,7 +1445,7 @@
             版本：<strong id="about-version-zh">V2.0</strong>
             （构建日期：<span id="about-build-date-zh">2026年10月3日</span>）。
             <br />
-            内部构建号：<strong id="about-build-id-zh">201</strong>。
+            内部构建号：<strong id="about-build-id-zh">202</strong>。
           </p>
         </div>
       </section>

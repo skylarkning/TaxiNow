@@ -1,3 +1,9 @@
+# TaxiNow V2.0 — Build 202
+
+- Completed flight deck and vertical profile localization for all seven supported languages (Issue #6).
+- Restored the sun/moon theme shortcut beside Settings.
+- Fixed light theme initialization, airport list style leakage, and light control/profile colours (Issue #7).
+
 # TaxiNow V2.0 — Build 201
 
 - Added the current airport ICAO selector above the chart button and moved the airport name beside the flight number.

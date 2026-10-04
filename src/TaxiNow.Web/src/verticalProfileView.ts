@@ -1,3 +1,5 @@
+import { t } from './localization';
+const tr = (key: string, values?: Record<string, string | number>) => t('flightdeck.' + key, values);
 import type { VerticalProfileConstraint, VerticalProfileModel } from './verticalProfile';
 
 export interface VerticalProfileViewState {
@@ -12,11 +14,11 @@ export interface VerticalProfileView {
   destroy(): void;
 }
 
-const simulationNotice = 'Terrain colours are a simulation advisory only.';
+const simulationNotice = () => tr('simulationNotice');
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
 const finite = (value: number | null | undefined): value is number => typeof value === 'number' && Number.isFinite(value);
 const identifier = (value: string) => value.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 24);
-const feet = (value: number | null | undefined) => finite(value) ? `${Math.round(value).toLocaleString('en-US')} ft` : 'Unavailable';
+const feet = (value: number | null | undefined) => finite(value) ? `${Math.round(value).toLocaleString('en-US')} ft` : tr('unavailable');
 
 export function profilePanelHeight(hostHeight: number, _mobile: boolean): number {
   return finite(hostHeight) ? Math.max(0, hostHeight) : 0;
@@ -32,36 +34,36 @@ export function selectWaypointLabelIndexes(count: number, maximum: number): numb
 }
 
 function restrictionLabel(constraint: VerticalProfileConstraint | null | undefined): string {
-  if (!constraint) return 'No restriction';
+  if (!constraint) return tr('noRestriction');
   switch (constraint.kind) {
-    case 'at': return `At ${feet(constraint.minimumAltitudeFeet ?? constraint.maximumAltitudeFeet)}`;
-    case 'atOrAbove': return `At or above ${feet(constraint.minimumAltitudeFeet)}`;
-    case 'atOrBelow': return `At or below ${feet(constraint.maximumAltitudeFeet)}`;
-    case 'between': return `Between ${feet(constraint.minimumAltitudeFeet)} and ${feet(constraint.maximumAltitudeFeet)}`;
+    case 'at': return tr('at', { altitude: feet(constraint.minimumAltitudeFeet ?? constraint.maximumAltitudeFeet) });
+    case 'atOrAbove': return tr('above', { altitude: feet(constraint.minimumAltitudeFeet) });
+    case 'atOrBelow': return tr('below', { altitude: feet(constraint.maximumAltitudeFeet) });
+    case 'between': return tr('between', { minimum: feet(constraint.minimumAltitudeFeet), maximum: feet(constraint.maximumAltitudeFeet) });
   }
 }
 
 function statusMessage(model: VerticalProfileModel | null, state: VerticalProfileViewState): string {
   if (state.message) return state.message.slice(0, 240);
-  if (state.status === 'loading') return 'Loading terrain profile…';
-  if (state.status === 'error') return 'Terrain unavailable. Try again.';
-  if (!model || state.status === 'empty') return 'Import a flight plan to see the vertical profile.';
-  return model.terrain.length ? '' : 'Terrain unavailable. Planned profile remains visible.';
+  if (state.status === 'loading') return tr('profileLoading');
+  if (state.status === 'error') return tr('profileError');
+  if (!model || state.status === 'empty') return tr('profileEmpty');
+  return model.terrain.length ? '' : tr('profileNoTerrain');
 }
 
 export function verticalProfileSummary(
   model: VerticalProfileModel | null,
   state: VerticalProfileViewState = { status: model ? 'ready' : 'empty' }
 ): string {
-  if (!model) return `${statusMessage(model, state)} ${simulationNotice}`;
+  if (!model) return `${statusMessage(model, state)} ${simulationNotice()}`;
   const altitude = finite(model.aircraft?.altitudeMslFeet)
-    ? `Live aircraft altitude ${feet(model.aircraft.altitudeMslFeet)} MSL.`
-    : 'Live aircraft altitude unavailable.';
+    ? tr('liveAltitude', { altitude: feet(model.aircraft.altitudeMslFeet) })
+    : tr('liveUnavailable');
   const terrain = model.terrain.length
-    ? `Terrain source ${model.source.name}. ${model.source.cacheState === 'cachedOffline' ? 'Cached offline terrain.' : 'Fresh terrain profile.'}`
-    : 'Terrain unavailable.';
+    ? `${tr('terrainSource', { name: model.source.name })} ${model.source.cacheState === 'cachedOffline' ? tr('cachedTerrain') : tr('freshTerrain')}`
+    : tr('terrainUnavailable');
   const stateText = state.status === 'ready' ? '' : ` ${statusMessage(model, state)}`;
-  return `${identifier(model.origin)} to ${identifier(model.destination)} vertical profile. ${altitude} ${terrain}${stateText} ${simulationNotice}`;
+  return `${tr('profileRoute', { origin: identifier(model.origin), destination: identifier(model.destination) })} ${altitude} ${terrain}${stateText} ${simulationNotice()}`;
 }
 
 export interface ProfileInspection {
@@ -92,12 +94,12 @@ export function profileInspection(model: VerticalProfileModel, requestedIndex: n
   const waypoint = model.routePoints.reduce<typeof model.routePoints[number] | undefined>((nearest, point) =>
     !nearest || Math.abs(point.distanceNm - sample.distanceNm) < Math.abs(nearest.distanceNm - sample.distanceNm) ? point : nearest, undefined);
   const restriction = model.constraints.find(item => item.waypointIndex === waypoint?.waypointIndex);
-  const terrain = 'elevationFeet' in sample ? `Terrain ${feet(sample.elevationFeet)}` : 'Terrain unavailable';
+  const terrain = 'elevationFeet' in sample ? `${tr('terrain')} ${feet(sample.elevationFeet)}` : tr('terrainUnavailable');
   // Terrain reference altitude may be live MSL for clearance colouring; inspect the plotted path instead.
   const planned = plannedAltitudeAt(model, sample.distanceNm);
   return {
     index, distanceNm: sample.distanceNm,
-    label: `${sample.distanceNm.toFixed(1)} NM · Nearest waypoint ${identifier(waypoint?.ident ?? 'Unavailable')} · ${terrain} · Planned ${feet(planned)} · ${restrictionLabel(restriction)}`
+    label: `${sample.distanceNm.toFixed(1)} NM · ${tr('nearest')} ${identifier(waypoint?.ident ?? tr('unavailable'))} · ${terrain} · ${tr('planned')} ${feet(planned)} · ${restrictionLabel(restriction)}`
   };
 }
 
@@ -219,36 +221,36 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
     return node;
   };
   const panel = element('section', 'fd-vertical-profile');
-  panel.setAttribute('aria-label', 'Vertical situation profile');
+  panel.setAttribute('aria-label', tr('profileAria'));
   const header = element('div', 'fd-profile-header');
-  const title = element('strong', 'fd-profile-title', 'Vertical profile');
+  const title = element('strong', 'fd-profile-title', tr('profileTitle'));
   const metrics = element('dl', 'fd-profile-metrics');
   const metricValues: HTMLElement[] = [];
-  for (const [index, name] of ['MSL', 'AGL', 'Clearance', 'Next restriction', 'Remaining', 'Terrain'].entries()) {
+  for (const [index, name] of ['MSL', 'AGL', tr('clearance'), tr('nextRestriction'), tr('remaining'), tr('terrain')].entries()) {
     const group = element('div', `fd-profile-metric-${index}`);
     const value = element('dd', `fd-profile-value-${index}`, '—');
     group.append(element('dt', `fd-profile-label-${index}`, name), value);
     metrics.append(group); metricValues.push(value);
   }
   const close = element('button', 'fd-profile-close', '×');
-  close.type = 'button'; close.setAttribute('aria-label', 'Close vertical profile');
+  close.type = 'button'; close.setAttribute('aria-label', tr('profileClose'));
   header.append(title, metrics, close);
   const plot = element('div', 'fd-profile-plot');
   const canvas = element('canvas', 'fd-profile-canvas');
   canvas.tabIndex = 0;
   canvas.setAttribute('role', 'img');
-  canvas.setAttribute('aria-label', 'Route altitude and terrain profile. Use Left and Right arrows to inspect samples; Escape to close.');
+  canvas.setAttribute('aria-label', tr('profileKeyboard'));
   canvas.setAttribute('aria-describedby', 'fd-profile-summary fd-profile-tooltip');
-  canvas.textContent = 'Route altitude and terrain profile. A text summary is available below.';
+  canvas.textContent = tr('profileFallback');
   const status = element('p', 'fd-profile-status'); status.setAttribute('role', 'status');
-  const retry = element('button', 'fd-profile-retry', 'Retry'); retry.type = 'button'; retry.hidden = true;
+  const retry = element('button', 'fd-profile-retry', tr('retry')); retry.type = 'button'; retry.hidden = true;
   const overlay = element('div', 'fd-profile-overlay'); overlay.append(status, retry);
   const tooltip = element('div', 'fd-profile-tooltip'); tooltip.hidden = true;
   tooltip.setAttribute('role', 'status'); tooltip.setAttribute('aria-live', 'polite'); tooltip.setAttribute('aria-atomic', 'true');
   plot.append(canvas, overlay, tooltip);
   const footer = element('div', 'fd-profile-footer');
   const attribution = element('span', 'fd-profile-attribution');
-  footer.append(attribution, element('span', 'fd-profile-notice', 'Simulation only · Dashed: estimated · Amber/red: terrain clearance'));
+  footer.append(attribution, element('span', 'fd-profile-notice', tr('profileLegend')));
   const summary = element('p', 'fd-profile-summary'); summary.className = 'fd-profile-sr-only';
   summary.setAttribute('aria-live', 'polite'); summary.setAttribute('aria-atomic', 'true');
   panel.append(header, plot, footer, summary); host.append(panel);
@@ -327,13 +329,13 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
     retry.hidden = state.status !== 'error';
     const text = verticalProfileSummary(model, state);
     if (summary.textContent !== text) summary.textContent = text;
-    title.textContent = model ? `${identifier(model.origin)} → ${identifier(model.destination)}` : 'Vertical profile';
-    attribution.textContent = model ? `${model.source.name} · ${model.source.attribution}` : 'Terrain unavailable';
+    title.textContent = model ? `${identifier(model.origin)} → ${identifier(model.destination)}` : tr('profileTitle');
+    attribution.textContent = model ? `${model.source.name} · ${model.source.attribution}` : tr('terrainUnavailable');
     const values = model ? [
       feet(model.metrics.currentAltitudeFeet), feet(model.metrics.currentAglFeet), feet(model.metrics.terrainClearanceFeet),
-      model.metrics.nextRestriction ? `${identifier(model.metrics.nextRestriction.ident)} · ${restrictionLabel(model.metrics.nextRestriction)}` : 'None',
-      `${model.metrics.distanceRemainingNm.toFixed(1)} NM`, model.terrain.length ? model.metrics.sourceCacheBadge : 'Unavailable'
-    ] : ['—', '—', '—', '—', '—', 'Unavailable'];
+      model.metrics.nextRestriction ? `${identifier(model.metrics.nextRestriction.ident)} · ${restrictionLabel(model.metrics.nextRestriction)}` : tr('none'),
+      `${model.metrics.distanceRemainingNm.toFixed(1)} NM`, model.terrain.length ? `${model.source.name} · ${tr(model.source.cacheState === 'cachedOffline' ? 'offline' : 'fresh')}` : tr('unavailable')
+    ] : ['—', '—', '—', '—', '—', tr('unavailable')];
     metricValues.forEach((value, index) => { value.textContent = values[index]!; });
     if (!tooltip.hidden) inspect(selectedIndex);
     resize();

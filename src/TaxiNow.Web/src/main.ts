@@ -315,7 +315,7 @@ async function start(): Promise<void> {
   const serverLink =
     document.querySelector<HTMLAnchorElement>("#server-url")!;
   serverLink.href = appStatus.localUrl;
-  serverLink.textContent = `${getLocale().startsWith("zh") ? "移动设备" : "Mobile device"}: ${appStatus.localUrl}`;
+  serverLink.textContent = `${t("flightdeck.mobile")}: ${appStatus.localUrl}`;
   serverLink.title = t("access.title", {
     addresses: appStatus.localUrls.join(", ")
   });
@@ -358,7 +358,14 @@ function setupThemeSelector(): void {
   const options = Array.from(
     menu.querySelectorAll<HTMLButtonElement>("[data-theme-option]")
   );
+  const quickToggle = document.querySelector<HTMLButtonElement>("#quick-theme-toggle");
   const sync = (theme: "dark" | "light"): void => {
+    if (quickToggle) {
+      quickToggle.dataset.currentTheme = theme;
+      const label = t(theme === "dark" ? "settings.switchLight" : "settings.switchDark");
+      quickToggle.setAttribute("aria-label", label);
+      quickToggle.title = label;
+    }
     for (const option of options) {
       option.setAttribute(
         "aria-checked",
@@ -366,6 +373,16 @@ function setupThemeSelector(): void {
       );
     }
   };
+  const selectTheme = (theme: "dark" | "light"): void => {
+    try { window.localStorage.setItem(themeStorageKey, theme); } catch { /* Keep the session usable. */ }
+    applyTheme(theme);
+    sync(theme);
+    menu.hidden = true;
+    selector.setAttribute("aria-expanded", "false");
+  };
+  quickToggle?.addEventListener("click", () => {
+    selectTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+  });
   sync(initial);
   selector.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -377,22 +394,16 @@ function setupThemeSelector(): void {
   for (const option of options) {
     option.addEventListener("click", () => {
       const theme = option.dataset.themeOption === "light" ? "light" : "dark";
-      try {
-        window.localStorage.setItem(themeStorageKey, theme);
-      } catch {
-        // The theme remains active for this session.
-      }
-      applyTheme(theme);
-      sync(theme);
-      menu.hidden = true;
-      selector.setAttribute("aria-expanded", "false");
+      selectTheme(theme);
     });
   }
 }
 
 function applyTheme(theme: "dark" | "light"): void {
   document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme;
+  document.documentElement.style.colorScheme = theme === "light" ? "only light" : "dark";
+  document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]')
+    ?.setAttribute("content", theme === "light" ? "only light" : "dark");
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
     ?.setAttribute("content", theme === "light" ? "#eaf2f6" : "#08111d");
   if (mapInitialized && typeof map !== "undefined" && map) {
@@ -4130,7 +4141,7 @@ function applyTelemetrySample(sample: TelemetrySnapshot): void {
     }
     setStatus(
       sample.simulator === "xPlane12"
-        ? (getLocale().startsWith("zh") ? "位置已与 X-Plane 12 同步。" : "Position in sync with X-Plane 12.")
+        ? (t("flightdeck.xplaneSynced"))
         : t("status.synced"),
       "connected"
     );

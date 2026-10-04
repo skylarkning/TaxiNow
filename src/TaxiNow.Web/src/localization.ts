@@ -1,3 +1,4 @@
+import { flightDeckTranslations } from "./localization.flightdeck";
 import type { AppLocale } from "./regionNames";
 import {
   frenchTranslations,
@@ -417,6 +418,7 @@ for (const locale of Object.keys(translations) as AppLocale[]) {
   Object.assign(translations[locale], extendedTranslations[locale]);
   Object.assign(translations[locale], settingsTranslations[locale]);
   Object.assign(translations[locale], v14Translations[locale]);
+  Object.assign(translations[locale], flightDeckTranslations[locale]);
 }
 translations["zh-Hant"]["faq.warp.a"] =
   translations["zh-Hant"]["faq.warp.a"]
