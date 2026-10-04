@@ -11,14 +11,14 @@
   #error InstallerOutputDir must be supplied by the packaging script.
 #endif
 #ifndef SetupBaseFilename
-  #define SetupBaseFilename "TaxiNow-V2.0-Build-205-Setup"
+  #define SetupBaseFilename "TaxiNow-Pro-V2.0-Build-205-Setup"
 #endif
 #ifndef DefaultDataRoot
   #define DefaultDataRoot "{localappdata}\TaxiNow"
 #endif
 
-#define ProductName "TaxiNow"
-#define ProductDisplayName "TaxiNow V2.0 (Build 205)"
+#define ProductName "TaxiNow Pro"
+#define ProductDisplayName "TaxiNow Pro V2.0 (Build 205)"
 #define ProductVersion "2.0.0.205"
 #define ProductPublisher "Sky Ning"
 #define ProductExeName "TaxiNow.App.exe"
@@ -36,7 +36,7 @@ AppPublisherURL=https://github.com/skylarkning/TaxiNow-Release
 AppSupportURL=https://github.com/skylarkning/TaxiNow-Release/issues
 AppUpdatesURL=https://github.com/skylarkning/TaxiNow-Release/releases
 DefaultDirName={localappdata}\Programs\TaxiNow
-DefaultGroupName=TaxiNow
+DefaultGroupName=TaxiNow Pro
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
@@ -54,7 +54,7 @@ InfoAfterFile={#RepoRoot}\NOTICE
 VersionInfoVersion=2.0.0.205
 VersionInfoProductVersion=2.0.0.205
 VersionInfoCompany={#ProductPublisher}
-VersionInfoDescription=TaxiNow V2.0 Build 205 Installer
+VersionInfoDescription=TaxiNow Pro V2.0 Build 205 Installer
 VersionInfoProductName={#ProductName}
 CloseApplications=yes
 CloseApplicationsFilter={#ProductExeName}
@@ -77,16 +77,16 @@ Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 Source: "{#PrerequisiteDir}\MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
 
 [Icons]
-Name: "{group}\TaxiNow"; Filename: "{app}\{#ProductExeName}"; WorkingDir: "{app}"
-Name: "{group}\TaxiNow EULA"; Filename: "{app}\EULA.txt"
-Name: "{group}\TaxiNow License"; Filename: "{app}\LICENSE.txt"
+Name: "{group}\TaxiNow Pro"; Filename: "{app}\{#ProductExeName}"; WorkingDir: "{app}"
+Name: "{group}\TaxiNow Pro EULA"; Filename: "{app}\EULA.txt"
+Name: "{group}\TaxiNow Pro License"; Filename: "{app}\LICENSE.txt"
 Name: "{group}\Third-party notices"; Filename: "{app}\NOTICE"
-Name: "{group}\TaxiNow official releases"; Filename: "https://github.com/skylarkning/TaxiNow-Release"
-Name: "{group}\Uninstall TaxiNow"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\TaxiNow"; Filename: "{app}\{#ProductExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\TaxiNow Pro official releases"; Filename: "https://github.com/skylarkning/TaxiNow-Release"
+Name: "{group}\Uninstall TaxiNow Pro"; Filename: "{uninstallexe}"
+Name: "{autodesktop}\TaxiNow Pro"; Filename: "{app}\{#ProductExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#ProductExeName}"; Description: "Launch TaxiNow"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#ProductExeName}"; Description: "Launch TaxiNow Pro"; Flags: nowait postinstall skipifsilent
 
 [Code]
 const

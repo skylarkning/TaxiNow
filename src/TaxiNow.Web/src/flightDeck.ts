@@ -89,7 +89,7 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
     const b = button(tr(tab), () => { setMode(true); currentTab = tab; $('fd-panel').hidden = false; renderPanel(); });
     b.id = `fd-tab-${tab}`; nav.append(b);
   }
-  const title = document.createElement('div'); title.id = 'fd-title'; title.textContent = 'TaxiNow · ' + tr('view'); nav.append(title);
+  const title = document.createElement('div'); title.id = 'fd-title'; title.textContent = 'TaxiNow Pro · ' + tr('view'); nav.append(title);
   document.querySelector('header .actions')!.prepend(nav);
   const rail = document.createElement('nav'); rail.className = 'fd-rail'; rail.setAttribute('aria-label', tr('mapViews'));
   rail.append(button(tr('globe'), () => setMode(true)), button(tr('ground'), () => setMode(false)));
@@ -320,7 +320,7 @@ function renderPanel(): void {
 function clearPlan(): void {
   plan = clearFlightPlanState(profileController);
   store({ identifier: $<HTMLInputElement>('fd-identifier').value, kind: 'username' });
-  $('fd-title').textContent = 'TaxiNow · ' + tr('view');
+  $('fd-title').textContent = 'TaxiNow Pro · ' + tr('view');
   renderPanel();
   drawRoute();
   feedback('');
