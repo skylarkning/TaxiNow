@@ -15,6 +15,7 @@
 *.nupkg
 artifacts/
 .worktrees/
+.superpowers/
 tools/map_pipeline/build/
 logs/
 .env
