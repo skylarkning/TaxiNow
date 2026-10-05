@@ -82,6 +82,8 @@ export interface VerticalProfileModel {
   weatherBands: WeatherBand[];
   weatherWarnings: string[];
   weatherSourceSummary: string;
+  weatherCacheState?: WeatherProfileResponse['cacheState'];
+  weatherEtaBasis?: string;
   source: VerticalProfileSource;
   metrics: VerticalProfileMetrics;
   accessibilitySummary: string;
@@ -394,6 +396,10 @@ export function buildVerticalProfileModel(input: BuildVerticalProfileInput): Ver
     weatherBands,
     weatherWarnings,
     weatherSourceSummary,
+    ...(weatherProfile ? {
+      weatherCacheState: weatherProfile.cacheState,
+      weatherEtaBasis: weatherProfile.etaBasis
+    } : {}),
     source,
     metrics,
     accessibilitySummary: buildAccessibilitySummary(

@@ -59,6 +59,22 @@ a strictly filtered geometric fallback. The dataset is made available under
 the Community Data License Agreement - Permissive, Version 2.0.
 https://github.com/microsoft/GlobalMLBuildingFootprints
 
+Open-Meteo
+----------
+
+TaxiNow can request forecast pressure-level cloud fields and precipitation
+data from Open-Meteo for the optional vertical weather profile. The provider
+and dataset attribution returned by the configured service must be retained.
+https://open-meteo.com/
+
+NOAA Aviation Weather Center
+----------------------------
+
+TaxiNow can request worldwide METAR, TAF, domestic SIGMET, and international
+SIGMET data from the NOAA Aviation Weather Center public API for the optional
+vertical weather profile.
+https://aviationweather.gov/data/api/
+
 micromamba
 ----------
 

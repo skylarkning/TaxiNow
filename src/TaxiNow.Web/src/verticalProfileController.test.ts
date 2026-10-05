@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ElevationProfileResponse, TelemetrySnapshot } from './contracts';
+import type { ElevationProfileResponse, TelemetrySnapshot, WeatherProfileResponse } from './contracts';
 import type { FlightPlan } from './flightPlan';
 import type { VerticalProfileModel } from './verticalProfile';
 import type { VerticalProfileView, VerticalProfileViewState } from './verticalProfileView';
@@ -32,7 +32,21 @@ function telemetry(overrides: Partial<TelemetrySnapshot> = {}): TelemetrySnapsho
     ...overrides
   };
 }
-function harness(initialOpen = true, preferenceStore?: unknown) {
+function weather(overrides: Partial<WeatherProfileResponse> = {}): WeatherProfileResponse {
+  return {
+    startDistanceNm: 0, endDistanceNm: 500,
+    generatedAt: '2026-10-06T00:00:00Z', validFrom: '2026-10-06T00:00:00Z', validTo: '2026-10-06T02:00:00Z',
+    etaBasis: 'scheduled', cacheState: 'fresh',
+    bands: [{
+      id: 'cloud-0', kind: 'cloud', intensity: 'moderate', pathRelation: 'onPath', confidence: 'high', valueKind: 'forecast', source: 'Open-Meteo',
+      columns: [{ longitude: 0, latitude: 0, distanceNm: 0, validAt: '2026-10-06T00:00:00Z', originalBaseFeet: 1000, originalTopFeet: 10000, baseFeet: 1000, topFeet: 10000, plannedAltitudeFeet: 10000 }]
+    }],
+    sources: [{ name: 'Open-Meteo', attribution: 'Weather: Open-Meteo', generatedAt: '2026-10-06T00:00:00Z', validFrom: null, validTo: null }],
+    warnings: [],
+    ...overrides
+  };
+}
+function harness(initialOpen = true, preferenceStore?: unknown, recordWeather = false) {
   let model: VerticalProfileModel | null = null;
   let state: VerticalProfileViewState | undefined;
   let open = initialOpen;
@@ -45,7 +59,12 @@ function harness(initialOpen = true, preferenceStore?: unknown) {
   };
   const controller = new VerticalProfileController(view, {
     initialOpen,
-    fetch: (url, init) => new Promise<Response>(resolve => requests.push({ url: String(url), init: init!, resolve })),
+    fetch: (url, init) => {
+      if (!recordWeather && String(url) === '/api/v1/weather/profile') {
+        return Promise.resolve(new Response('', { status: 404 }));
+      }
+      return new Promise<Response>(resolve => requests.push({ url: String(url), init: init!, resolve }));
+    },
     onOpenChange: next => openings.push(next),
     ...(preferenceStore ? { preferenceStore } : {})
   } as ConstructorParameters<typeof VerticalProfileController>[1]);
@@ -54,6 +73,183 @@ function harness(initialOpen = true, preferenceStore?: unknown) {
 }
 
 describe('VerticalProfileController', () => {
+  it('loads terrain and weather independently and renders whichever arrives first', async () => {
+    const h = harness(true, undefined, true);
+    const pending = h.controller.setPlan({
+      ...plan(), departureTimeUtc: '2026-10-06T00:00:00Z', estimatedEnrouteSeconds: 3600
+    });
+    expect(h.requests.map(request => request.url).sort()).toEqual([
+      '/api/v1/elevation/profile', '/api/v1/weather/profile'
+    ]);
+    const weatherRequest = h.requests.find(request => request.url.includes('/weather/'))!;
+    const terrainRequest = h.requests.find(request => request.url.includes('/elevation/'))!;
+
+    weatherRequest.resolve(Response.json(weather()));
+    await vi.waitFor(() => expect(h.model?.weatherBands).toHaveLength(1));
+    expect(h.model?.terrain).toEqual([]);
+    expect(h.state?.status).toBe('loading');
+
+    terrainRequest.resolve(Response.json(terrain()));
+    await pending;
+    expect(h.model?.terrain).toHaveLength(2);
+    expect(h.model?.weatherBands).toHaveLength(1);
+    expect(h.state?.status).toBe('ready');
+  });
+
+  it('sends bounded route altitude, critical, live position, speed, and timing fields', async () => {
+    const h = harness(true, undefined, true);
+    h.controller.setTelemetry(telemetry({ groundSpeedKnots: 430 }));
+    const pending = h.controller.setPlan({
+      ...plan(), departureTimeUtc: '2026-10-06T00:00:00Z', estimatedEnrouteSeconds: 3600,
+      points: [
+        { ident: 'KAAA', position: [0, 0], airway: '', plannedAltitudeFeet: 1000 },
+        { ident: 'STEP', position: [0.5, 0], airway: '', plannedAltitudeFeet: 10000, constraintKind: 'atOrAbove', minimumAltitudeFeet: 9000 },
+        { ident: 'KBBB', position: [1, 0], airway: '', plannedAltitudeFeet: 2000 }
+      ]
+    });
+    const weatherRequest = h.requests.find(request => request.url.includes('/weather/'))!;
+    const body = JSON.parse(weatherRequest.init.body as string);
+
+    expect(body.route).toEqual([
+      { ident: 'KAAA', longitude: 0, latitude: 0, plannedAltitudeFeet: 1000, critical: true },
+      { ident: 'STEP', longitude: 0.5, latitude: 0, plannedAltitudeFeet: 10000, critical: true },
+      { ident: 'KBBB', longitude: 1, latitude: 0, plannedAltitudeFeet: 2000, critical: true }
+    ]);
+    expect(body.currentDistanceNm).toBeCloseTo(30, 0);
+    expect(body.groundSpeedKnots).toBe(430);
+    expect(body.departureTimeUtc).toBe('2026-10-06T00:00:00Z');
+    expect(body.estimatedEnrouteSeconds).toBe(3600);
+    h.requests.find(request => request.url.includes('/elevation/'))!.resolve(Response.json(terrain()));
+    weatherRequest.resolve(Response.json(weather()));
+    await pending;
+  });
+
+  it('defers weather while closed, starts it on open, and aborts it on close', async () => {
+    const h = harness(false, undefined, true);
+    const terrainPending = h.controller.setPlan(plan());
+    expect(h.requests.map(request => request.url)).toEqual(['/api/v1/elevation/profile']);
+    h.requests[0]!.resolve(Response.json(terrain()));
+    await terrainPending;
+
+    h.controller.setOpen(true);
+    const weatherRequest = h.requests.find(request => request.url.includes('/weather/'))!;
+    expect(weatherRequest).toBeDefined();
+    h.controller.setOpen(false);
+    expect((weatherRequest.init.signal as AbortSignal).aborted).toBe(true);
+    weatherRequest.resolve(Response.json(weather()));
+    await Promise.resolve(); await Promise.resolve();
+    expect(h.model?.weatherBands).toEqual([]);
+  });
+
+  it('aborts superseded weather and stale responses cannot replace the new route', async () => {
+    const h = harness(true, undefined, true);
+    const older = h.controller.setPlan(plan());
+    const oldWeather = h.requests.find(request => request.url.includes('/weather/'))!;
+    const oldTerrain = h.requests.find(request => request.url.includes('/elevation/'))!;
+    const newer = h.controller.setPlan(plan(2));
+    expect((oldWeather.init.signal as AbortSignal).aborted).toBe(true);
+    const newWeather = h.requests.filter(request => request.url.includes('/weather/')).at(-1)!;
+    const newTerrain = h.requests.filter(request => request.url.includes('/elevation/')).at(-1)!;
+    newWeather.resolve(Response.json(weather({ bands: [] })));
+    newTerrain.resolve(Response.json(terrain(900)));
+    await newer;
+    oldWeather.resolve(Response.json(weather()));
+    oldTerrain.resolve(Response.json(terrain(100)));
+    await older;
+    expect(h.model?.destination).toBe('KCCC');
+    expect(h.model?.weatherBands).toEqual([]);
+  });
+
+  it('weather failure keeps terrain and retry requests only the missing source', async () => {
+    const h = harness(true, undefined, true);
+    const first = h.controller.setPlan(plan());
+    h.requests.find(request => request.url.includes('/elevation/'))!.resolve(Response.json(terrain()));
+    h.requests.find(request => request.url.includes('/weather/'))!.resolve(new Response('', { status: 503 }));
+    await first;
+    expect(h.model?.terrain).toHaveLength(2);
+    expect(h.model?.weatherBands).toEqual([]);
+    expect(h.state?.status).toBe('ready');
+
+    const retry = h.controller.retry();
+    const retried = h.requests.slice(2);
+    expect(retried).toHaveLength(1);
+    expect(retried[0]!.url).toBe('/api/v1/weather/profile');
+    retried[0]!.resolve(Response.json(weather()));
+    await retry;
+    expect(h.model?.weatherBands).toHaveLength(1);
+  });
+
+  it('keeps stale weather visible when its refresh fails', async () => {
+    const h = harness(true, undefined, true);
+    const first = h.controller.setPlan(plan());
+    h.requests.find(request => request.url.includes('/elevation/'))!.resolve(Response.json(terrain()));
+    h.requests.find(request => request.url.includes('/weather/'))!.resolve(Response.json(weather({ cacheState: 'stale' })));
+    await first;
+    expect(h.model?.weatherBands).toHaveLength(1);
+
+    const refresh = h.controller.retry();
+    h.requests.filter(request => request.url.includes('/weather/')).at(-1)!
+      .resolve(new Response('', { status: 503 }));
+    await refresh;
+
+    expect(h.model?.weatherBands).toHaveLength(1);
+    expect(h.model?.weatherCacheState).toBe('stale');
+  });
+
+  it('suppresses weather requests for the session after a feature-disabled 404', async () => {
+    const h = harness(true, undefined, true);
+    const first = h.controller.setPlan(plan());
+    h.requests.find(request => request.url.includes('/elevation/'))!.resolve(Response.json(terrain()));
+    h.requests.find(request => request.url.includes('/weather/'))!.resolve(new Response('', { status: 404 }));
+    await first;
+    const second = h.controller.setPlan(plan(2));
+    const latestTerrain = h.requests.filter(request => request.url.includes('/elevation/')).at(-1)!;
+    latestTerrain.resolve(Response.json(terrain()));
+    await second;
+    expect(h.requests.filter(request => request.url.includes('/weather/'))).toHaveLength(1);
+  });
+
+  it('reuses identical route and time-bucket weather after visiting another route', async () => {
+    const h = harness(true, undefined, true);
+    const first = h.controller.setPlan({ ...plan(), departureTimeUtc: '2026-10-06T00:00:00Z' });
+    h.requests.find(request => request.url.includes('/elevation/'))!.resolve(Response.json(terrain()));
+    h.requests.find(request => request.url.includes('/weather/'))!.resolve(Response.json(weather()));
+    await first;
+
+    const second = h.controller.setPlan({ ...plan(2), departureTimeUtc: '2026-10-06T00:00:00Z' });
+    h.requests.filter(request => request.url.includes('/elevation/')).at(-1)!.resolve(Response.json(terrain(900)));
+    h.requests.filter(request => request.url.includes('/weather/')).at(-1)!.resolve(Response.json(weather({ bands: [] })));
+    await second;
+
+    await h.controller.setPlan({ ...plan(), departureTimeUtc: '2026-10-06T00:00:00Z' });
+    expect(h.requests.filter(request => request.url.includes('/weather/'))).toHaveLength(2);
+    expect(h.model?.weatherBands).toHaveLength(1);
+  });
+
+  it('limits the weather request route to two hundred points while preserving endpoints and critical changes', async () => {
+    const h = harness(true, undefined, true);
+    const points: FlightPlan['points'] = Array.from({ length: 450 }, (_, index) => ({
+      ident: `P${index}`,
+      position: [index / 1000, 0] as [number, number],
+      airway: ''
+    }));
+    points[111]!.plannedAltitudeFeet = 10_000;
+    points[112]!.plannedAltitudeFeet = 10_000;
+    points[333]!.constraintKind = 'atOrAbove';
+    points[333]!.minimumAltitudeFeet = 12_000;
+    const pending = h.controller.setPlan({ ...plan(), points });
+    const weatherRequest = h.requests.find(request => request.url.includes('/weather/'))!;
+    const body = JSON.parse(weatherRequest.init.body as string);
+    expect(body.route).toHaveLength(200);
+    expect(body.route[0].ident).toBe('P0');
+    expect(body.route.at(-1).ident).toBe('P449');
+    expect(body.route.find((point: { ident: string }) => point.ident === 'P111')?.critical).toBe(true);
+    expect(body.route.find((point: { ident: string }) => point.ident === 'P333')?.critical).toBe(true);
+    h.requests.find(request => request.url.includes('/elevation/'))!.resolve(Response.json(terrain()));
+    weatherRequest.resolve(Response.json(weather()));
+    await pending;
+  });
+
   it('expires live altitude without another sample, retains terrain, and recovers on fresh telemetry', async () => {
     vi.useFakeTimers();
     try {

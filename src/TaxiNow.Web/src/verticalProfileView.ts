@@ -76,8 +76,17 @@ export function verticalProfileSummary(
   const terrain = model.terrain.length
     ? `${tr('terrainSource', { name: model.source.name })} ${model.source.cacheState === 'cachedOffline' ? tr('cachedTerrain') : tr('freshTerrain')}`
     : tr('terrainUnavailable');
+  const weather = model.weatherBands.length
+    ? [
+        model.weatherSourceSummary,
+        model.weatherCacheState === 'stale' ? tr('weatherStale') : '',
+        model.weatherCacheState === 'partial' ? tr('weatherPartial') : '',
+        model.weatherEtaBasis ? tr('etaBasis', { basis: model.weatherEtaBasis }) : '',
+        tr('weatherDisclaimer')
+      ].filter(Boolean).join(' · ')
+    : `${tr('weatherUnavailable')} ${tr('weatherDisclaimer')}`;
   const stateText = state.status === 'ready' ? '' : ` ${statusMessage(model, state)}`;
-  return `${tr('profileRoute', { origin: identifier(model.origin), destination: identifier(model.destination) })} ${altitude} ${terrain}${stateText} ${simulationNotice()}`;
+  return `${tr('profileRoute', { origin: identifier(model.origin), destination: identifier(model.destination) })} ${altitude} ${terrain} ${weather}${stateText} ${simulationNotice()}`;
 }
 
 export interface ProfileInspection {
@@ -111,9 +120,30 @@ export function profileInspection(model: VerticalProfileModel, requestedIndex: n
   const terrain = 'elevationFeet' in sample ? `${tr('terrain')} ${feet(sample.elevationFeet)}` : tr('terrainUnavailable');
   // Terrain reference altitude may be live MSL for clearance colouring; inspect the plotted path instead.
   const planned = plannedAltitudeAt(model, sample.distanceNm);
+  const weather = model.weatherBands
+    .flatMap(band => band.columns.map(column => ({ band, column })))
+    .sort((left, right) =>
+      Math.abs(left.column.distanceNm - sample.distanceNm) -
+      Math.abs(right.column.distanceNm - sample.distanceNm))[0];
+  const weatherText = weather
+    ? [
+        weather.band.source,
+        tr('weatherValid', {
+          time: Number.isFinite(Date.parse(weather.column.validAt))
+            ? new Date(weather.column.validAt).toLocaleString()
+            : tr('unavailable')
+        }),
+        tr(`confidence${weather.band.confidence[0]!.toUpperCase()}${weather.band.confidence.slice(1)}`),
+        tr('cloudBase', { altitude: finite(weather.column.baseFeet) ? feet(weather.column.baseFeet) : tr('unknownBoundary') }),
+        tr('cloudTop', { altitude: finite(weather.column.topFeet) ? feet(weather.column.topFeet) : tr('unknownBoundary') }),
+        weather.band.pathRelation === 'unknown'
+          ? tr('unknownBoundary')
+          : tr(weather.band.pathRelation === 'onPath' ? 'onPath' : 'offPath')
+      ].join(' · ')
+    : tr('weatherUnavailable');
   return {
     index, distanceNm: sample.distanceNm,
-    label: `${sample.distanceNm.toFixed(1)} NM · ${tr('nearest')} ${identifier(waypoint?.ident ?? tr('unavailable'))} · ${terrain} · ${tr('planned')} ${feet(planned)} · ${restrictionLabel(restriction)}`
+    label: `${sample.distanceNm.toFixed(1)} NM · ${tr('nearest')} ${identifier(waypoint?.ident ?? tr('unavailable'))} · ${terrain} · ${tr('planned')} ${feet(planned)} · ${restrictionLabel(restriction)} · ${weatherText}`
   };
 }
 
@@ -156,7 +186,7 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
   const zoomOut = element('button', 'fd-profile-zoom-out', '−');
   const reset = element('button', 'fd-profile-reset', '↺');
   const zoomIn = element('button', 'fd-profile-zoom-in', '+');
-  for (const [button, label] of [[zoomOut, 'Zoom out'], [reset, 'Reset profile view'], [zoomIn, 'Zoom in']] as const) {
+  for (const [button, label] of [[zoomOut, tr('profileZoomOut')], [reset, tr('profileReset')], [zoomIn, tr('profileZoomIn')]] as const) {
     button.type = 'button';
     button.setAttribute('aria-label', label);
   }
@@ -164,7 +194,7 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
   plot.append(canvas, controls, overlay, tooltip);
   const footer = element('div', 'fd-profile-footer');
   const attribution = element('span', 'fd-profile-attribution');
-  footer.append(attribution, element('span', 'fd-profile-notice', tr('profileLegend')));
+  footer.append(attribution, element('span', 'fd-profile-notice', `${tr('profileLegend')} · ${tr('weatherDisclaimer')}`));
   const summary = element('p', 'fd-profile-summary'); summary.className = 'fd-profile-sr-only';
   summary.setAttribute('aria-live', 'polite'); summary.setAttribute('aria-atomic', 'true');
   panel.append(header, plot, footer, summary); host.append(panel);
@@ -306,7 +336,9 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
     const text = verticalProfileSummary(model, state);
     if (summary.textContent !== text) summary.textContent = text;
     title.textContent = model ? `${identifier(model.origin)} → ${identifier(model.destination)}` : tr('profileTitle');
-    attribution.textContent = model ? `${model.source.name} · ${model.source.attribution}` : tr('terrainUnavailable');
+    attribution.textContent = model
+      ? [model.source.name, model.source.attribution, model.weatherSourceSummary].filter(Boolean).join(' · ')
+      : tr('terrainUnavailable');
     const values = model ? [
       feet(model.metrics.currentAltitudeFeet), feet(model.metrics.currentAglFeet), feet(model.metrics.terrainClearanceFeet),
       model.metrics.nextRestriction ? `${identifier(model.metrics.nextRestriction.ident)} · ${restrictionLabel(model.metrics.nextRestriction)}` : tr('none'),

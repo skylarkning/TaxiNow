@@ -7,6 +7,19 @@ import {
 describe("application localization", () => {
   it("keeps every translation catalog complete", () => {
     const englishKeys = getTranslationKeys("en");
+    expect(englishKeys).toEqual(expect.arrayContaining([
+      "flightdeck.weatherDisclaimer",
+      "flightdeck.weatherStale",
+      "flightdeck.weatherPartial",
+      "flightdeck.cloudBase",
+      "flightdeck.cloudTop",
+      "flightdeck.returnStrong",
+      "flightdeck.onPath",
+      "flightdeck.offPath",
+      "flightdeck.profileReset",
+      "flightdeck.etaBasis",
+      "flightdeck.unknownBoundary"
+    ]));
     expect(getTranslationKeys("fr")).toEqual(englishKeys);
     expect(getTranslationKeys("de")).toEqual(englishKeys);
     expect(getTranslationKeys("zh-Hans")).toEqual(englishKeys);

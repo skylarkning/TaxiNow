@@ -465,4 +465,44 @@ describe('profile inspection', () => {
     missing.altitudePath = [];
     expect(profileInspection(missing, 0)).toBeNull();
   });
+
+  it('announces forecast validity, confidence, path relation, and unknown boundaries', () => {
+    const profile = model();
+    profile.weatherBands = [{
+      id: 'cloud-0', kind: 'cloud', intensity: 'moderate', pathRelation: 'onPath',
+      confidence: 'high', valueKind: 'estimated', source: 'Open-Meteo + METAR',
+      columns: [{
+        longitude: 0, latitude: 0, distanceNm: 0,
+        validAt: '2026-10-06T00:30:00Z', originalBaseFeet: null,
+        originalTopFeet: 10_000, baseFeet: null, topFeet: 12_000,
+        plannedAltitudeFeet: 10_000
+      }]
+    }];
+
+    const label = profileInspection(profile, 0)?.label ?? '';
+    expect(label).toContain('KAAA');
+    expect(label).toContain('Open-Meteo + METAR');
+    expect(label).toMatch(/valid/i);
+    expect(label).toMatch(/high confidence/i);
+    expect(label).toMatch(/cloud base.*unknown boundary/i);
+    expect(label).toContain('12,000 ft');
+    expect(label).toMatch(/planned path/i);
+  });
+
+  it('does not describe an unknown weather-path relation as off-path', () => {
+    const profile = model();
+    profile.weatherBands = [{
+      id: 'cloud-unknown', kind: 'cloud', intensity: 'weak', pathRelation: 'unknown',
+      confidence: 'low', valueKind: 'forecast', source: 'Open-Meteo',
+      columns: [{
+        longitude: 0, latitude: 0, distanceNm: 0,
+        validAt: '2026-10-06T00:30:00Z', originalBaseFeet: 1000,
+        originalTopFeet: 10_000, baseFeet: 1000, topFeet: 10_000,
+        plannedAltitudeFeet: 10_000
+      }]
+    }];
+    const label = profileInspection(profile, 0)?.label ?? '';
+    expect(label).toMatch(/unknown boundary/i);
+    expect(label).not.toMatch(/off planned path/i);
+  });
 });

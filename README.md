@@ -329,6 +329,34 @@ message and Retry. Attribution: **Elevation: Open-Meteo · Copernicus DEM**
 `TaxiNow__Elevation__BaseUrl` and `TaxiNow__Elevation__ApiKey`; commercial use
 requires an appropriately licensed endpoint or a compatible self-hosted service.
 
+The optional route-weather overlay is guarded by
+`TaxiNow__Features__VerticalWeatherProfileEnabled` and remains **off by
+default**. When enabled, TaxiNow samples no more than 32 points from the next
+500 NM of the route, aligns the samples with the flight-plan ETA, and builds a
+forecast cross-section from Open-Meteo pressure-level cloud, precipitation,
+showers, weather-code, and CAPE fields. Nearby METAR/TAF reports can refine a
+cloud base; an intersecting, valid SIGMET with an explicit altitude can refine
+a boundary. Unknown bases or tops remain unknown instead of being inferred.
+
+The overlay is always **forecast / estimated — not airborne radar**. Green,
+yellow, and red shapes indicate forecast return intensity; solid shapes
+intersect the planned vertical path and striped shapes are off-path. Weather
+and terrain load independently, so provider failure never removes the planned
+route or terrain profile. Weather cache entries are fresh for 15 minutes, may
+be shown stale for at most two hours after provider failure, and use a short
+two-minute negative cache after total acquisition failure. Wheel/trackpad,
+drag, keyboard, and the visible controls zoom or pan the distance axis; a view
+of 120 NM or less keeps every waypoint eligible, while a full-route view keeps
+the route ends, next fix, restrictions, step points, TOC, and TOD.
+
+Provider endpoints can be overridden with
+`TaxiNow__Weather__ForecastBaseUrl` and
+`TaxiNow__Weather__AviationBaseUrl`. Before enabling the feature in a release,
+the distributor must review current provider terms, rate limits, attribution,
+cache behavior, and production performance. The default must remain off until
+that review is explicitly accepted. Attribution: **Weather forecast:
+Open-Meteo** and **METAR/TAF/SIGMET: NOAA Aviation Weather Center**.
+
 MSFS 2020/2024 supplies MSL and AGL altitude through SimConnect; X-Plane 12
 supplies the corresponding altitude data through UDP, converted from metres to
 feet. A disconnected, stale, or invalid simulator position hides the aircraft
