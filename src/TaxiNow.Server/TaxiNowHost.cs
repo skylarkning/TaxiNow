@@ -13,6 +13,7 @@ using TaxiNow.Server.SayIntentions;
 using TaxiNow.Server.Telemetry;
 using TaxiNow.Server.Vatsim;
 using TaxiNow.Server.SimBrief;
+using TaxiNow.Server.Weather;
 using TaxiNow.SimConnect.Managed;
 using TaxiNow.SimConnect.Replay;
 using TaxiNow.Storage;
@@ -37,6 +38,8 @@ public static class TaxiNowHost
         "/api/v1/integrations/gnss/interference";
     public const string ElevationProfilePath =
         "/api/v1/elevation/profile";
+    public const string WeatherProfilePath =
+        "/api/v1/weather/profile";
     private const string VmasPresenceCorsPolicy = "VmasPresence";
     public const string ProductVersion = "2.0.0";
     public const string DisplayVersion = "V2.0";
@@ -122,6 +125,35 @@ public static class TaxiNowHost
                     ElevationProfileService.HttpClientName),
                 services.GetRequiredService<StoragePaths>(),
                 services.GetRequiredService<IConfiguration>()));
+        builder.Services.AddHttpClient(
+            OpenMeteoWeatherProvider.HttpClientName,
+            client =>
+            {
+                client.Timeout = OpenMeteoWeatherProvider.RequestTimeout;
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("TaxiNow-Pro/2.0");
+            })
+            .ConfigurePrimaryHttpMessageHandler(() =>
+                new HttpClientHandler { AllowAutoRedirect = false });
+        builder.Services.AddHttpClient(
+            AviationWeatherProvider.HttpClientName,
+            client =>
+            {
+                client.Timeout = AviationWeatherProvider.RequestTimeout;
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("TaxiNow-Pro/2.0");
+            })
+            .ConfigurePrimaryHttpMessageHandler(() =>
+                new HttpClientHandler { AllowAutoRedirect = false });
+        builder.Services.AddSingleton<IWeatherForecastProvider>(services =>
+            new OpenMeteoWeatherProvider(
+                services.GetRequiredService<IHttpClientFactory>().CreateClient(
+                    OpenMeteoWeatherProvider.HttpClientName),
+                services.GetRequiredService<IConfiguration>()));
+        builder.Services.AddSingleton<IAviationWeatherProvider>(services =>
+            new AviationWeatherProvider(
+                services.GetRequiredService<IHttpClientFactory>().CreateClient(
+                    AviationWeatherProvider.HttpClientName),
+                services.GetRequiredService<IConfiguration>()));
+        builder.Services.AddSingleton<WeatherProfileService>();
         builder.Services.AddHttpClient<SimBriefService>(client =>
         {
             client.DefaultRequestHeaders.UserAgent.ParseAdd("TaxiNow/1.5");
@@ -159,6 +191,12 @@ public static class TaxiNowHost
         var app = builder.Build();
         app.MapSimBrief();
         app.MapElevationProfile();
+        if (app.Configuration.GetValue(
+                "TaxiNow:Features:VerticalWeatherProfileEnabled",
+                false))
+        {
+            app.MapWeatherProfile();
+        }
         app.Use(async (context, next) =>
         {
             var settings = context.RequestServices

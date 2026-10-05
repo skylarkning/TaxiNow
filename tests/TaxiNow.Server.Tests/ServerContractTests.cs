@@ -1,10 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using TaxiNow.Core.Telemetry;
 using TaxiNow.Server;
 using TaxiNow.Server.Downloads;
 using TaxiNow.Server.Elevation;
+using TaxiNow.Server.Weather;
 using TaxiNow.Storage;
 using Xunit;
 
@@ -183,6 +185,71 @@ public sealed class ServerContractTests
     }
 
     [Fact]
+    public void WeatherContract_UsesCamelCaseEnumsNullableBoundsAndDistanceNm()
+    {
+        var now = DateTimeOffset.Parse("2026-10-06T00:00:00Z");
+        var response = new WeatherProfileResponse(
+            0, 25, now, now, now.AddMinutes(10), "scheduled", "fresh",
+            [
+                new WeatherBand(
+                    "cloud-0", WeatherFeatureKind.Cloud, WeatherIntensity.Moderate,
+                    WeatherPathRelation.OnPath, WeatherConfidence.High,
+                    WeatherValueKind.Estimated,
+                    [new WeatherBandColumn(-79, 43, 12.5, now, null, 20_000, 1_000, null, 18_000)],
+                    "Open-Meteo + METAR")
+            ],
+            [new WeatherSourceInfo("Open-Meteo", "Weather: Open-Meteo", now, now, now)],
+            ["partial"]);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+
+        var json = JsonSerializer.Serialize(response, options);
+
+        using var document = JsonDocument.Parse(json);
+        var band = document.RootElement.GetProperty("bands")[0];
+        var column = band.GetProperty("columns")[0];
+        Assert.Equal("cloud", band.GetProperty("kind").GetString());
+        Assert.Equal("onPath", band.GetProperty("pathRelation").GetString());
+        Assert.Equal("estimated", band.GetProperty("valueKind").GetString());
+        Assert.Equal(12.5, column.GetProperty("distanceNm").GetDouble());
+        Assert.Equal(JsonValueKind.Null, column.GetProperty("originalBaseFeet").ValueKind);
+        Assert.Equal(JsonValueKind.Null, column.GetProperty("topFeet").ValueKind);
+        Assert.Contains("Open-Meteo", document.RootElement.GetProperty("sources")[0].GetProperty("attribution").GetString());
+        Assert.Equal("/api/v1/weather/profile", TaxiNowHost.WeatherProfilePath);
+    }
+
+    [Fact]
+    public async Task WeatherEndpoint_IsMappedOnlyWhenFeatureFlagIsEnabled()
+    {
+        var disabledRoot = TempRoot();
+        var enabledRoot = TempRoot();
+        try
+        {
+            await using var disabled = TaxiNowHost.Build(configure: builder =>
+            {
+                builder.Configuration["TaxiNow:StorageRoot"] = disabledRoot;
+                builder.Configuration["TaxiNow:Features:VerticalWeatherProfileEnabled"] = "false";
+            });
+            await using var enabled = TaxiNowHost.Build(configure: builder =>
+            {
+                builder.Configuration["TaxiNow:StorageRoot"] = enabledRoot;
+                builder.Configuration["TaxiNow:Features:VerticalWeatherProfileEnabled"] = "true";
+            });
+
+            Assert.DoesNotContain(((IEndpointRouteBuilder)disabled).DataSources.SelectMany(source => source.Endpoints),
+                endpoint => endpoint.DisplayName?.Contains(TaxiNowHost.WeatherProfilePath, StringComparison.Ordinal) == true);
+            Assert.Contains(((IEndpointRouteBuilder)enabled).DataSources.SelectMany(source => source.Endpoints),
+                endpoint => endpoint.DisplayName?.Contains(TaxiNowHost.WeatherProfilePath, StringComparison.Ordinal) == true);
+            Assert.NotNull(enabled.Services.GetRequiredService<WeatherProfileService>());
+        }
+        finally
+        {
+            if (Directory.Exists(disabledRoot)) Directory.Delete(disabledRoot, recursive: true);
+            if (Directory.Exists(enabledRoot)) Directory.Delete(enabledRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void IcaoDownload_IsNormalized()
     {
         var request = DownloadRequestValidator.NormalizeAndValidate(
@@ -277,4 +344,7 @@ public sealed class ServerContractTests
             }
         }
     }
+
+    private static string TempRoot() => Path.Combine(
+        Path.GetTempPath(), "TaxiNow.Tests", Guid.NewGuid().ToString("N"));
 }

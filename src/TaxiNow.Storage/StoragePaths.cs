@@ -10,6 +10,8 @@ public sealed record StoragePaths(string Root)
     public string SourceCachePath => Path.Combine(Root, "source-cache");
     public string ElevationProfilesPath =>
         Path.Combine(Root, "elevation-profiles");
+    public string WeatherProfilesPath =>
+        Path.Combine(Root, "weather-profiles");
     public string PipelinePath => Path.Combine(Root, "pipeline");
     public string WebPath => Path.Combine(Root, "web");
     public string LogsPath => Path.Combine(Root, "logs");
@@ -27,6 +29,7 @@ public sealed record StoragePaths(string Root)
         Directory.CreateDirectory(MapsPath);
         Directory.CreateDirectory(SourceCachePath);
         Directory.CreateDirectory(ElevationProfilesPath);
+        Directory.CreateDirectory(WeatherProfilesPath);
         Directory.CreateDirectory(PipelinePath);
         Directory.CreateDirectory(WebPath);
         Directory.CreateDirectory(LogsPath);
@@ -66,6 +69,7 @@ public sealed record StoragePaths(string Root)
             "maps",
             "source-cache",
             "elevation-profiles",
+            "weather-profiles",
             "pipeline",
             "web",
             "logs"
