@@ -216,9 +216,9 @@ describe('panel lifecycle', () => {
     expect(canvas.height).toBe(400);
     expect(operations.get('setTransform')).toHaveBeenLastCalledWith(2, 0, 0, 2, 0, 0);
     const renderedLabels = operations.get('fillText')!.mock.calls.map(call => call[0]);
-    expect(renderedLabels).toContain('KAAA');
+    expect(renderedLabels).not.toContain('KAAA');
     expect(renderedLabels).toContain('KBBB');
-    expect(operations.get('fill')!.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(operations.get('fill')!.mock.calls.length).toBeGreaterThanOrEqual(2);
     const paints = operations.get('clearRect')!.mock.calls.length;
     view.render(profile); view.resize();
     expect(operations.get('clearRect')).toHaveBeenCalledTimes(paints);

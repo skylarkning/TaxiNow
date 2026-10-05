@@ -1,6 +1,17 @@
 import { t } from './localization';
 const tr = (key: string, values?: Record<string, string | number>) => t('flightdeck.' + key, values);
 import type { VerticalProfileConstraint, VerticalProfileModel } from './verticalProfile';
+import { classifyVerticalProfilePoints, layoutVerticalProfileLabels } from './verticalProfileLabels';
+import {
+  drawVerticalProfile,
+  verticalProfileBounds,
+  type VerticalProfilePalette
+} from './verticalProfileRenderer';
+import {
+  createProfileViewport,
+  profileXToDistance,
+  type ProfileViewport
+} from './verticalProfileViewport';
 
 export interface VerticalProfileViewState {
   status: 'ready' | 'loading' | 'empty' | 'error';
@@ -103,115 +114,6 @@ export function profileInspection(model: VerticalProfileModel, requestedIndex: n
   };
 }
 
-interface Palette {
-  background: string; text: string; muted: string; grid: string;
-  terrain: string; terrainStroke: string; route: string; amber: string; red: string; aircraft: string; font: string;
-}
-
-function drawProfile(context: CanvasRenderingContext2D, model: VerticalProfileModel, width: number, height: number, palette: Palette): void {
-  const left = Math.min(54, width * 0.2), right = Math.max(left + 1, width - 22);
-  const top = 22, bottom = Math.max(top + 1, height - 33);
-  const distance = Math.max(1, model.totalDistanceNm);
-  const altitudes = [...model.altitudePath.map(point => point.altitudeFeet), ...model.terrain.map(point => point.elevationFeet),
-    ...model.constraints.flatMap(point => [point.minimumAltitudeFeet, point.maximumAltitudeFeet]), model.aircraft?.altitudeMslFeet].filter(finite);
-  const lower = Math.floor(Math.min(0, ...altitudes) / 1000) * 1000;
-  const upper = Math.ceil(Math.max(3000, ...altitudes) * 1.12 / 1000) * 1000;
-  const x = (value: number) => left + clamp(value / distance, 0, 1) * (right - left);
-  const y = (value: number) => bottom - clamp((value - lower) / (upper - lower), 0, 1) * (bottom - top);
-  const line = (x1: number, y1: number, x2: number, y2: number) => {
-    context.beginPath(); context.moveTo(x1, y1); context.lineTo(x2, y2); context.stroke();
-  };
-  const label = (text: string, atX: number, atY: number, maximum = right - left) => {
-    const measured = Math.min(context.measureText(text).width, maximum);
-    context.fillText(text, clamp(atX - measured / 2, 2, Math.max(2, width - measured - 2)), clamp(atY, 10, height - 2), maximum);
-  };
-  context.clearRect(0, 0, width, height);
-  context.fillStyle = palette.background;
-  context.fillRect(0, 0, width, height);
-  context.font = `10px ${palette.font}`;
-  context.lineWidth = 1;
-  context.strokeStyle = palette.grid;
-  context.fillStyle = palette.muted;
-  for (let tick = 0; tick <= 4; tick++) {
-    const altitude = lower + (upper - lower) * tick / 4;
-    line(left, y(altitude), right, y(altitude));
-    context.fillText(`${Math.round(altitude / 1000)}k`, 6, y(altitude) + 3);
-  }
-  context.fillText('FT MSL', 6, 11);
-  const horizontalTicks = Math.max(2, Math.min(8, Math.floor((right - left) / 85)));
-  for (let tick = 0; tick <= horizontalTicks; tick++) {
-    const value = distance * tick / horizontalTicks;
-    line(x(value), top, x(value), bottom);
-    label(`${Math.round(value)}`, x(value), height - 4, 42);
-  }
-  context.fillText('NM', Math.max(2, width - 19), height - 4);
-
-  // Clip functional data to the plot while keeping tick and waypoint labels readable.
-  context.save(); context.beginPath(); context.rect(left, top, right - left, bottom - top); context.clip();
-  if (model.terrain.length) {
-    context.beginPath(); context.moveTo(x(model.terrain[0]!.distanceNm), bottom);
-    for (const point of model.terrain) context.lineTo(x(point.distanceNm), y(point.elevationFeet));
-    context.lineTo(x(model.terrain.at(-1)!.distanceNm), bottom); context.closePath();
-    context.fillStyle = palette.terrain; context.fill();
-    for (let index = 1; index < model.terrain.length; index++) {
-      const previous = model.terrain[index - 1]!, point = model.terrain[index]!;
-      if (point.clearanceBand === 'normal') continue;
-      context.beginPath(); context.moveTo(x(previous.distanceNm), bottom);
-      context.lineTo(x(previous.distanceNm), y(previous.elevationFeet));
-      context.lineTo(x(point.distanceNm), y(point.elevationFeet)); context.lineTo(x(point.distanceNm), bottom); context.closePath();
-      context.fillStyle = point.clearanceBand === 'red' ? palette.red : palette.amber; context.fill();
-    }
-    context.beginPath();
-    context.moveTo(x(model.terrain[0]!.distanceNm), y(model.terrain[0]!.elevationFeet));
-    for (const point of model.terrain.slice(1)) context.lineTo(x(point.distanceNm), y(point.elevationFeet));
-    context.strokeStyle = palette.terrainStroke;
-    context.lineWidth = 2;
-    context.stroke();
-  }
-  context.strokeStyle = palette.route; context.lineWidth = 1.5;
-  for (let index = 1; index < model.altitudePath.length; index++) {
-    const previous = model.altitudePath[index - 1]!, point = model.altitudePath[index]!;
-    context.setLineDash(point.estimated || previous.estimated ? [5, 3] : []);
-    line(x(previous.distanceNm), y(previous.altitudeFeet), x(point.distanceNm), y(point.altitudeFeet));
-  }
-  context.setLineDash([]);
-  context.strokeStyle = palette.text; context.lineWidth = 1;
-  for (const restriction of model.constraints) {
-    const atX = x(restriction.distanceNm);
-    const bar = (altitude: number | undefined, direction: number) => {
-      if (!finite(altitude)) return;
-      const atY = y(altitude);
-      line(atX - 5, atY, atX + 5, atY);
-      if (direction) { line(atX - 5, atY, atX - 5, atY + direction * 5); line(atX + 5, atY, atX + 5, atY + direction * 5); }
-    };
-    if (restriction.kind === 'at') bar(restriction.minimumAltitudeFeet ?? restriction.maximumAltitudeFeet, 0);
-    else { bar(restriction.minimumAltitudeFeet, -1); bar(restriction.maximumAltitudeFeet, 1); }
-  }
-  context.restore();
-  context.fillStyle = palette.text;
-  for (const point of [model.routePoints[0], model.routePoints.at(-1)]) {
-    if (!point) continue;
-    context.fillRect(x(point.distanceNm) - 3, bottom - 3, 6, 6);
-  }
-  const indexes = selectWaypointLabelIndexes(model.routePoints.length, Math.min(8, Math.max(2, Math.floor((right - left) / 90))));
-  let labelEnd = -Infinity;
-  for (const index of indexes) {
-    const point = model.routePoints[index]!;
-    const text = identifier(point.ident).slice(0, 12);
-    const labelWidth = Math.min(context.measureText(text).width, 82);
-    const start = clamp(x(point.distanceNm) - labelWidth / 2, 2, width - labelWidth - 2);
-    if (start < labelEnd + 6 && index !== model.routePoints.length - 1) continue;
-    label(text, x(point.distanceNm), index === model.routePoints.length - 1 && start < labelEnd + 6 ? top + 12 : top - 7, 82);
-    labelEnd = start + labelWidth;
-  }
-  if (model.aircraft && finite(model.aircraft.altitudeMslFeet)) {
-    const atX = x(model.aircraft.distanceNm), atY = y(model.aircraft.altitudeMslFeet);
-    context.fillStyle = palette.aircraft;
-    context.beginPath(); context.moveTo(atX, atY - 6); context.lineTo(atX + 5, atY + 5);
-    context.lineTo(atX, atY + 2); context.lineTo(atX - 5, atY + 5); context.closePath(); context.fill();
-  }
-}
-
 export function createVerticalProfileView(host: HTMLElement): VerticalProfileView {
   const document = host.ownerDocument;
   const window = document.defaultView;
@@ -256,6 +158,8 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
   panel.append(header, plot, footer, summary); host.append(panel);
 
   let model: VerticalProfileModel | null = null;
+  let viewport: ProfileViewport | null = null;
+  let viewportRouteKey = '';
   let state: VerticalProfileViewState = { status: 'empty' };
   let open = !(window?.matchMedia?.('(max-width: 620px)').matches ?? false);
   let destroyed = false, dirty = true, selectedIndex = 0;
@@ -290,19 +194,31 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
     const dpr = Math.max(1, window?.devicePixelRatio ?? 1);
     const style = window?.getComputedStyle(panel);
     const color = (name: string, fallback: string) => style?.getPropertyValue(name).trim() || fallback;
-    const palette: Palette = {
+    const palette: VerticalProfilePalette = {
       background: color('--fd-profile-background', '#071826'), text: color('--fd-profile-text', '#e9f6ff'),
       muted: color('--fd-profile-muted', '#9bb7c8'), grid: color('--fd-profile-grid', '#28495c'),
       terrain: color('--fd-profile-terrain', '#335966'), terrainStroke: color('--fd-profile-terrain-stroke', '#6f9ca8'),
       route: color('--fd-profile-route', '#42c7ff'), amber: color('--fd-profile-amber', '#ffc857'),
       red: color('--fd-profile-red', '#ff6961'), aircraft: color('--fd-profile-aircraft', '#7ef0b8'),
+      weatherWeak: color('--fd-profile-weather-weak', '#35c96f'),
+      weatherModerate: color('--fd-profile-weather-moderate', '#f2cf3a'),
+      weatherStrong: color('--fd-profile-weather-strong', '#ef5350'),
       font: style?.fontFamily || 'sans-serif'
     };
     const paletteKey = JSON.stringify(palette);
     if (!dirty && width === lastWidth && height === lastHeight && dpr === lastDpr && paletteKey === lastPalette) return;
     canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (model) drawProfile(context, model, width, height, palette);
+    if (model) {
+      viewport ??= createProfileViewport(model.totalDistanceNm, model.aircraft?.distanceNm);
+      const bounds = verticalProfileBounds(width, height);
+      const labels = layoutVerticalProfileLabels(
+        classifyVerticalProfilePoints(model),
+        viewport,
+        bounds.right - bounds.left,
+        text => context!.measureText(identifier(text)).width);
+      drawVerticalProfile(context, model, viewport, bounds, palette, labels);
+    }
     else context.clearRect(0, 0, width, height);
     lastWidth = width; lastHeight = height; lastDpr = dpr; lastPalette = paletteKey; dirty = false;
   }
@@ -321,6 +237,13 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
   function render(next: VerticalProfileModel | null, nextState?: VerticalProfileViewState) {
     if (destroyed) return;
     dirty ||= model !== next;
+    const nextRouteKey = next
+      ? JSON.stringify([next.totalDistanceNm, next.routePoints.map(point => [point.position[0], point.position[1]])])
+      : '';
+    if (nextRouteKey !== viewportRouteKey) {
+      viewport = next ? createProfileViewport(next.totalDistanceNm, next.aircraft?.distanceNm) : null;
+      viewportRouteKey = nextRouteKey;
+    }
     model = next; state = nextState ?? { status: next ? 'ready' : 'empty' };
     const message = statusMessage(model, state);
     status.textContent = message; overlay.hidden = !message;
@@ -352,10 +275,17 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
   listen(canvas, 'focus', () => inspect(selectedIndex));
   listen(canvas, 'blur', () => { tooltip.hidden = true; });
   listen(canvas, 'pointermove', event => {
-    if (!model) return;
+    if (!model || !viewport) return;
     const bounds = canvas.getBoundingClientRect();
-    const left = Math.min(54, bounds.width * 0.2), right = Math.max(left + 1, bounds.width - 22);
-    const distance = clamp(((event as PointerEvent).clientX - bounds.left - left) / (right - left), 0, 1) * model.totalDistanceNm;
+    const plotBounds = verticalProfileBounds(bounds.width, bounds.height);
+    const plotX = clamp(
+      (event as PointerEvent).clientX - bounds.left - plotBounds.left,
+      0,
+      plotBounds.right - plotBounds.left);
+    const distance = profileXToDistance(
+      plotX,
+      viewport,
+      plotBounds.right - plotBounds.left);
     const samples = model.terrain.length ? model.terrain : model.altitudePath;
     let index = 0;
     for (let candidate = 1; candidate < samples.length; candidate++) {
@@ -380,7 +310,7 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
       resizeObserver?.disconnect(); themeObserver?.disconnect();
       listeners.forEach(remove => remove()); panel.remove();
       host.style.removeProperty('--fd-profile-height');
-      model = null; context = null;
+      model = null; viewport = null; context = null;
     }
   };
 }
