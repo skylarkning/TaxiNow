@@ -14,6 +14,34 @@ describe('SimBrief flight plans', () => {
     expect(result.callsign).toBe('CCA123');
     expect(result.distance).toBeGreaterThan(1000);
   });
+  it('normalizes optional SimBrief departure and enroute timing', () => {
+    const numeric = parseSimBrief({
+      ...plan(),
+      times: { sched_out: '1791244800', est_time_enroute: '7200' }
+    });
+    const iso = parseSimBrief({
+      ...plan(),
+      times: { sched_out: '2026-10-06T00:00:00Z', est_time_enroute: 3600 }
+    });
+
+    expect(numeric.departureTimeUtc).toBe('2026-10-06T00:00:00.000Z');
+    expect(numeric.estimatedEnrouteSeconds).toBe(7200);
+    expect(iso.departureTimeUtc).toBe('2026-10-06T00:00:00.000Z');
+    expect(iso.estimatedEnrouteSeconds).toBe(3600);
+  });
+
+  it('omits absent or invalid timing for saved-plan compatibility', () => {
+    const absent = parseSimBrief(plan());
+    const invalid = parseSimBrief({
+      ...plan(),
+      times: { sched_out: 'not-a-date', est_time_enroute: '-1' }
+    });
+
+    expect(absent).not.toHaveProperty('departureTimeUtc');
+    expect(absent).not.toHaveProperty('estimatedEnrouteSeconds');
+    expect(invalid).not.toHaveProperty('departureTimeUtc');
+    expect(invalid).not.toHaveProperty('estimatedEnrouteSeconds');
+  });
   it('rejects missing coordinates instead of drawing a shortcut', () => {
     const value = plan(); value.navlog.fix[0]!.pos_lat = '';
     expect(() => parseSimBrief(value)).toThrow();

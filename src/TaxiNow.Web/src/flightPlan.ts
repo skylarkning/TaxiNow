@@ -15,6 +15,7 @@ export interface FlightPlan {
   callsign: string; aircraft: string; altitude: string; route: string;
   points: FlightPoint[]; distance: number; importedAt: string;
   originElevationFeet?: number; destinationElevationFeet?: number;
+  departureTimeUtc?: string; estimatedEnrouteSeconds?: number;
 }
 type RecordValue = Record<string, unknown>;
 function record(value: unknown): RecordValue {
@@ -22,6 +23,25 @@ function record(value: unknown): RecordValue {
   return value as RecordValue;
 }
 function label(value: unknown): string { return typeof value === 'string' || typeof value === 'number' ? String(value).slice(0, 12000) : ''; }
+function optionalUtcTime(value: unknown): string | undefined {
+  const raw = typeof value === 'string' ? value.trim() : value;
+  if (raw === '' || (typeof raw !== 'string' && typeof raw !== 'number')) return undefined;
+  const numeric = typeof raw === 'number' ? raw : /^\d+(?:\.\d+)?$/.test(raw) ? Number(raw) : Number.NaN;
+  const milliseconds = Number.isFinite(numeric) && numeric > 0
+    ? numeric * (numeric < 100_000_000_000 ? 1000 : 1)
+    : typeof raw === 'string' ? Date.parse(raw) : Number.NaN;
+  if (!Number.isFinite(milliseconds) || milliseconds <= 0) return undefined;
+  const date = new Date(milliseconds);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : undefined;
+}
+function optionalDurationSeconds(value: unknown): number | undefined {
+  if (typeof value === 'string' && !value.trim()) return undefined;
+  const duration = typeof value === 'number' ? value
+    : typeof value === 'string' ? Number(value.trim()) : Number.NaN;
+  return Number.isFinite(duration) && duration > 0 && duration <= 7 * 24 * 60 * 60
+    ? duration
+    : undefined;
+}
 export function optionalAltitude(value: unknown): number | undefined {
   if (typeof value === 'string' && !value.trim()) return undefined;
   if (typeof value !== 'string' && typeof value !== 'number') return undefined;
@@ -118,6 +138,13 @@ export function parseSimBrief(input: unknown): FlightPlan {
   const destinationElevationFeet = optionalAltitude(destination.elevation);
   if (originElevationFeet !== undefined) parsed.originElevationFeet = originElevationFeet;
   if (destinationElevationFeet !== undefined) parsed.destinationElevationFeet = destinationElevationFeet;
+  const times = data.times && typeof data.times === 'object' && !Array.isArray(data.times)
+    ? data.times as RecordValue
+    : undefined;
+  const departureTimeUtc = optionalUtcTime(times?.sched_out);
+  const estimatedEnrouteSeconds = optionalDurationSeconds(times?.est_time_enroute);
+  if (departureTimeUtc !== undefined) parsed.departureTimeUtc = departureTimeUtc;
+  if (estimatedEnrouteSeconds !== undefined) parsed.estimatedEnrouteSeconds = estimatedEnrouteSeconds;
   return parsed;
 }
 const rad = Math.PI / 180;

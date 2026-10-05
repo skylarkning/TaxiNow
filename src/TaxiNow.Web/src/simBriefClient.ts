@@ -1,6 +1,6 @@
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
-const navigationFields = ['origin', 'destination', 'general', 'navlog', 'aircraft'] as const;
+const navigationFields = ['origin', 'destination', 'general', 'navlog', 'aircraft', 'times'] as const;
 
 export function filterSimBriefNavigation(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};

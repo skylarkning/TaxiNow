@@ -44,10 +44,15 @@ describe('SimBrief client', () => {
     const filtered = filterSimBriefNavigation({
       origin: { icao_code: 'ZBAA' },
       navlog: { fix: [] },
+      times: { sched_out: '1791244800', est_time_enroute: '7200' },
       pilot: { name: 'Private' },
       files: { pdf: 'private-url' }
     });
 
-    expect(filtered).toEqual({ origin: { icao_code: 'ZBAA' }, navlog: { fix: [] } });
+    expect(filtered).toEqual({
+      origin: { icao_code: 'ZBAA' },
+      navlog: { fix: [] },
+      times: { sched_out: '1791244800', est_time_enroute: '7200' }
+    });
   });
 });

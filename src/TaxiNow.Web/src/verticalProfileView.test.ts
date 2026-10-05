@@ -26,6 +26,7 @@ function model(): VerticalProfileModel {
       { longitude: 1, latitude: 0, distanceNm: 100, elevationFeet: 800, referenceAltitudeFeet: 2000, clearanceFeet: 1200, clearanceBand: 'amber' }
     ],
     aircraft: { distanceNm: 40, altitudeMslFeet: 12500, altitudeAglFeet: 11000, crossTrackDistanceNm: 0, terrainElevationFeet: 1500, clearanceFeet: 11000, clearanceBand: 'normal' },
+    weatherBands: [], weatherWarnings: [], weatherSourceSummary: '',
     source: { name: 'Open-Meteo', cacheState: 'fresh', generatedAt: '2026-09-12T00:00:00Z', attribution: 'Open-Meteo · Copernicus DEM' },
     metrics: { currentAltitudeFeet: 12500, currentAglFeet: 11000, terrainClearanceFeet: 11000, nextRestriction: null, distanceRemainingNm: 60, sourceCacheBadge: 'Fresh' },
     accessibilitySummary: 'KAAA to KBBB vertical profile.'

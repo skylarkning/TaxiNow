@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ElevationProfileResponse, TelemetrySnapshot } from './contracts';
+import type { ElevationProfileResponse, TelemetrySnapshot, WeatherProfileResponse } from './contracts';
 import type { FlightPlan, FlightPoint } from './flightPlan';
 import {
   buildVerticalProfileModel,
@@ -54,6 +54,36 @@ function telemetry(overrides: Partial<TelemetrySnapshot> = {}): TelemetrySnapsho
     altitudeMslFeet: 5000,
     altitudeAglFeet: 4000,
     state: 'airborne',
+    ...overrides
+  };
+}
+
+function weather(overrides: Partial<WeatherProfileResponse> = {}): WeatherProfileResponse {
+  const validAt = '2026-10-06T00:30:00Z';
+  return {
+    startDistanceNm: 0,
+    endDistanceNm: 200,
+    generatedAt: '2026-10-06T00:00:00Z',
+    validFrom: '2026-10-06T00:00:00Z',
+    validTo: '2026-10-06T01:00:00Z',
+    etaBasis: 'scheduled',
+    cacheState: 'fresh',
+    bands: [{
+      id: 'cloud-0',
+      kind: 'cloud',
+      intensity: 'none',
+      pathRelation: 'onPath',
+      confidence: 'high',
+      valueKind: 'forecast',
+      source: 'Open-Meteo',
+      columns: [
+        { longitude: 2, latitude: 0, distanceNm: 220, validAt, originalBaseFeet: null, originalTopFeet: 12000, baseFeet: 2000, topFeet: null, plannedAltitudeFeet: 10000 },
+        { longitude: 1, latitude: 0, distanceNm: 100, validAt, originalBaseFeet: 1800, originalTopFeet: 11000, baseFeet: 1500, topFeet: 11000, plannedAltitudeFeet: 10000 },
+        { longitude: 0, latitude: 0, distanceNm: -5, validAt, originalBaseFeet: 1000, originalTopFeet: 9000, baseFeet: 1000, topFeet: 9000, plannedAltitudeFeet: 10000 }
+      ]
+    }],
+    sources: [{ name: 'Open-Meteo', attribution: 'Weather: Open-Meteo', generatedAt: '2026-10-06T00:00:00Z', validFrom: null, validTo: null }],
+    warnings: [],
     ...overrides
   };
 }
@@ -176,6 +206,55 @@ describe('vertical profile normalization', () => {
       attribution: 'Open-Meteo and Copernicus DEM'
     });
     expect(model.metrics.sourceCacheBadge).toBe('Open-Meteo · Cached/offline');
+  });
+
+  it('sorts and clips weather columns while preserving unknown boundaries', () => {
+    const model = buildVerticalProfileModel({
+      flightPlan: plan([
+        { ident: 'A', position: [0, 0], airway: '' },
+        { ident: 'B', position: [2 * nmLongitude, 0], airway: '' }
+      ]),
+      elevationProfile: terrain([]),
+      weatherProfile: weather()
+    });
+
+    expect(model.weatherBands).toHaveLength(1);
+    expect(model.weatherBands[0]!.columns.map(column => column.distanceNm)).toEqual([
+      0,
+      100,
+      expect.closeTo(200, 2)
+    ]);
+    expect(model.weatherBands[0]!.columns[2]).toMatchObject({
+      originalBaseFeet: null,
+      topFeet: null
+    });
+    expect(model.weatherSourceSummary).toBe('Open-Meteo');
+    expect(model.weatherWarnings).toEqual([]);
+  });
+
+  it('adds stale estimated weather and provider warnings to the accessible summary', () => {
+    const estimated = weather({
+      cacheState: 'stale',
+      bands: [{ ...weather().bands[0]!, valueKind: 'estimated' }],
+      sources: [
+        { name: 'Open-Meteo', attribution: 'Weather: Open-Meteo', generatedAt: '2026-10-06T00:00:00Z', validFrom: null, validTo: null },
+        { name: 'METAR', attribution: 'NOAA Aviation Weather Center', generatedAt: '2026-10-06T00:00:00Z', validFrom: null, validTo: null }
+      ],
+      warnings: ['TAF unavailable']
+    });
+    const model = buildVerticalProfileModel({
+      flightPlan: plan([
+        { ident: 'A', position: [0, 0], airway: '' },
+        { ident: 'B', position: [2 * nmLongitude, 0], airway: '' }
+      ]),
+      elevationProfile: terrain([]),
+      weatherProfile: estimated
+    });
+
+    expect(model.weatherSourceSummary).toBe('Open-Meteo · METAR');
+    expect(model.accessibilitySummary).toContain('stale');
+    expect(model.accessibilitySummary).toContain('estimated');
+    expect(model.accessibilitySummary).toContain('TAF unavailable');
   });
 });
 

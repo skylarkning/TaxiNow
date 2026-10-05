@@ -1,4 +1,4 @@
-import type { ElevationProfileResponse, TelemetrySnapshot } from './contracts';
+import type { ElevationProfileResponse, TelemetrySnapshot, WeatherBand, WeatherProfileResponse } from './contracts';
 import { distanceNm, type FlightPlan, type FlightPoint, type Position } from './flightPlan';
 
 export type TerrainClearanceBand = 'normal' | 'amber' | 'red';
@@ -79,6 +79,9 @@ export interface VerticalProfileModel {
   constraints: VerticalProfileConstraint[];
   terrain: VerticalProfileTerrainPoint[];
   aircraft?: VerticalProfileAircraft;
+  weatherBands: WeatherBand[];
+  weatherWarnings: string[];
+  weatherSourceSummary: string;
   source: VerticalProfileSource;
   metrics: VerticalProfileMetrics;
   accessibilitySummary: string;
@@ -88,6 +91,7 @@ export interface BuildVerticalProfileInput {
   flightPlan: FlightPlan;
   elevationProfile: ElevationProfileResponse;
   telemetry?: TelemetrySnapshot;
+  weatherProfile?: WeatherProfileResponse;
 }
 
 const nauticalMilesPerDegree = 60.0405;
@@ -220,7 +224,9 @@ function displayAltitude(value: number): string {
 function buildAccessibilitySummary(
   flightPlan: FlightPlan,
   aircraft: VerticalProfileAircraft | undefined,
-  cacheState: ElevationProfileResponse['cacheState']
+  cacheState: ElevationProfileResponse['cacheState'],
+  weatherProfile: WeatherProfileResponse | undefined,
+  weatherSourceSummary: string
 ): string {
   const aircraftText = aircraft
     ? `Aircraft altitude ${displayAltitude(aircraft.altitudeMslFeet)} feet MSL.`
@@ -228,11 +234,21 @@ function buildAccessibilitySummary(
   const terrainText = cacheState === 'cachedOffline'
     ? 'Terrain is from the cached offline profile.'
     : 'Terrain profile is fresh.';
-  return `${flightPlan.origin} to ${flightPlan.destination} vertical profile. ${aircraftText} ${terrainText} Terrain colours are a simulation advisory only.`;
+  const weatherText = !weatherProfile
+    ? 'Weather forecast unavailable.'
+    : [
+        `Weather forecast source ${weatherSourceSummary || 'unknown'}.`,
+        weatherProfile.cacheState === 'stale' ? 'Weather forecast is stale.' : '',
+        weatherProfile.bands.some(band => band.valueKind === 'estimated')
+          ? 'Weather boundaries include estimated values.'
+          : '',
+        ...weatherProfile.warnings
+      ].filter(Boolean).join(' ');
+  return `${flightPlan.origin} to ${flightPlan.destination} vertical profile. ${aircraftText} ${terrainText} ${weatherText} Terrain colours are a simulation advisory only.`;
 }
 
 export function buildVerticalProfileModel(input: BuildVerticalProfileInput): VerticalProfileModel {
-  const { flightPlan, elevationProfile, telemetry } = input;
+  const { flightPlan, elevationProfile, telemetry, weatherProfile } = input;
   const routeDistances = cumulativeRoute(flightPlan.points);
   const totalDistanceNm = routeDistances.at(-1) ?? 0;
   const sortedTerrain = [...elevationProfile.samples].sort((left, right) => left.distanceNm - right.distanceNm);
@@ -348,6 +364,23 @@ export function buildVerticalProfileModel(input: BuildVerticalProfileInput): Ver
     distanceRemainingNm: Math.max(0, totalDistanceNm - currentDistance),
     sourceCacheBadge
   };
+  const weatherBands = (weatherProfile?.bands ?? [])
+    .map(band => ({
+      ...band,
+      columns: band.columns
+        .filter(column => Number.isFinite(column.distanceNm))
+        .map(column => ({
+          ...column,
+          distanceNm: Math.max(0, Math.min(totalDistanceNm, column.distanceNm))
+        }))
+        .sort((left, right) => left.distanceNm - right.distanceNm)
+    }))
+    .filter(band => band.columns.length > 0)
+    .sort((left, right) => left.columns[0]!.distanceNm - right.columns[0]!.distanceNm);
+  const weatherSourceSummary = [...new Set(
+    (weatherProfile?.sources ?? []).map(source => source.name.trim()).filter(Boolean)
+  )].join(' · ');
+  const weatherWarnings = [...(weatherProfile?.warnings ?? [])];
 
   return {
     origin: flightPlan.origin,
@@ -358,8 +391,16 @@ export function buildVerticalProfileModel(input: BuildVerticalProfileInput): Ver
     constraints,
     terrain,
     aircraft,
+    weatherBands,
+    weatherWarnings,
+    weatherSourceSummary,
     source,
     metrics,
-    accessibilitySummary: buildAccessibilitySummary(flightPlan, aircraft, elevationProfile.cacheState)
+    accessibilitySummary: buildAccessibilitySummary(
+      flightPlan,
+      aircraft,
+      elevationProfile.cacheState,
+      weatherProfile,
+      weatherSourceSummary)
   };
 }

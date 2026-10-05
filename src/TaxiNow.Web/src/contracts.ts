@@ -87,6 +87,56 @@ export interface ElevationProfileResponse {
   attribution: string;
 }
 
+export type WeatherFeatureKind = "cloud" | "precipitation" | "convective";
+export type WeatherIntensity = "none" | "weak" | "moderate" | "strong";
+export type WeatherPathRelation = "unknown" | "onPath" | "offPath";
+export type WeatherConfidence = "low" | "medium" | "high";
+export type WeatherValueKind = "observed" | "forecast" | "estimated";
+
+export interface WeatherBandColumn {
+  longitude: number;
+  latitude: number;
+  distanceNm: number;
+  validAt: string;
+  originalBaseFeet: number | null;
+  originalTopFeet: number | null;
+  baseFeet: number | null;
+  topFeet: number | null;
+  plannedAltitudeFeet: number | null;
+}
+
+export interface WeatherBand {
+  id: string;
+  kind: WeatherFeatureKind;
+  intensity: WeatherIntensity;
+  pathRelation: WeatherPathRelation;
+  confidence: WeatherConfidence;
+  valueKind: WeatherValueKind;
+  columns: WeatherBandColumn[];
+  source: string;
+}
+
+export interface WeatherSourceInfo {
+  name: string;
+  attribution: string;
+  generatedAt: string;
+  validFrom: string | null;
+  validTo: string | null;
+}
+
+export interface WeatherProfileResponse {
+  startDistanceNm: number;
+  endDistanceNm: number;
+  generatedAt: string;
+  validFrom: string | null;
+  validTo: string | null;
+  etaBasis: string;
+  cacheState: "fresh" | "freshCache" | "partial" | "stale";
+  bands: WeatherBand[];
+  sources: WeatherSourceInfo[];
+  warnings: string[];
+}
+
 export interface AppStatus {
   product: string;
   version: string;
