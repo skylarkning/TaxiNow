@@ -235,7 +235,7 @@ html[data-theme] body.flightdeck .fd-map-point-order { display:grid; place-items
 
 /* Vertical situation display shares the flight-deck palette and controls. */
 #fd-root { --fd-profile-height:100%; }
-#fd-vertical-profile { --fd-profile-background:#071826; --fd-profile-surface:#0b2233; --fd-profile-text:#e9f6ff; --fd-profile-muted:#9bb7c8; --fd-profile-grid:#28495c; --fd-profile-terrain:#335966; --fd-profile-terrain-stroke:#6f9ca8; --fd-profile-route:#42c7ff; --fd-profile-amber:#ffc857; --fd-profile-red:#ff6961; --fd-profile-aircraft:#7ef0b8; position:absolute; inset:0; height:var(--fd-profile-height); box-sizing:border-box; display:flex; flex-direction:column; min-width:0; background:var(--fd-profile-background); color:var(--fd-profile-text); border-top:1px solid var(--fd-profile-grid); z-index:4; font:11px/1.35 Inter,"Segoe UI","Microsoft YaHei",sans-serif; }
+#fd-vertical-profile { --fd-profile-background:#071826; --fd-profile-surface:#0b2233; --fd-profile-text:#e9f6ff; --fd-profile-muted:#9bb7c8; --fd-profile-grid:#28495c; --fd-profile-terrain:#335966; --fd-profile-terrain-stroke:#6f9ca8; --fd-profile-route:#42c7ff; --fd-profile-amber:#ffc857; --fd-profile-red:#ff6961; --fd-profile-aircraft:#7ef0b8; --fd-profile-weather-weak:#35c96f; --fd-profile-weather-moderate:#f2cf3a; --fd-profile-weather-strong:#ef5350; position:absolute; inset:0; height:var(--fd-profile-height); box-sizing:border-box; display:flex; flex-direction:column; min-width:0; background:var(--fd-profile-background); color:var(--fd-profile-text); border-top:1px solid var(--fd-profile-grid); z-index:4; font:11px/1.35 Inter,"Segoe UI","Microsoft YaHei",sans-serif; }
 #fd-vertical-profile[hidden],#fd-vertical-profile [hidden] { display:none!important; }
 #fd-profile-header { display:flex; align-items:center; gap:12px; flex-shrink:0; min-width:0; padding:7px 12px; border-bottom:1px solid var(--fd-profile-grid); background:var(--fd-profile-surface); }
 #fd-profile-title { flex:0 1 auto; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:600; }
@@ -245,8 +245,13 @@ html[data-theme] body.flightdeck .fd-map-point-order { display:grid; place-items
 #fd-profile-metrics dd { margin:2px 0 0; font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 html[data-theme] body.flightdeck #fd-profile-close { flex-shrink:0; width:30px; height:30px; padding:0; border:1px solid var(--fd-profile-grid); border-radius:4px; background:#102d41; color:var(--fd-profile-text); font-size:21px; line-height:24px; }
 #fd-profile-plot { position:relative; flex:1; min-height:0; overflow:hidden; }
-#fd-profile-canvas { display:block; width:100%; height:100%; }
+#fd-profile-canvas { display:block; width:100%; height:100%; cursor:grab; touch-action:none; }
+#fd-profile-canvas:active { cursor:grabbing; }
 #fd-profile-canvas:focus-visible { outline:2px solid #269fdf; outline-offset:-2px; }
+#fd-profile-controls { position:absolute; top:8px; right:22px; display:flex; gap:4px; z-index:2; }
+html[data-theme] body.flightdeck #fd-profile-controls button { display:grid; place-items:center; width:30px; height:30px; box-sizing:border-box; padding:0; border:1px solid var(--fd-profile-grid); border-radius:4px; background:color-mix(in srgb,var(--fd-profile-surface) 90%,transparent); color:var(--fd-profile-text); font:600 16px/1 Inter,"Segoe UI",sans-serif; }
+html[data-theme] body.flightdeck #fd-profile-controls button:hover { border-color:var(--fd-profile-route); color:var(--fd-profile-route); }
+html[data-theme] body.flightdeck #fd-profile-controls button:focus-visible { outline:2px solid #269fdf; outline-offset:1px; }
 #fd-profile-overlay { position:absolute; top:28px; left:50%; transform:translateX(-50%); max-width:calc(100% - 28px); box-sizing:border-box; padding:7px 10px; display:flex; align-items:center; justify-content:center; gap:10px; border:1px solid var(--fd-profile-grid); border-radius:4px; background:var(--fd-profile-surface); color:var(--fd-profile-text); text-align:center; pointer-events:none; }
 #fd-profile-status { margin:0; font-size:11px; }
 html[data-theme] body.flightdeck #fd-profile-retry { pointer-events:auto; padding:5px 10px; border:1px solid var(--fd-profile-route); border-radius:4px; background:#102d41; color:var(--fd-profile-route); font-size:11px; }
@@ -267,6 +272,10 @@ html[data-theme] body.flightdeck #fd-profile-retry { pointer-events:auto; paddin
   #fd-profile-notice { font-size:8px; }
   #fd-profile-tooltip { left:8px; right:8px; font-size:10px; }
   #fd-profile-overlay { width:max-content; top:24px; }
+  #fd-profile-controls { right:8px; }
+}
+@media(pointer:coarse) {
+  html[data-theme] body.flightdeck #fd-profile-controls button { width:44px; height:44px; }
 }
 @media(prefers-reduced-motion:reduce) {
   #fd-map,.fd-map-bottom,.fd-map-tools,#fd-panel { transition:none; }
@@ -280,8 +289,10 @@ body.flightdeck .fd-account-settings small { color:var(--fd-muted); }
 html[data-theme="light"] body.flightdeck .fd-map-tools { background:#fff; border-color:#bac7d2; }
 html[data-theme="light"] body.flightdeck .fd-map-tools button { background:#fff; color:#24343e; border-color:#cbd5df; }
 html[data-theme="light"] body.flightdeck .fd-map-tools button[aria-pressed="true"] { background:#087fbd; color:#fff; }
-html[data-theme="light"] body.flightdeck #fd-vertical-profile { --fd-profile-background:#f5f7fa; --fd-profile-surface:#fff; --fd-profile-text:#24343e; --fd-profile-muted:#536774; --fd-profile-grid:#cbd5df; --fd-profile-terrain:#c7d8df; --fd-profile-terrain-stroke:#587785; --fd-profile-route:#0876b0; --fd-profile-amber:#a86b00; --fd-profile-red:#c93838; --fd-profile-aircraft:#08784c; }
-html[data-theme="light"] body.flightdeck #fd-profile-close,html[data-theme="light"] body.flightdeck #fd-profile-retry { background:#fff; color:#24343e; }
+html[data-theme="light"] body.flightdeck #fd-vertical-profile { --fd-profile-surface:#fff; }
+html[data-theme="light"] body.flightdeck #fd-profile-header,html[data-theme="light"] body.flightdeck #fd-profile-footer { color:#24343e; border-color:#bac7d2; }
+html[data-theme="light"] body.flightdeck #fd-profile-metrics dt,html[data-theme="light"] body.flightdeck #fd-profile-footer { color:#536774; }
+html[data-theme="light"] body.flightdeck #fd-profile-close,html[data-theme="light"] body.flightdeck #fd-profile-retry { background:#fff; color:#24343e; border-color:#bac7d2; }
 body.flightdeck .fd-fir-popup { color:var(--fd-text); }
 body.flightdeck .fd-fir-popup small { color:var(--fd-muted); }
 

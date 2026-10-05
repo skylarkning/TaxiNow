@@ -76,9 +76,11 @@ class TestElement extends EventTarget {
   find(id: string): TestElement | undefined { return this.id === id ? this : this.children.map(child => child.find(id)).find(Boolean); }
   context: unknown = null;
   getContext() { return this.context; }
+  setPointerCapture = vi.fn();
+  releasePointerCapture = vi.fn();
 }
 
-function browserFixture(mobile = false, paint = false, styleValues: Record<string, string> = {}) {
+function browserFixture(mobile = false, paint = false, styleValues: Record<string, string> = {}, reducedMotion = false) {
   const operations = new Map<string, ReturnType<typeof vi.fn>>();
   const context = new Proxy({}, {
     get: (_, name: string) => {
@@ -99,10 +101,16 @@ function browserFixture(mobile = false, paint = false, styleValues: Record<strin
     observe() {}
     disconnect() { this.disconnected = true; }
   }
+  const frames = new Map<number, FrameRequestCallback>();
+  let nextFrame = 1;
   const window = Object.assign(new EventTarget(), {
     innerWidth: mobile ? 500 : 1200, devicePixelRatio: 2,
-    matchMedia: () => ({ matches: mobile }),
+    matchMedia: (query: string) => ({ matches: query.includes('prefers-reduced-motion') ? reducedMotion : mobile }),
     getComputedStyle: () => ({ getPropertyValue: (name: string): string => styleValues[name] ?? '', fontFamily: 'sans-serif' }),
+    requestAnimationFrame: vi.fn((callback: FrameRequestCallback) => {
+      const id = nextFrame++; frames.set(id, callback); return id;
+    }),
+    cancelAnimationFrame: vi.fn((id: number) => { frames.delete(id); }),
     CustomEvent,
     ResizeObserver: Observer,
     MutationObserver: Observer
@@ -121,7 +129,11 @@ function browserFixture(mobile = false, paint = false, styleValues: Record<strin
   host.clientHeight = 800;
   vi.stubGlobal('document', document);
   vi.stubGlobal('window', window);
-  return { document, window, host, operations, observers };
+  const flushFrames = () => {
+    const pending = [...frames.entries()]; frames.clear();
+    pending.forEach(([, callback]) => callback(0));
+  };
+  return { document, window, host, operations, observers, flushFrames };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -249,6 +261,114 @@ describe('panel lifecycle', () => {
     expect(operations.get('set:fillStyle')?.mock.calls[0]?.[0]).toBe('#071826');
     expect(operations.get('set:strokeStyle')?.mock.calls.map(call => call[0])).toContain('#6f9ca8');
     expect(operations.get('set:lineWidth')?.mock.calls.map(call => call[0])).toContain(2);
+    view.destroy();
+  });
+
+  it('zooms around the wheel pointer and shares transforms with visible controls', () => {
+    const { host, flushFrames } = browserFixture(false, true);
+    const view = createVerticalProfileView(host as unknown as HTMLElement);
+    const profile = model();
+    profile.totalDistanceNm = 1000;
+    profile.routePoints[1]!.distanceNm = 1000;
+    profile.altitudePath[1]!.distanceNm = 1000;
+    profile.terrain[1]!.distanceNm = 1000;
+    profile.aircraft!.distanceNm = 100;
+    view.render(profile);
+    const canvas = host.find('fd-profile-canvas')!;
+    expect(canvas.dataset.viewportStart).toBe('100');
+    expect(canvas.dataset.viewportEnd).toBe('600');
+
+    const wheel = Object.assign(new Event('wheel', { cancelable: true }), {
+      deltaY: -120, clientX: 416, clientY: 80
+    });
+    canvas.dispatchEvent(wheel);
+    flushFrames();
+    const start = Number(canvas.dataset.viewportStart);
+    const end = Number(canvas.dataset.viewportEnd);
+    expect(end - start).toBeLessThan(500);
+    expect((start + end) / 2).toBeCloseTo(350, 0);
+    expect(wheel.defaultPrevented).toBe(true);
+
+    host.find('fd-profile-zoom-out')!.dispatchEvent(new Event('click'));
+    flushFrames();
+    expect(Number(canvas.dataset.viewportEnd) - Number(canvas.dataset.viewportStart)).toBeGreaterThan(end - start);
+    host.find('fd-profile-reset')!.dispatchEvent(new Event('click'));
+    flushFrames();
+    expect(canvas.dataset.viewportStart).toBe('100');
+    expect(canvas.dataset.viewportEnd).toBe('600');
+    view.destroy();
+  });
+
+  it('drags and keyboard-pans within route bounds while plain arrows keep inspection', () => {
+    const { host, flushFrames } = browserFixture(false, true);
+    const view = createVerticalProfileView(host as unknown as HTMLElement);
+    const profile = model();
+    profile.totalDistanceNm = 1000;
+    profile.routePoints[1]!.distanceNm = 1000;
+    profile.altitudePath[1]!.distanceNm = 1000;
+    profile.terrain[1]!.distanceNm = 1000;
+    profile.aircraft!.distanceNm = 300;
+    view.render(profile);
+    const canvas = host.find('fd-profile-canvas')!;
+    const panel = host.find('fd-vertical-profile')!;
+
+    canvas.dispatchEvent(Object.assign(new Event('pointerdown'), { pointerId: 1, clientX: 400 }));
+    canvas.dispatchEvent(Object.assign(new Event('pointermove'), { pointerId: 1, clientX: 1000, clientY: 80 }));
+    canvas.dispatchEvent(Object.assign(new Event('pointerup'), { pointerId: 1, clientX: 1000 }));
+    flushFrames();
+    expect(canvas.dataset.viewportStart).toBe('0');
+    expect(canvas.setPointerCapture).toHaveBeenCalledWith(1);
+    expect(canvas.releasePointerCapture).toHaveBeenCalledWith(1);
+
+    canvas.focus();
+    panel.dispatchEvent(Object.assign(new Event('keydown'), { key: 'ArrowRight', altKey: false }));
+    expect(host.find('fd-profile-tooltip')?.textContent).toContain('KBBB');
+    panel.dispatchEvent(Object.assign(new Event('keydown'), { key: 'ArrowRight', altKey: true }));
+    flushFrames();
+    expect(Number(canvas.dataset.viewportStart)).toBeGreaterThan(0);
+    view.destroy();
+  });
+
+  it('retains route-distance viewport through resize and cancels queued draws on destroy', () => {
+    const { host, window, flushFrames } = browserFixture(false, true, {}, true);
+    const view = createVerticalProfileView(host as unknown as HTMLElement);
+    const profile = model();
+    profile.totalDistanceNm = 1000;
+    profile.routePoints[1]!.distanceNm = 1000;
+    profile.altitudePath[1]!.distanceNm = 1000;
+    profile.terrain[1]!.distanceNm = 1000;
+    view.render(profile);
+    host.find('fd-profile-zoom-in')!.dispatchEvent(new Event('click'));
+    const canvas = host.find('fd-profile-canvas')!;
+    const before = [canvas.dataset.viewportStart, canvas.dataset.viewportEnd];
+    canvas.clientWidth = 320;
+    view.resize();
+    expect([canvas.dataset.viewportStart, canvas.dataset.viewportEnd]).toEqual(before);
+    view.destroy();
+    expect(window.cancelAnimationFrame).toHaveBeenCalled();
+    flushFrames();
+  });
+
+  it('renders every identifier in a dense eighty-mile viewport at narrow width', () => {
+    const { host, operations } = browserFixture(false, true);
+    const view = createVerticalProfileView(host as unknown as HTMLElement);
+    const profile = model();
+    profile.aircraft = undefined;
+    profile.totalDistanceNm = 80;
+    profile.routePoints = Array.from({ length: 9 }, (_, waypointIndex) => ({
+      ident: `FIX${waypointIndex}`,
+      position: [waypointIndex / 6, 0] as [number, number],
+      distanceNm: waypointIndex * 10,
+      waypointIndex
+    }));
+    profile.altitudePath = profile.routePoints.map(point => ({
+      distanceNm: point.distanceNm, altitudeFeet: 10_000, estimated: false, waypointIndex: point.waypointIndex
+    }));
+    const canvas = host.find('fd-profile-canvas')!;
+    canvas.clientWidth = 320;
+    view.render(profile);
+    const labels = operations.get('fillText')!.mock.calls.map(call => call[0]);
+    for (let index = 0; index < 9; index++) expect(labels).toContain(`FIX${index}`);
     view.destroy();
   });
 });

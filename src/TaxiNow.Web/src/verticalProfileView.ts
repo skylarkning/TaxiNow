@@ -9,7 +9,10 @@ import {
 } from './verticalProfileRenderer';
 import {
   createProfileViewport,
+  panProfileViewport,
   profileXToDistance,
+  resetProfileViewport,
+  zoomProfileViewport,
   type ProfileViewport
 } from './verticalProfileViewport';
 
@@ -149,7 +152,16 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
   const overlay = element('div', 'fd-profile-overlay'); overlay.append(status, retry);
   const tooltip = element('div', 'fd-profile-tooltip'); tooltip.hidden = true;
   tooltip.setAttribute('role', 'status'); tooltip.setAttribute('aria-live', 'polite'); tooltip.setAttribute('aria-atomic', 'true');
-  plot.append(canvas, overlay, tooltip);
+  const controls = element('div', 'fd-profile-controls');
+  const zoomOut = element('button', 'fd-profile-zoom-out', '−');
+  const reset = element('button', 'fd-profile-reset', '↺');
+  const zoomIn = element('button', 'fd-profile-zoom-in', '+');
+  for (const [button, label] of [[zoomOut, 'Zoom out'], [reset, 'Reset profile view'], [zoomIn, 'Zoom in']] as const) {
+    button.type = 'button';
+    button.setAttribute('aria-label', label);
+  }
+  controls.append(zoomOut, reset, zoomIn);
+  plot.append(canvas, controls, overlay, tooltip);
   const footer = element('div', 'fd-profile-footer');
   const attribution = element('span', 'fd-profile-attribution');
   footer.append(attribution, element('span', 'fd-profile-notice', tr('profileLegend')));
@@ -165,11 +177,14 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
   let destroyed = false, dirty = true, selectedIndex = 0;
   let previousFocus: HTMLElement | null = null;
   let lastWidth = 0, lastHeight = 0, lastDpr = 0, lastPalette = '';
+  let animationFrame: number | undefined;
+  let drag: { pointerId: number; clientX: number } | undefined;
   let context: CanvasRenderingContext2D | null = null;
   try { context = canvas.getContext('2d'); } catch { /* Text and controls still work when canvas is unavailable. */ }
   const listeners: Array<() => void> = [];
-  function listen(target: EventTarget, type: string, handler: EventListener) {
-    target.addEventListener(type, handler); listeners.push(() => target.removeEventListener(type, handler));
+  function listen(target: EventTarget, type: string, handler: EventListener, options?: AddEventListenerOptions) {
+    target.addEventListener(type, handler, options);
+    listeners.push(() => target.removeEventListener(type, handler, options));
   }
   function emit(type: string, detail?: { open: boolean }) {
     const EventClass = window?.CustomEvent ?? CustomEvent;
@@ -181,6 +196,43 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
     if (!point) return;
     selectedIndex = point.index;
     if (tooltip.textContent !== point.label) tooltip.textContent = point.label;
+  }
+  function publishViewport() {
+    if (!viewport) {
+      delete canvas.dataset.viewportStart;
+      delete canvas.dataset.viewportEnd;
+      return;
+    }
+    const display = (value: number) => String(Math.round(value * 1000) / 1000);
+    canvas.dataset.viewportStart = display(viewport.startDistanceNm);
+    canvas.dataset.viewportEnd = display(viewport.endDistanceNm);
+  }
+  function scheduleDraw() {
+    dirty = true;
+    if (destroyed || animationFrame !== undefined) return;
+    if (window?.requestAnimationFrame) {
+      animationFrame = window.requestAnimationFrame(() => {
+        animationFrame = undefined;
+        resize();
+      });
+    } else {
+      resize();
+    }
+  }
+  function updateViewport(next: ProfileViewport) {
+    if (viewport && next.startDistanceNm === viewport.startDistanceNm &&
+        next.endDistanceNm === viewport.endDistanceNm &&
+        next.totalDistanceNm === viewport.totalDistanceNm) return;
+    viewport = next;
+    publishViewport();
+    scheduleDraw();
+  }
+  function zoom(factor: number, anchor?: number) {
+    if (!viewport) return;
+    updateViewport(zoomProfileViewport(
+      viewport,
+      factor,
+      anchor ?? (viewport.startDistanceNm + viewport.endDistanceNm) / 2));
   }
   function resize() {
     if (destroyed) return;
@@ -243,6 +295,7 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
     if (nextRouteKey !== viewportRouteKey) {
       viewport = next ? createProfileViewport(next.totalDistanceNm, next.aircraft?.distanceNm) : null;
       viewportRouteKey = nextRouteKey;
+      publishViewport();
     }
     model = next; state = nextState ?? { status: next ? 'ready' : 'empty' };
     const message = statusMessage(model, state);
@@ -265,17 +318,64 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
   }
   listen(close, 'click', () => setOpen(false));
   listen(retry, 'click', () => emit('vertical-profile-retry'));
+  listen(zoomOut, 'click', () => zoom(1 / 1.5));
+  listen(zoomIn, 'click', () => zoom(1.5));
+  listen(reset, 'click', () => {
+    if (viewport) updateViewport(resetProfileViewport(viewport, model?.aircraft?.distanceNm));
+  });
   listen(panel, 'keydown', event => {
-    const key = (event as KeyboardEvent).key;
+    const keyboard = event as KeyboardEvent;
+    const key = keyboard.key;
     if (key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); }
+    else if (keyboard.altKey && (key === 'ArrowLeft' || key === 'ArrowRight') && viewport) {
+      event.preventDefault();
+      const span = viewport.endDistanceNm - viewport.startDistanceNm;
+      updateViewport(panProfileViewport(viewport, span * (key === 'ArrowRight' ? 0.1 : -0.1)));
+    }
     else if (key === 'ArrowLeft' || key === 'ArrowRight') {
       event.preventDefault(); inspect(selectedIndex + (key === 'ArrowRight' ? 1 : -1));
+    }
+    else if (key === '+' || key === '=') { event.preventDefault(); zoom(1.5); }
+    else if (key === '-' || key === '_') { event.preventDefault(); zoom(1 / 1.5); }
+    else if ((key === '0' || key === 'Home') && viewport) {
+      event.preventDefault();
+      updateViewport(resetProfileViewport(viewport, model?.aircraft?.distanceNm));
     }
   });
   listen(canvas, 'focus', () => inspect(selectedIndex));
   listen(canvas, 'blur', () => { tooltip.hidden = true; });
+  listen(canvas, 'wheel', event => {
+    if (!viewport || !model) return;
+    const wheel = event as WheelEvent;
+    const bounds = canvas.getBoundingClientRect();
+    const plotBounds = verticalProfileBounds(bounds.width, bounds.height);
+    const plotX = clamp(wheel.clientX - bounds.left - plotBounds.left, 0, plotBounds.right - plotBounds.left);
+    const anchor = profileXToDistance(plotX, viewport, plotBounds.right - plotBounds.left);
+    wheel.preventDefault();
+    zoom(Math.exp(-clamp(wheel.deltaY, -500, 500) * 0.002), anchor);
+  }, { passive: false });
+  listen(canvas, 'pointerdown', event => {
+    if (!viewport) return;
+    const pointer = event as PointerEvent;
+    if (pointer.button !== undefined && pointer.button !== 0) return;
+    drag = { pointerId: pointer.pointerId, clientX: pointer.clientX };
+    canvas.setPointerCapture(pointer.pointerId);
+    pointer.preventDefault();
+  });
   listen(canvas, 'pointermove', event => {
     if (!model || !viewport) return;
+    const pointer = event as PointerEvent;
+    if (drag?.pointerId === pointer.pointerId) {
+      const bounds = canvas.getBoundingClientRect();
+      const plotBounds = verticalProfileBounds(bounds.width, bounds.height);
+      const span = viewport.endDistanceNm - viewport.startDistanceNm;
+      const deltaNm = -(pointer.clientX - drag.clientX) /
+        Math.max(1, plotBounds.right - plotBounds.left) * span;
+      drag.clientX = pointer.clientX;
+      updateViewport(panProfileViewport(viewport, deltaNm));
+      pointer.preventDefault();
+      return;
+    }
     const bounds = canvas.getBoundingClientRect();
     const plotBounds = verticalProfileBounds(bounds.width, bounds.height);
     const plotX = clamp(
@@ -293,6 +393,14 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
     }
     inspect(index);
   });
+  const endDrag = (event: Event) => {
+    const pointer = event as PointerEvent;
+    if (drag?.pointerId !== pointer.pointerId) return;
+    canvas.releasePointerCapture(pointer.pointerId);
+    drag = undefined;
+  };
+  listen(canvas, 'pointerup', endDrag);
+  listen(canvas, 'pointercancel', endDrag);
   listen(canvas, 'pointerleave', () => { if (document.activeElement !== canvas) tooltip.hidden = true; });
   if (window) listen(window, 'resize', resize);
   const resizeObserver = window?.ResizeObserver ? new window.ResizeObserver(resize) : null;
@@ -307,6 +415,8 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
     destroy() {
       if (destroyed) return;
       setOpen(false); destroyed = true;
+      if (animationFrame !== undefined) window?.cancelAnimationFrame?.(animationFrame);
+      animationFrame = undefined;
       resizeObserver?.disconnect(); themeObserver?.disconnect();
       listeners.forEach(remove => remove()); panel.remove();
       host.style.removeProperty('--fd-profile-height');
