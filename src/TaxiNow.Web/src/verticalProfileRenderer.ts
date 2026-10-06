@@ -1,5 +1,5 @@
 import type { VerticalProfileModel } from './verticalProfile';
-import type { ProfileLabelPlacement } from './verticalProfileLabels';
+import { formatProfileAltitude, type ProfileLabelPlacement } from './verticalProfileLabels';
 import { buildWeatherPolygons, type WeatherPolygon } from './verticalProfileWeather';
 import { distanceToProfileX, type ProfileViewport } from './verticalProfileViewport';
 
@@ -128,7 +128,7 @@ export function drawVerticalProfile(
   for (const point of model.altitudePath) {
     if (point.waypointIndex !== null) altitudeByWaypoint.set(point.waypointIndex, point.altitudeFeet);
   }
-  const labelOffsets = [-8, 16, -21];
+  const labelOffsets = [-18, 13, -31];
   for (const placement of labels) {
     const altitude = altitudeByWaypoint.get(placement.candidate.waypointIndex);
     const anchorX = bounds.left + placement.x;
@@ -141,11 +141,16 @@ export function drawVerticalProfile(
     const labelY = anchorY === undefined
       ? bounds.top + 12 + placement.row * 13
       : clamp(anchorY + labelOffsets[placement.row % labelOffsets.length]!,
-          bounds.top + 10, bounds.bottom - 4);
+          bounds.top + 10, bounds.bottom - 14);
     context.fillText(
       placement.candidate.ident.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 24),
       anchorX - placement.width / 2,
       labelY,
+      placement.width);
+    context.fillText(
+      formatProfileAltitude(placement.candidate.altitudeFeet),
+      anchorX - placement.width / 2,
+      labelY + 10,
       placement.width);
   }
 
@@ -156,7 +161,7 @@ export function drawVerticalProfile(
     const markerAltitude = finite(plannedAltitude)
       ? plannedAltitude
       : model.aircraft.altitudeMslFeet;
-    const triangle = aircraftTriangle(x(model.aircraft.distanceNm), y(markerAltitude), 14);
+    const triangle = aircraftTriangle(x(model.aircraft.distanceNm), y(markerAltitude), 22);
     context.fillStyle = palette.aircraft;
     context.beginPath();
     context.moveTo(triangle[0].x, triangle[0].y);

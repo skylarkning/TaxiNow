@@ -120,4 +120,16 @@ describe('vertical profile label layout', () => {
       expect(placement.x + placement.width / 2).toBeLessThanOrEqual(320);
     }
   });
+
+  it('reserves enough width for the planned altitude text', () => {
+    const profile = model([0, 50], [10_000, 12_000]);
+    const placements = layoutVerticalProfileLabels(
+      classifyVerticalProfilePoints(profile),
+      createProfileViewport(50),
+      320,
+      measure);
+
+    expect(placements[0]!.width).toBe(75);
+    expect(placements[1]!.width).toBe(75);
+  });
 });

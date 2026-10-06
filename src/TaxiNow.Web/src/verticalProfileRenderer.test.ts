@@ -100,7 +100,7 @@ describe('vertical profile renderer', () => {
   it('draws layers in operational order with stripes and no full-height vertical grid', () => {
     const recording = context();
     const labels: ProfileLabelPlacement[] = [{
-      candidate: { ident: 'A', distanceNm: 0, waypointIndex: 0, priority: 100, critical: true, reasons: ['endpoint'] },
+      candidate: { ident: 'A', distanceNm: 0, altitudeFeet: 10_000, waypointIndex: 0, priority: 100, critical: true, reasons: ['endpoint'] },
       x: 0, row: 0, width: 12
     }];
     const viewport: ProfileViewport = { totalDistanceNm: 100, startDistanceNm: 0, endDistanceNm: 100 };
@@ -139,7 +139,7 @@ describe('vertical profile renderer', () => {
     const recording = context();
     const bounds = { left: 54, right: 778, top: 22, bottom: 167 };
     const labels: ProfileLabelPlacement[] = [{
-      candidate: { ident: 'B', distanceNm: 100, waypointIndex: 1, priority: 100, critical: true, reasons: ['endpoint'] },
+      candidate: { ident: 'B', distanceNm: 100, altitudeFeet: 12_000, waypointIndex: 1, priority: 100, critical: true, reasons: ['endpoint'] },
       x: bounds.right - bounds.left, row: 0, width: 12
     }];
 
@@ -149,7 +149,7 @@ describe('vertical profile renderer', () => {
 
     const label = recording.textCalls.find(([text]) => text === 'B');
     const expectedRouteY = bounds.bottom - (12_000 / 17_000) * (bounds.bottom - bounds.top);
-    expect(label?.[2]).toBeCloseTo(expectedRouteY - 8, 4);
+    expect(label?.[2]).toBeCloseTo(expectedRouteY - 18, 4);
     expect(label?.[2]).not.toBe(bounds.top + 12);
   });
 
@@ -161,7 +161,29 @@ describe('vertical profile renderer', () => {
     expect(triangle[0]!.y).toBeGreaterThan(triangle[2]!.y);
   });
 
-  it('places a fourteen-pixel aircraft marker on the planned route at its current distance', () => {
+  it('shows the planned altitude beneath every placed waypoint label', () => {
+    const recording = context();
+    const bounds = { left: 54, right: 778, top: 22, bottom: 167 };
+    const labels: ProfileLabelPlacement[] = [
+      {
+        candidate: { ident: 'A', distanceNm: 0, altitudeFeet: 10_000, waypointIndex: 0, priority: 100, critical: true, reasons: ['endpoint'] },
+        x: 20, row: 0, width: 72
+      },
+      {
+        candidate: { ident: 'B', distanceNm: 100, altitudeFeet: 12_000, waypointIndex: 1, priority: 100, critical: true, reasons: ['endpoint'] },
+        x: 680, row: 1, width: 72
+      }
+    ];
+
+    drawVerticalProfile(recording.context, model(),
+      { totalDistanceNm: 100, startDistanceNm: 0, endDistanceNm: 100 },
+      bounds, palette, labels);
+
+    expect(recording.textCalls.map(([text]) => text)).toEqual(
+      expect.arrayContaining(['A', '10,000 FT', 'B', '12,000 FT']));
+  });
+
+  it('places a twenty-two-pixel aircraft marker on the planned route at its current distance', () => {
     const recording = context();
     const profile = model();
     profile.aircraft = { ...profile.aircraft!, altitudeMslFeet: 5_000 };
@@ -176,6 +198,6 @@ describe('vertical profile renderer', () => {
     const anchor = recording.moveCalls.at(-1)!;
     const firstUpperCorner = recording.lineCalls.at(-2)!;
     expect(anchor[1]).toBeCloseTo(expectedY, 4);
-    expect(firstUpperCorner[1]).toBeCloseTo(expectedY - 14, 4);
+    expect(firstUpperCorner[1]).toBeCloseTo(expectedY - 22, 4);
   });
 });

@@ -6,6 +6,7 @@ export type ProfileLabelReason = 'endpoint' | 'next' | 'constraint' | 'step' | '
 export interface ProfileLabelCandidate {
   ident: string;
   distanceNm: number;
+  altitudeFeet: number | null;
   waypointIndex: number;
   priority: number;
   critical: boolean;
@@ -22,6 +23,12 @@ export interface ProfileLabelPlacement {
 const routeChangeThresholdFeet = 500;
 const stepAltitudeThresholdFeet = 1000;
 const stepDistanceThresholdNm = 20;
+
+export function formatProfileAltitude(altitudeFeet: number | null): string {
+  return Number.isFinite(altitudeFeet)
+    ? `${Math.round(altitudeFeet!).toLocaleString('en-US')} FT`
+    : '-- FT';
+}
 
 export function classifyVerticalProfilePoints(
   model: VerticalProfileModel
@@ -77,6 +84,7 @@ export function classifyVerticalProfilePoints(
     return {
       ident: point.ident,
       distanceNm: point.distanceNm,
+      altitudeFeet: altitudeByWaypoint.get(point.waypointIndex)?.altitudeFeet ?? null,
       waypointIndex: point.waypointIndex,
       priority,
       critical: priority > 0,
@@ -129,7 +137,8 @@ export function layoutVerticalProfileLabels(
   const placements: ProfileLabelPlacement[] = [];
 
   for (const candidate of ordered) {
-    const labelWidth = Math.min(width, Math.max(1, measureText(candidate.ident) + 12));
+    const labelWidth = Math.min(width, Math.max(1,
+      Math.max(measureText(candidate.ident), measureText(formatProfileAltitude(candidate.altitudeFeet))) + 12));
     const rawX = distanceToProfileX(candidate.distanceNm, viewport, width);
     const x = Math.max(labelWidth / 2, Math.min(width - labelWidth / 2, rawX));
     const interval: [number, number] = [x - labelWidth / 2, x + labelWidth / 2];
