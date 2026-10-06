@@ -1,7 +1,7 @@
 import type { VerticalProfileModel } from './verticalProfile';
 import { distanceToProfileX, type ProfileViewport } from './verticalProfileViewport';
 
-export type ProfileLabelReason = 'endpoint' | 'next' | 'constraint' | 'step' | 'toc' | 'tod';
+export type ProfileLabelReason = 'endpoint' | 'next' | 'constraint' | 'step' | 'altitudeChange' | 'toc' | 'tod';
 
 export interface ProfileLabelCandidate {
   ident: string;
@@ -53,6 +53,10 @@ export function classifyVerticalProfilePoints(
       const previousAltitude = altitudeByWaypoint.get(previous.waypointIndex)?.altitudeFeet;
       const altitude = altitudeByWaypoint.get(point.waypointIndex)?.altitudeFeet;
       if (Number.isFinite(previousAltitude) && Number.isFinite(altitude) &&
+          Math.abs(altitude! - previousAltitude!) >= stepAltitudeThresholdFeet - 1e-9) {
+        reasons.push('altitudeChange');
+      }
+      if (Number.isFinite(previousAltitude) && Number.isFinite(altitude) &&
           Math.abs(altitude! - previousAltitude!) >= stepAltitudeThresholdFeet - 1e-9 &&
           hasStableBandBefore(index - 1, model, altitudeByWaypoint)) {
         reasons.push('step');
@@ -65,9 +69,10 @@ export function classifyVerticalProfilePoints(
 
     const priority = reasons.includes('endpoint') ? 100
       : reasons.includes('next') ? 95
-        : reasons.includes('constraint') ? 90
-          : reasons.includes('step') ? 85
-            : reasons.includes('toc') || reasons.includes('tod') ? 80
+          : reasons.includes('constraint') ? 90
+            : reasons.includes('step') ? 85
+              : reasons.includes('altitudeChange') ? 82
+                : reasons.includes('toc') || reasons.includes('tod') ? 80
               : 0;
     return {
       ident: point.ident,

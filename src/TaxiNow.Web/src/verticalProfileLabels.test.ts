@@ -67,6 +67,18 @@ describe('vertical profile label classification', () => {
     expect(tooShort.slice(1).every(candidate => !candidate.reasons.includes('step'))).toBe(true);
     expect(tooSmall.slice(1).every(candidate => !candidate.reasons.includes('step'))).toBe(true);
   });
+
+  it('keeps significant climb and descent waypoints critical even before a stable cruise band', () => {
+    const candidates = classifyVerticalProfilePoints(
+      model([0, 60, 120, 180, 240], [0, 8_000, 20_000, 32_000, 3_000]));
+
+    expect(candidates.slice(1, -1).map(candidate => candidate.reasons)).toEqual([
+      expect.arrayContaining(['altitudeChange']),
+      expect.arrayContaining(['altitudeChange']),
+      expect.arrayContaining(['altitudeChange'])
+    ]);
+    expect(candidates.slice(1, -1).every(candidate => candidate.critical)).toBe(true);
+  });
 });
 
 describe('vertical profile label layout', () => {
