@@ -124,11 +124,28 @@ export function drawVerticalProfile(
   context.restore();
 
   context.fillStyle = palette.text;
+  const altitudeByWaypoint = new Map<number, number>();
+  for (const point of model.altitudePath) {
+    if (point.waypointIndex !== null) altitudeByWaypoint.set(point.waypointIndex, point.altitudeFeet);
+  }
+  const labelOffsets = [-8, 16, -21];
   for (const placement of labels) {
+    const altitude = altitudeByWaypoint.get(placement.candidate.waypointIndex);
+    const anchorX = bounds.left + placement.x;
+    const anchorY = finite(altitude) ? y(altitude) : undefined;
+    if (anchorY !== undefined) {
+      context.beginPath();
+      context.arc(anchorX, anchorY, 2, 0, Math.PI * 2);
+      context.fill();
+    }
+    const labelY = anchorY === undefined
+      ? bounds.top + 12 + placement.row * 13
+      : clamp(anchorY + labelOffsets[placement.row % labelOffsets.length]!,
+          bounds.top + 10, bounds.bottom - 4);
     context.fillText(
       placement.candidate.ident.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 24),
-      bounds.left + placement.x - placement.width / 2,
-      bounds.top + 12 + placement.row * 13,
+      anchorX - placement.width / 2,
+      labelY,
       placement.width);
   }
 

@@ -47,6 +47,7 @@ function model(): VerticalProfileModel {
 
 function context() {
   const events: string[] = [];
+  const textCalls: Array<[string, number, number]> = [];
   const segments: Array<[number, number, number, number]> = [];
   let fillStyle = '', strokeStyle = '', start: [number, number] | undefined;
   const target = {
@@ -59,10 +60,13 @@ function context() {
       start = [x, y];
     }),
     quadraticCurveTo: vi.fn((_cx: number, _cy: number, x: number, y: number) => { start = [x, y]; }),
-    closePath: vi.fn(), rect: vi.fn(), clip: vi.fn(), save: vi.fn(), restore: vi.fn(),
+    closePath: vi.fn(), rect: vi.fn(), arc: vi.fn(), clip: vi.fn(), save: vi.fn(), restore: vi.fn(),
     fill: vi.fn(() => events.push(`fill:${fillStyle}`)),
     stroke: vi.fn(() => events.push(`stroke:${strokeStyle}`)),
-    fillText: vi.fn((text: string) => events.push(`text:${text}`)),
+    fillText: vi.fn((text: string, x: number, y: number) => {
+      events.push(`text:${text}`);
+      textCalls.push([text, x, y]);
+    }),
     measureText: vi.fn((text: string) => ({ width: text.length * 6 })),
     setLineDash: vi.fn(),
     createPattern: vi.fn(() => ({ pattern: true }))
@@ -74,7 +78,7 @@ function context() {
       return Reflect.set(object, property, value);
     }
   });
-  return { context: proxy, events, segments, createPattern: target.createPattern };
+  return { context: proxy, events, segments, textCalls, createPattern: target.createPattern };
 }
 
 beforeEach(() => {
@@ -126,6 +130,24 @@ describe('vertical profile renderer', () => {
       { left: 54, right: 778, top: 22, bottom: 167 }, palette, []);
 
     expect(recording.events).toEqual(expect.arrayContaining(['fill:green', 'fill:yellow', 'fill:weather-red']));
+  });
+
+  it('anchors waypoint labels beside their planned altitude instead of the plot top', () => {
+    const recording = context();
+    const bounds = { left: 54, right: 778, top: 22, bottom: 167 };
+    const labels: ProfileLabelPlacement[] = [{
+      candidate: { ident: 'B', distanceNm: 100, waypointIndex: 1, priority: 100, critical: true, reasons: ['endpoint'] },
+      x: bounds.right - bounds.left, row: 0, width: 12
+    }];
+
+    drawVerticalProfile(recording.context, model(),
+      { totalDistanceNm: 100, startDistanceNm: 0, endDistanceNm: 100 },
+      bounds, palette, labels);
+
+    const label = recording.textCalls.find(([text]) => text === 'B');
+    const expectedRouteY = bounds.bottom - (12_000 / 17_000) * (bounds.bottom - bounds.top);
+    expect(label?.[2]).toBeCloseTo(expectedRouteY - 8, 4);
+    expect(label?.[2]).not.toBe(bounds.top + 12);
   });
 
   it('returns a downward triangle whose first point is the exact aircraft anchor', () => {
