@@ -152,7 +152,11 @@ export function drawVerticalProfile(
   if (model.aircraft && finite(model.aircraft.altitudeMslFeet) &&
       model.aircraft.distanceNm >= viewport.startDistanceNm &&
       model.aircraft.distanceNm <= viewport.endDistanceNm) {
-    const triangle = aircraftTriangle(x(model.aircraft.distanceNm), y(model.aircraft.altitudeMslFeet), 10);
+    const plannedAltitude = plannedAltitudeAtDistance(model, model.aircraft.distanceNm);
+    const markerAltitude = finite(plannedAltitude)
+      ? plannedAltitude
+      : model.aircraft.altitudeMslFeet;
+    const triangle = aircraftTriangle(x(model.aircraft.distanceNm), y(markerAltitude), 14);
     context.fillStyle = palette.aircraft;
     context.beginPath();
     context.moveTo(triangle[0].x, triangle[0].y);
@@ -161,6 +165,21 @@ export function drawVerticalProfile(
     context.closePath();
     context.fill();
   }
+}
+
+function plannedAltitudeAtDistance(model: VerticalProfileModel, distanceNm: number): number | null {
+  const path = model.altitudePath;
+  if (!path.length) return null;
+  if (distanceNm <= path[0]!.distanceNm) return path[0]!.altitudeFeet;
+  for (let index = 1; index < path.length; index++) {
+    const previous = path[index - 1]!;
+    const next = path[index]!;
+    if (distanceNm > next.distanceNm) continue;
+    const span = next.distanceNm - previous.distanceNm;
+    const fraction = span > 0 ? (distanceNm - previous.distanceNm) / span : 0;
+    return previous.altitudeFeet + fraction * (next.altitudeFeet - previous.altitudeFeet);
+  }
+  return path.at(-1)!.altitudeFeet;
 }
 
 function drawTerrain(

@@ -49,13 +49,16 @@ function context() {
   const events: string[] = [];
   const textCalls: Array<[string, number, number]> = [];
   const segments: Array<[number, number, number, number]> = [];
+  const moveCalls: Array<[number, number]> = [];
+  const lineCalls: Array<[number, number]> = [];
   let fillStyle = '', strokeStyle = '', start: [number, number] | undefined;
   const target = {
     clearRect: vi.fn(),
     fillRect: vi.fn(() => events.push(`fill:${fillStyle}`)),
     beginPath: vi.fn(() => { start = undefined; }),
-    moveTo: vi.fn((x: number, y: number) => { start = [x, y]; }),
+    moveTo: vi.fn((x: number, y: number) => { moveCalls.push([x, y]); start = [x, y]; }),
     lineTo: vi.fn((x: number, y: number) => {
+      lineCalls.push([x, y]);
       if (start) segments.push([start[0], start[1], x, y]);
       start = [x, y];
     }),
@@ -78,7 +81,7 @@ function context() {
       return Reflect.set(object, property, value);
     }
   });
-  return { context: proxy, events, segments, textCalls, createPattern: target.createPattern };
+  return { context: proxy, events, segments, textCalls, moveCalls, lineCalls, createPattern: target.createPattern };
 }
 
 beforeEach(() => {
@@ -156,5 +159,23 @@ describe('vertical profile renderer', () => {
     expect(triangle[0]).toEqual({ x: 120, y: 80 });
     expect(triangle[0]!.y).toBeGreaterThan(triangle[1]!.y);
     expect(triangle[0]!.y).toBeGreaterThan(triangle[2]!.y);
+  });
+
+  it('places a fourteen-pixel aircraft marker on the planned route at its current distance', () => {
+    const recording = context();
+    const profile = model();
+    profile.aircraft = { ...profile.aircraft!, altitudeMslFeet: 5_000 };
+    const bounds = { left: 54, right: 778, top: 22, bottom: 167 };
+
+    drawVerticalProfile(recording.context, profile,
+      { totalDistanceNm: 100, startDistanceNm: 0, endDistanceNm: 100 },
+      bounds, palette, []);
+
+    const plannedAltitudeAtAircraft = 11_000;
+    const expectedY = bounds.bottom - (plannedAltitudeAtAircraft / 17_000) * (bounds.bottom - bounds.top);
+    const anchor = recording.moveCalls.at(-1)!;
+    const firstUpperCorner = recording.lineCalls.at(-2)!;
+    expect(anchor[1]).toBeCloseTo(expectedY, 4);
+    expect(firstUpperCorner[1]).toBeCloseTo(expectedY - 14, 4);
   });
 });
