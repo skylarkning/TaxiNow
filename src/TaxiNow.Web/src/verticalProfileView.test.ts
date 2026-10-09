@@ -311,6 +311,8 @@ describe('panel lifecycle', () => {
     view.render(profile);
     const canvas = host.find('fd-profile-canvas')!;
     const panel = host.find('fd-vertical-profile')!;
+    const viewportChanges = vi.fn();
+    panel.addEventListener('vertical-profile-viewport-change', viewportChanges);
 
     canvas.dispatchEvent(Object.assign(new Event('pointerdown'), { pointerId: 1, clientX: 400 }));
     canvas.dispatchEvent(Object.assign(new Event('pointermove'), { pointerId: 1, clientX: 1000, clientY: 80 }));
@@ -326,6 +328,8 @@ describe('panel lifecycle', () => {
     panel.dispatchEvent(Object.assign(new Event('keydown'), { key: 'ArrowRight', altKey: true }));
     flushFrames();
     expect(Number(canvas.dataset.viewportStart)).toBeGreaterThan(0);
+    expect(viewportChanges).toHaveBeenCalled();
+    expect(viewportChanges.mock.calls.at(-1)?.[0].detail.startDistanceNm).toBe(Number(canvas.dataset.viewportStart));
     view.destroy();
   });
 
@@ -504,5 +508,39 @@ describe('profile inspection', () => {
     const label = profileInspection(profile, 0)?.label ?? '';
     expect(label).toMatch(/unknown boundary/i);
     expect(label).not.toMatch(/off planned path/i);
+  });
+
+  it('does not report weather across a gap larger than fifty nautical miles', () => {
+    const profile = model();
+    profile.weatherBands = [{
+      id: 'distant-cloud', kind: 'cloud', intensity: 'moderate', pathRelation: 'onPath',
+      confidence: 'medium', valueKind: 'forecast', source: 'Open-Meteo',
+      columns: [{
+        longitude: 0, latitude: 0, distanceNm: 0,
+        validAt: '2026-10-06T00:30:00Z', originalBaseFeet: 2_000,
+        originalTopFeet: 8_000, baseFeet: 2_000, topFeet: 8_000,
+        plannedAltitudeFeet: 10_000
+      }]
+    }];
+
+    expect(profileInspection(profile, 1)?.label).toMatch(/weather forecast unavailable/i);
+  });
+
+  it('announces weather intensity and value kind without relying on colour', () => {
+    const profile = model();
+    profile.weatherBands = [{
+      id: 'cloud', kind: 'cloud', intensity: 'strong', pathRelation: 'onPath',
+      confidence: 'high', valueKind: 'observed', source: 'METAR',
+      columns: [{
+        longitude: 0, latitude: 0, distanceNm: 0,
+        validAt: '2026-10-06T00:30:00Z', originalBaseFeet: 2_000,
+        originalTopFeet: 8_000, baseFeet: 2_000, topFeet: 8_000,
+        plannedAltitudeFeet: 10_000
+      }]
+    }];
+
+    const label = profileInspection(profile, 0)?.label ?? '';
+    expect(label).toMatch(/strong return/i);
+    expect(label).toMatch(/observed/i);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ElevationProfileResponse, TelemetrySnapshot, WeatherProfileResponse } from './contracts';
-import type { FlightPlan } from './flightPlan';
+import { distanceNm, type FlightPlan } from './flightPlan';
 import type { VerticalProfileModel } from './verticalProfile';
 import type { VerticalProfileView, VerticalProfileViewState } from './verticalProfileView';
 import { VerticalProfileController } from './verticalProfileController';
@@ -226,6 +226,40 @@ describe('VerticalProfileController', () => {
     expect(h.model?.weatherBands).toHaveLength(1);
   });
 
+  it('requests a new weather interval when the visible viewport leaves cached coverage', async () => {
+    const h = harness(true, undefined, true);
+    const longPlan = {
+      ...plan(), distance: 1000,
+      points: [
+        { ident: 'START', position: [0, 0] as [number, number], airway: '' },
+        { ident: 'END', position: [16, 0] as [number, number], airway: '' }
+      ]
+    };
+    const first = h.controller.setPlan(longPlan);
+    h.requests.find(request => request.url.includes('/elevation/'))!.resolve(Response.json(terrain()));
+    h.requests.find(request => request.url.includes('/weather/'))!.resolve(Response.json(weather()));
+    await first;
+
+    h.controller.setViewport(600, 900);
+    const weatherRequests = h.requests.filter(request => request.url.includes('/weather/'));
+    expect(weatherRequests).toHaveLength(2);
+    expect(JSON.parse(weatherRequests[1]!.init.body as string).currentDistanceNm).toBe(600);
+    weatherRequests[1]!.resolve(Response.json(weather({ startDistanceNm: 600, endDistanceNm: 1000 })));
+  });
+
+  it('refreshes unscheduled weather when a speed change shifts ETA by five minutes or more', async () => {
+    const h = harness(true, undefined, true);
+    h.controller.setTelemetry(telemetry({ longitude: 0, groundSpeedKnots: 500 }));
+    const first = h.controller.setPlan({ ...plan(), distance: 500 });
+    h.requests.find(request => request.url.includes('/elevation/'))!.resolve(Response.json(terrain()));
+    h.requests.find(request => request.url.includes('/weather/'))!.resolve(Response.json(weather()));
+    await first;
+
+    h.controller.setTelemetry(telemetry({ longitude: 0, groundSpeedKnots: 250 }));
+
+    expect(h.requests.filter(request => request.url.includes('/weather/'))).toHaveLength(2);
+  });
+
   it('limits the weather request route to two hundred points while preserving endpoints and critical changes', async () => {
     const h = harness(true, undefined, true);
     const points: FlightPlan['points'] = Array.from({ length: 450 }, (_, index) => ({
@@ -248,6 +282,26 @@ describe('VerticalProfileController', () => {
     h.requests.find(request => request.url.includes('/elevation/'))!.resolve(Response.json(terrain()));
     weatherRequest.resolve(Response.json(weather()));
     await pending;
+  });
+
+  it('projects current distance against the same downsampled route sent to weather', () => {
+    const h = harness(true, undefined, true);
+    const points: FlightPlan['points'] = Array.from({ length: 450 }, (_, index) => ({
+      ident: `Z${index}`,
+      position: [index / 100, index % 2 ? 1 : -1] as [number, number],
+      airway: ''
+    }));
+    const last = points.at(-1)!;
+    h.controller.setTelemetry(telemetry({ latitude: last.position[1], longitude: last.position[0] }));
+    void h.controller.setPlan({ ...plan(), distance: 10_000, points });
+    const request = h.requests.find(item => item.url.includes('/weather/'))!;
+    const body = JSON.parse(request.init.body as string);
+    const sentDistance = body.route.slice(1).reduce((total: number, point: { longitude: number; latitude: number }, index: number) =>
+      total + distanceNm(
+        [body.route[index].longitude, body.route[index].latitude],
+        [point.longitude, point.latitude]), 0);
+
+    expect(body.currentDistanceNm).toBeLessThanOrEqual(sentDistance + 1);
   });
 
   it('expires live altitude without another sample, retains terrain, and recovers on fresh telemetry', async () => {

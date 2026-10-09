@@ -53,8 +53,17 @@ export function buildWeatherPolygons(
       }
     }
     for (const run of runs) {
-      const columns = clipRun(run, viewport.startDistanceNm, viewport.endDistanceNm);
+      let columns = clipRun(run, viewport.startDistanceNm, viewport.endDistanceNm);
       if (columns.length === 0) continue;
+      if (columns.length === 1) {
+        const column = columns[0]!;
+        const halfWidth = 5;
+        const start = Math.max(viewport.startDistanceNm, column.distanceNm - halfWidth);
+        const end = Math.min(viewport.endDistanceNm, column.distanceNm + halfWidth);
+        columns = start < end
+          ? [{ ...column, distanceNm: start }, { ...column, distanceNm: end }]
+          : columns;
+      }
       polygons.push({
         bandId: band.id,
         kind: band.kind,

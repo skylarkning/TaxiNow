@@ -135,6 +135,18 @@ describe('vertical profile renderer', () => {
     expect(recording.events).toEqual(expect.arrayContaining(['fill:green', 'fill:yellow', 'fill:weather-red']));
   });
 
+  it('labels weather intensity, value kind, base, and top without relying on colour', () => {
+    const recording = context();
+
+    drawVerticalProfile(recording.context, model(),
+      { totalDistanceNm: 100, startDistanceNm: 0, endDistanceNm: 100 },
+      { left: 54, right: 778, top: 22, bottom: 167 }, palette, []);
+
+    const labels = recording.textCalls.map(([text]) => text);
+    expect(labels).toContain('MOD · FCST · B2k T5k');
+    expect(labels).toContain('STR · FCST · B8k T14k');
+  });
+
   it('anchors waypoint labels beside their planned altitude instead of the plot top', () => {
     const recording = context();
     const bounds = { left: 54, right: 778, top: 22, bottom: 167 };

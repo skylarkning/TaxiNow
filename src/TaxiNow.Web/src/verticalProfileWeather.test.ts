@@ -62,4 +62,12 @@ describe('vertical profile weather geometry', () => {
     expect(openBase!.columns.every(item => item.baseFeet === null)).toBe(true);
     expect(openTop!.columns.every(item => item.topFeet === null)).toBe(true);
   });
+
+  it('gives an isolated weather column a bounded visible footprint', () => {
+    const polygon = buildWeatherPolygons([band([column(100)])], viewport())[0]!;
+
+    expect(polygon.columns).toHaveLength(2);
+    expect(polygon.columns[0]!.distanceNm).toBe(95);
+    expect(polygon.columns[1]!.distanceNm).toBe(105);
+  });
 });

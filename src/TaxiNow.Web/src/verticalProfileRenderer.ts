@@ -263,6 +263,15 @@ function drawWeather(
   context.closePath();
   context.fillStyle = striped ? createStripePattern(context, color) : color;
   context.fill();
+  const altitudeLabel = (value: number | null) => value === null ? '?' : `${Math.round(value / 1000)}k`;
+  const intensity = polygon.intensity === 'strong' ? 'STR'
+    : polygon.intensity === 'moderate' ? 'MOD' : 'WEAK';
+  const valueKind = polygon.valueKind === 'forecast' ? 'FCST'
+    : polygon.valueKind === 'observed' ? 'OBS' : 'EST';
+  const label = `${intensity} · ${valueKind} · B${altitudeLabel(first.baseFeet)} T${altitudeLabel(first.topFeet)}`;
+  const labelY = first.topFeet === null ? bounds.top + 12 : clamp(y(first.topFeet) + 12, bounds.top + 12, bounds.bottom - 4);
+  context.fillStyle = palette.text;
+  context.fillText(label, x(first.distanceNm) + 4, labelY, 132);
 }
 
 function traceBoundary(

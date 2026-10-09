@@ -56,6 +56,7 @@ export class VerticalProfileController {
   private readonly weatherCache = new Map<string, WeatherProfileResponse>();
   private weatherRequest: { abort: AbortController; promise: Promise<void>; key: string } | undefined;
   private weatherFeatureDisabled = false;
+  private requestedWeatherStart: number | undefined;
   private state: VerticalProfileViewState = { status: 'empty' };
   private openPreference: boolean;
   private mapView: 'globe' | 'ground' = 'globe';
@@ -84,6 +85,7 @@ export class VerticalProfileController {
       this.weatherRequest = undefined;
       this.weatherIdentity = weatherIdentity;
       this.weather = undefined;
+      this.requestedWeatherStart = undefined;
     }
     if (!plan) {
       this.weatherRequest?.abort.abort();
@@ -160,6 +162,12 @@ export class VerticalProfileController {
     }
   }
 
+  setViewport(startDistanceNm: number, _endDistanceNm: number): void {
+    if (!Number.isFinite(startDistanceNm) || startDistanceNm < 0) return;
+    this.requestedWeatherStart = startDistanceNm;
+    if (this.isVisible()) void this.loadWeather();
+  }
+
   private applyOpen(): void {
     const open = this.mapView === 'globe' && this.openPreference;
     this.applyingOpen = true;
@@ -214,7 +222,11 @@ export class VerticalProfileController {
       ? Date.parse(this.plan.departureTimeUtc)
       : Date.now();
     const bucket = Math.floor((Number.isFinite(bucketSource) ? bucketSource : Date.now()) / 300_000);
-    const key = `${this.weatherIdentity}|${bucket}`;
+    const remainingDistanceNm = Math.max(0, this.plan.distance - (body.currentDistanceNm ?? 0));
+    const etaDurationBucket = !this.plan.departureTimeUtc && body.groundSpeedKnots
+      ? Math.floor((remainingDistanceNm / body.groundSpeedKnots * 60) / 5)
+      : 'scheduled';
+    const key = `${this.weatherIdentity}|${bucket}|${etaDurationBucket}`;
     const cached = this.weatherCache.get(key);
     if (!force && cached && this.coversRequestedWindow(cached, body.currentDistanceNm ?? 0)) {
       this.weather = cached;
@@ -302,15 +314,16 @@ export class VerticalProfileController {
     const validTelemetry = hasFreshProfileTelemetry(this.telemetry) && this.telemetry &&
       Number.isFinite(this.telemetry.latitude) && Number.isFinite(this.telemetry.longitude);
     const projection = validTelemetry
-      ? projectPositionOntoRoute(plan.points, [this.telemetry!.longitude, this.telemetry!.latitude])
+      ? projectPositionOntoRoute(selected.map(item => item.point), [this.telemetry!.longitude, this.telemetry!.latitude])
       : undefined;
+    const currentDistanceNm = this.requestedWeatherStart ?? projection?.distanceNm;
     const speed = validTelemetry && Number.isFinite(this.telemetry!.groundSpeedKnots) &&
       this.telemetry!.groundSpeedKnots >= 50 && this.telemetry!.groundSpeedKnots <= 750
       ? this.telemetry!.groundSpeedKnots
       : undefined;
     return {
       route,
-      ...(projection ? { currentDistanceNm: projection.distanceNm } : {}),
+      ...(currentDistanceNm !== undefined ? { currentDistanceNm } : {}),
       ...(speed !== undefined ? { groundSpeedKnots: speed } : {}),
       ...(plan.departureTimeUtc ? { departureTimeUtc: plan.departureTimeUtc } : {}),
       ...(plan.estimatedEnrouteSeconds !== undefined

@@ -121,6 +121,7 @@ export function profileInspection(model: VerticalProfileModel, requestedIndex: n
   // Terrain reference altitude may be live MSL for clearance colouring; inspect the plotted path instead.
   const planned = plannedAltitudeAt(model, sample.distanceNm);
   const weather = model.weatherBands
+    .filter(band => weatherBandCoversDistance(band.columns, sample.distanceNm))
     .flatMap(band => band.columns.map(column => ({ band, column })))
     .sort((left, right) =>
       Math.abs(left.column.distanceNm - sample.distanceNm) -
@@ -134,6 +135,8 @@ export function profileInspection(model: VerticalProfileModel, requestedIndex: n
             : tr('unavailable')
         }),
         tr(`confidence${weather.band.confidence[0]!.toUpperCase()}${weather.band.confidence.slice(1)}`),
+        tr(`return${weather.band.intensity[0]!.toUpperCase()}${weather.band.intensity.slice(1)}`),
+        weather.band.valueKind,
         tr('cloudBase', { altitude: finite(weather.column.baseFeet) ? feet(weather.column.baseFeet) : tr('unknownBoundary') }),
         tr('cloudTop', { altitude: finite(weather.column.topFeet) ? feet(weather.column.topFeet) : tr('unknownBoundary') }),
         weather.band.pathRelation === 'unknown'
@@ -145,6 +148,21 @@ export function profileInspection(model: VerticalProfileModel, requestedIndex: n
     index, distanceNm: sample.distanceNm,
     label: `${sample.distanceNm.toFixed(1)} NM · ${tr('nearest')} ${identifier(waypoint?.ident ?? tr('unavailable'))} · ${terrain} · ${tr('planned')} ${feet(planned)} · ${restrictionLabel(restriction)} · ${weatherText}`
   };
+}
+
+function weatherBandCoversDistance(
+  columns: readonly VerticalProfileModel['weatherBands'][number]['columns'][number][],
+  distanceNm: number
+): boolean {
+  const ordered = [...columns].sort((left, right) => left.distanceNm - right.distanceNm);
+  if (ordered.some(column => Math.abs(column.distanceNm - distanceNm) <= 5 + 1e-9)) return true;
+  for (let index = 1; index < ordered.length; index++) {
+    const previous = ordered[index - 1]!;
+    const next = ordered[index]!;
+    if (next.distanceNm - previous.distanceNm <= 50 + 1e-9 &&
+        distanceNm >= previous.distanceNm && distanceNm <= next.distanceNm) return true;
+  }
+  return false;
 }
 
 export function createVerticalProfileView(host: HTMLElement): VerticalProfileView {
@@ -216,7 +234,7 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
     target.addEventListener(type, handler, options);
     listeners.push(() => target.removeEventListener(type, handler, options));
   }
-  function emit(type: string, detail?: { open: boolean }) {
+  function emit(type: string, detail?: Record<string, number | boolean>) {
     const EventClass = window?.CustomEvent ?? CustomEvent;
     panel.dispatchEvent(new EventClass(type, { bubbles: true, detail }));
   }
@@ -255,6 +273,10 @@ export function createVerticalProfileView(host: HTMLElement): VerticalProfileVie
         next.totalDistanceNm === viewport.totalDistanceNm) return;
     viewport = next;
     publishViewport();
+    emit('vertical-profile-viewport-change', {
+      startDistanceNm: next.startDistanceNm,
+      endDistanceNm: next.endDistanceNm
+    });
     scheduleDraw();
   }
   function zoom(factor: number, anchor?: number) {

@@ -164,6 +164,10 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
     profileController?.setOpen((event as CustomEvent<{ open: boolean }>).detail.open);
   });
   root.addEventListener('vertical-profile-retry', () => { void profileController?.retry(); });
+  root.addEventListener('vertical-profile-viewport-change', event => {
+    const detail = (event as CustomEvent<{ startDistanceNm: number; endDistanceNm: number }>).detail;
+    profileController?.setViewport(detail.startDistanceNm, detail.endDistanceNm);
+  });
   // Observe actual map dimensions throughout the profile's CSS transition.
   // Resizing never calls fitRoute, so opening a panel preserves pan and zoom.
   new ResizeObserver(() => routeMap?.resize()).observe($('fd-map'));

@@ -48,7 +48,7 @@ function model(distances: number[], altitudes: number[], aircraftDistance = 0): 
 
 describe('vertical profile label classification', () => {
   it('classifies endpoints, next waypoint, constraints, TOC and TOD as critical', () => {
-    const profile = model([0, 20, 60, 100, 140], [0, 10_000, 10_000, 10_000, 0], 25);
+    const profile = model([0, 20, 60, 120, 140], [0, 10_000, 10_000, 10_000, 0], 25);
 
     const candidates = classifyVerticalProfilePoints(profile);
 
@@ -79,6 +79,24 @@ describe('vertical profile label classification', () => {
     ]);
     expect(candidates.slice(1, -1).every(candidate => candidate.critical)).toBe(true);
   });
+
+  it('ignores a brief level-off for TOC and uses a twenty-mile stable band', () => {
+    const candidates = classifyVerticalProfilePoints(
+      model([0, 10, 20, 30, 60], [0, 10_000, 10_000, 11_000, 11_000]));
+
+    expect(candidates[1]!.reasons).not.toContain('toc');
+    expect(candidates[3]!.reasons).toContain('toc');
+  });
+
+  it('marks TOD only when at least one thousand feet is lost within twenty miles', () => {
+    const accepted = classifyVerticalProfilePoints(
+      model([0, 20, 40, 50, 60], [0, 10_000, 10_000, 9_500, 9_000]));
+    const shallow = classifyVerticalProfilePoints(
+      model([0, 20, 40, 50, 60], [0, 10_000, 10_000, 9_600, 9_100]));
+
+    expect(accepted[2]!.reasons).toContain('tod');
+    expect(shallow[2]!.reasons).not.toContain('tod');
+  });
 });
 
 describe('vertical profile label layout', () => {
@@ -94,6 +112,14 @@ describe('vertical profile label layout', () => {
 
     expect(placements).toHaveLength(9);
     expect(Math.max(...placements.map(placement => placement.row))).toBeLessThan(3);
+    for (const row of [0, 1, 2]) {
+      const items = placements.filter(item => item.row === row)
+        .sort((left, right) => left.x - right.x);
+      for (let index = 1; index < items.length; index++) {
+        expect(items[index - 1]!.x + items[index - 1]!.width / 2 + 4)
+          .toBeLessThanOrEqual(items[index]!.x - items[index]!.width / 2);
+      }
+    }
   });
 
   it('full-route view keeps critical points and drops ordinary waypoints', () => {

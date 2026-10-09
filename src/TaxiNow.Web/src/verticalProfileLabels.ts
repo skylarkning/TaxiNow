@@ -37,13 +37,6 @@ export function classifyVerticalProfilePoints(
   for (const point of model.altitudePath) {
     if (point.waypointIndex !== null) altitudeByWaypoint.set(point.waypointIndex, point);
   }
-  const trends = model.routePoints.slice(1).map((point, index) => {
-    const previousAltitude = altitudeByWaypoint.get(model.routePoints[index]!.waypointIndex)?.altitudeFeet;
-    const altitude = altitudeByWaypoint.get(point.waypointIndex)?.altitudeFeet;
-    if (!Number.isFinite(previousAltitude) || !Number.isFinite(altitude)) return 0;
-    const change = altitude! - previousAltitude!;
-    return change > routeChangeThresholdFeet ? 1 : change < -routeChangeThresholdFeet ? -1 : 0;
-  });
   const next = model.aircraft
     ? model.routePoints.find(point => point.distanceNm > model.aircraft!.distanceNm + 1e-6)
     : undefined;
@@ -70,8 +63,13 @@ export function classifyVerticalProfilePoints(
       }
     }
     if (index > 0 && index < model.routePoints.length - 1) {
-      if (trends[index - 1] === 1 && trends[index] !== 1) reasons.push('toc');
-      if (trends[index - 1] !== -1 && trends[index] === -1) reasons.push('tod');
+      const previousAltitude = altitudeByWaypoint.get(model.routePoints[index - 1]!.waypointIndex)?.altitudeFeet;
+      const altitude = altitudeByWaypoint.get(point.waypointIndex)?.altitudeFeet;
+      if (Number.isFinite(previousAltitude) && Number.isFinite(altitude) &&
+          altitude! - previousAltitude! > routeChangeThresholdFeet &&
+          hasStableBandAfter(index, model, altitudeByWaypoint)) reasons.push('toc');
+      if (hasStableBandBefore(index, model, altitudeByWaypoint) &&
+          losesAltitudeWithin(index, model, altitudeByWaypoint)) reasons.push('tod');
     }
 
     const priority = reasons.includes('endpoint') ? 100
@@ -91,6 +89,43 @@ export function classifyVerticalProfilePoints(
       reasons
     };
   });
+}
+
+function hasStableBandAfter(
+  startIndex: number,
+  model: VerticalProfileModel,
+  altitudeByWaypoint: ReadonlyMap<number, { distanceNm: number; altitudeFeet: number }>
+): boolean {
+  const start = model.routePoints[startIndex]!;
+  const startAltitude = altitudeByWaypoint.get(start.waypointIndex)?.altitudeFeet;
+  if (!Number.isFinite(startAltitude)) return false;
+  let minimum = startAltitude!, maximum = startAltitude!;
+  for (let index = startIndex + 1; index < model.routePoints.length; index++) {
+    const point = model.routePoints[index]!;
+    const altitude = altitudeByWaypoint.get(point.waypointIndex)?.altitudeFeet;
+    if (!Number.isFinite(altitude)) return false;
+    minimum = Math.min(minimum, altitude!); maximum = Math.max(maximum, altitude!);
+    if (maximum - minimum > routeChangeThresholdFeet + 1e-9) return false;
+    if (point.distanceNm - start.distanceNm >= stepDistanceThresholdNm - 1e-9) return true;
+  }
+  return false;
+}
+
+function losesAltitudeWithin(
+  startIndex: number,
+  model: VerticalProfileModel,
+  altitudeByWaypoint: ReadonlyMap<number, { distanceNm: number; altitudeFeet: number }>
+): boolean {
+  const start = model.routePoints[startIndex]!;
+  const startAltitude = altitudeByWaypoint.get(start.waypointIndex)?.altitudeFeet;
+  if (!Number.isFinite(startAltitude)) return false;
+  for (let index = startIndex + 1; index < model.routePoints.length; index++) {
+    const point = model.routePoints[index]!;
+    if (point.distanceNm - start.distanceNm > stepDistanceThresholdNm + 1e-9) return false;
+    const altitude = altitudeByWaypoint.get(point.waypointIndex)?.altitudeFeet;
+    if (Number.isFinite(altitude) && startAltitude! - altitude! >= stepAltitudeThresholdFeet - 1e-9) return true;
+  }
+  return false;
 }
 
 function hasStableBandBefore(
