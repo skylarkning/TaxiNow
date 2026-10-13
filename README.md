@@ -207,16 +207,30 @@ to live simulator positions. TaxiNow Pro does not expose or log the SayIntention
 API key, email address, or other account fields. Only one of VATSIM, BeyondATC,
 or SayIntentions traffic can be displayed at a time.
 
-TaxiNow Pro source code is not publicly available. Qualified independent security
-or privacy experts may request limited review access from Sky Ning solely to
-verify TaxiNow Pro's security or privacy behavior. Approval and review conditions
-are at the developer's discretion. Review access does not grant permission to
-copy, modify, compile, publish, disclose, or redistribute the source code.
+### Public source code and antivirus reports
+
+Following concerns raised in a user comment about some antivirus software
+flagging TaxiNow Pro as malware, Sky Ning has made the source code publicly
+available at [skylarkning/TaxiNow](https://github.com/skylarkning/TaxiNow).
+
+TaxiNow Pro does not contain malicious code or viruses, and everyone is welcome
+to inspect the source code to verify this. If you find a security vulnerability,
+please [open an issue on GitHub](https://github.com/skylarkning/TaxiNow/issues)
+or contact Sky Ning directly.
+
+TaxiNow Pro is now an “open-source” project in the sense that its source is
+publicly available for inspection. Reuse remains subject to the repository's
+[License](https://github.com/skylarkning/TaxiNow/blob/main/LICENSE),
+[EULA](https://github.com/skylarkning/TaxiNow/blob/main/EULA.txt), and
+[third-party notices](https://github.com/skylarkning/TaxiNow/blob/main/NOTICE);
+public access does not grant unrestricted reuse rights.
+
+Thank you for using TaxiNow Pro.
 
 ### License and disclaimer
 
-TaxiNow Pro is copyrighted software and is not open-source or public-domain
-software. It is provided free of charge for personal, non-commercial
+TaxiNow Pro is copyrighted software with publicly available source code.
+It is not public-domain software; source access does not change the license terms. It is provided free of charge for personal, non-commercial
 flight-simulation use. Commercial use, real-world navigation, modification,
 derivative works, resale, rehosting, and redistribution are prohibited unless
 Sky Ning gives prior written permission.
@@ -416,14 +430,29 @@ SimConnect 读取已经注入 MSFS 的非本机飞机。SayIntentions 模式仅�
 API Key、邮箱地址或其他账户字段。VATSIM、BeyondATC 与 SayIntentions 一次只能
 显示一种交通来源。
 
-TaxiNow Pro 源代码不公开。符合条件的独立安全或隐私专家，可以仅以核验 TaxiNow Pro
-安全与隐私行为为目的，向 Sky Ning 申请有限审查访问。是否批准及具体审查条件
-由开发者决定。审查权限不包含复制、修改、编译、公开、披露或再发布源代码的
-授权。
+### 公开源代码与杀毒软件报告
+
+针对用户评论中提到部分杀毒软件将 TaxiNow Pro 报告为恶意软件的担忧，
+Sky Ning 决定在 [skylarkning/TaxiNow](https://github.com/skylarkning/TaxiNow)
+公开源代码。
+
+TaxiNow Pro 不包含恶意代码或病毒，欢迎所有人检查源代码进行核验。
+如果发现安全漏洞，请[在 GitHub 提交 issue](https://github.com/skylarkning/TaxiNow/issues)，
+或直接联系 Sky Ning。
+
+TaxiNow Pro 现在是一个“开源”项目，即源代码已公开供大家检查。
+如需复用任何内容，仍须遵守源代码仓库中的
+[许可证](https://github.com/skylarkning/TaxiNow/blob/main/LICENSE)、
+[EULA](https://github.com/skylarkning/TaxiNow/blob/main/EULA.txt)及
+[第三方声明](https://github.com/skylarkning/TaxiNow/blob/main/NOTICE)。
+源代码公开不代表获得不受限制的复用权限。
+
+感谢使用 TaxiNow Pro。
 
 ### 许可与免责声明
 
-TaxiNow Pro 是受版权保护的软件，不是开源或公有领域软件。软件完全免费，仅供个人、
+TaxiNow Pro 是源代码已公开的受版权保护的软件，并非公有领域软件。
+源代码公开不改变许可证条款。软件完全免费，仅供个人、
 非商业模拟飞行使用。未经 Sky Ning 事先书面授权，禁止商业使用、真实飞行导航、
 修改、二次创作、倒卖、重新托管或重新分发。
 
