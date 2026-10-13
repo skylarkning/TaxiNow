@@ -71,7 +71,7 @@ public partial class MainWindow : Window
             MapView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
             MapView.CoreWebView2.NewWindowRequested += (_, args) =>
             {
-                if (args.Uri != "https://github.com/skylarkning/TaxiNow-Release/issues/new/choose") return;
+                if (args.Uri != "https://github.com/skylarkning/TaxiNow/issues/new/choose") return;
                 args.Handled = true;
                 try { Process.Start(new ProcessStartInfo(args.Uri) { UseShellExecute = true }); }
                 catch (Exception error) { System.Diagnostics.Debug.WriteLine(error); }
@@ -278,15 +278,10 @@ public partial class MainWindow : Window
         string? digest)
     {
         if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out var uri) ||
-            uri.Scheme != Uri.UriSchemeHttps ||
-            !uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase) ||
-            !uri.AbsolutePath.StartsWith(
-                "/skylarkning/TaxiNow-Release/releases/download/",
-                StringComparison.OrdinalIgnoreCase) ||
-            !uri.AbsolutePath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            !TaxiNow.Core.Updates.OfficialReleaseDownloads.IsInstallerUri(uri))
         {
             throw new InvalidOperationException(
-                "TaxiNow Pro only installs official HTTPS release installers from skylarkning/TaxiNow-Release.");
+                "TaxiNow Pro only installs official HTTPS release installers from skylarkning/TaxiNow or the legacy skylarkning/TaxiNow-Release repository.");
         }
 
         var expected = digest?.StartsWith(

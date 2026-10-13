@@ -130,7 +130,7 @@ export function setupFlightDeck(navigation?: FlightDeckGroundNavigation): void {
   about.classList.add('settings-check-row');
   about.setAttribute('role', 'menuitem');
   const report = button(t('actions.reportIssue'), () => {
-    window.open('https://github.com/skylarkning/TaxiNow-Release/issues/new/choose', '_blank', 'noopener,noreferrer');
+    window.open('https://github.com/skylarkning/TaxiNow/issues/new/choose', '_blank', 'noopener,noreferrer');
     settingsMenu.hidden = true;
     $('settings-selector').setAttribute('aria-expanded', 'false');
   }, 'settings-check-row');

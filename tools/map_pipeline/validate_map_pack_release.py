@@ -18,10 +18,10 @@ import urllib.request
 from typing import Any
 
 
-DEFAULT_RELEASE_REPOSITORY = "skylarkning/TaxiNow-Release"
+DEFAULT_RELEASE_REPOSITORY = "skylarkning/TaxiNow"
 DEFAULT_PUBLIC_INDEX_URL = (
     "https://raw.githubusercontent.com/"
-    "skylarkning/TaxiNow-Release/main/map-packs/index.json"
+    "skylarkning/TaxiNow/main/map-packs/index.json"
 )
 
 
