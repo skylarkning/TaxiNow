@@ -12,10 +12,31 @@ desktop WebView2 shell and in an optional browser view.
 
 > Flight simulation use only. Not for real-world navigation.
 
+## Public source code and security
+
+Following concerns raised in a user comment about some antivirus software
+flagging TaxiNow Pro as malware, Sky Ning has made the source code publicly
+available at [skylarkning/TaxiNow](https://github.com/skylarkning/TaxiNow).
+
+TaxiNow Pro does not contain malicious code or viruses, and everyone is welcome
+to inspect the source code to verify this. If you find a security vulnerability,
+please [open an issue on GitHub](https://github.com/skylarkning/TaxiNow/issues)
+or contact Sky Ning directly.
+
+TaxiNow Pro is now an “open-source” project in the sense that its source is
+publicly available for inspection. Reuse remains subject to the repository's
+[License](https://github.com/skylarkning/TaxiNow/blob/main/LICENSE),
+[EULA](https://github.com/skylarkning/TaxiNow/blob/main/EULA.txt), and
+[third-party notices](https://github.com/skylarkning/TaxiNow/blob/main/NOTICE);
+public access does not grant unrestricted reuse rights.
+
+Thank you for using TaxiNow Pro.
+
 ## License
 
 TaxiNow is free of charge for personal, non-commercial flight-simulation use,
-but it is **not open-source or public-domain software**. Commercial use,
+and its publicly available source remains subject to the repository's license.
+It is not public-domain software. Commercial use,
 real-world aviation/navigation use, modification, derivative works, resale,
 and redistribution are prohibited unless Sky Ning provides prior express
 written permission. Public binaries and release documents are available from
@@ -36,8 +57,8 @@ Official binaries are published only by `skylarkning` through the
 [official TaxiNow page on flightsim.to](https://flightsim.to/addon/112712/taxinow)
 and the [TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release).
 TaxiNow is provided **“AS IS”**, without warranties of any kind. Source code is
-not publicly available; qualified independent security or privacy experts may
-request limited review access solely to verify TaxiNow's security and privacy.
+publicly available in this repository for security and privacy inspection;
+see the announcement above and the license documentation before reuse.
 
 Production branding assets live in
 [`src/TaxiNow.Web/public/branding`](src/TaxiNow.Web/public/branding). The wide
