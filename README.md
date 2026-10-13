@@ -21,6 +21,8 @@ contributions from **[睡务局局长](https://github.com/stewieqi-del)**.<br>
 > For personal flight simulation only. Not for real-world navigation.<br>
 > 仅供个人模拟飞行使用，严禁用于真实飞行导航。
 
+### See TaxiNow Pro on flightsim.to: [TaxiNow Pro](https://flightsim.to/addon/112712/taxinow)
+
 **[English](#english) | [中文](#中文) | [Contribute / 参与贡献](CONTRIBUTING.md)**
 
 ## Screenshots / 界面预览
