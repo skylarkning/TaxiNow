@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/taxinow-logo.png" width="540" alt="TaxiNow Pro" />
+</p>
+
 # TaxiNow Pro
 
 TaxiNow Pro is a free Windows companion for flight simulation. It shows your
