@@ -75,13 +75,15 @@ profiles, traffic and weather overlays, and optional access from a phone or tabl
 
 ## Contribute to TaxiNow Pro / 参与贡献
 
-I welcome bug reports, feature ideas, testing feedback, and documentation suggestions.
-Read the **[contribution guide](CONTRIBUTING.md)** for reporting issues and proposing changes.
-Please discuss code, documentation, or translation changes with me first and obtain
-the permission required by the license before modifying or publishing them.
+I welcome direct code contributions as well as reports and suggestions: **fork
+the repository, make your changes, and open a PR**. AI assistance is fine, but
+you must understand, fully test, and be able to explain everything you submit.
+Blind vibe coding and pure AI slop waste review effort and are not encouraged.
+I reserve the right to block access for abuse. Read the **[contribution guide](CONTRIBUTING.md)**.
 
-我欢迎问题报告、功能建议、测试反馈和文档改进建议。请阅读 **[参与贡献指南](CONTRIBUTING.md)**。
-代码、文档或翻译修改，请先与我讨论，并在修改或发布前取得许可证要求的许可。
+我也欢迎直接贡献代码：**fork 仓库、完成修改、提交 PR**。可以使用 AI，但必须理解、
+充分测试并能解释所提交的内容。不鼓励盲目的 vibe coding 或纯粹的 AI slop，
+因为这会浪费审核精力。我保留封禁滥用者仓库访问的权利。详见 **[参与贡献指南](CONTRIBUTING.md)**。
 
 ## More / 更多
 

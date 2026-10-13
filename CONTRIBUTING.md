@@ -1,11 +1,12 @@
 # Contribute to TaxiNow Pro / 参与贡献指南
 
 I welcome bug reports, feature ideas, testing feedback, documentation suggestions,
-and help improving TaxiNow Pro. Read [LICENSE](LICENSE) and [EULA.txt](EULA.txt)
-before modifying or reusing any material. Public source access does not grant
-unrestricted modification or redistribution rights. For code, documentation,
-or translation changes, discuss your proposal with me first and obtain the
-written permission required by the license before making or publishing changes.
+and direct code contributions. You can get involved by forking TaxiNow Pro,
+making a focused change, and submitting a pull request (PR).
+
+I permit forks and changes solely for preparing and submitting contributions
+to this repository. This permission does not authorize unrelated reuse or
+redistribution; read [LICENSE](LICENSE) and [EULA.txt](EULA.txt) for other uses.
 
 ## Report a bug or suggest a feature
 
@@ -22,26 +23,49 @@ publishing credentials or exploit details that expose other users.
 
 ## Propose a change
 
-After I confirm the scope and the required permission:
+For larger changes, open an issue first so we can discuss the approach before
+you spend time implementing it. For a focused fix, you can submit a PR directly.
 
-1. Follow the [build guide](docs/BUILDING.md) to set up the Windows environment.
-2. Work on a descriptive branch and keep the change focused on the agreed issue.
+1. Fork this repository to your GitHub account, clone your fork, and follow the
+   [build guide](docs/BUILDING.md) to set up the Windows environment.
+2. Create a descriptive branch in your fork and keep the change focused.
 3. Run `./scripts/build.ps1 -Configuration Release` for code changes. Add or update
    tests when needed to verify behavior. For documentation-only changes, check
    links and wording; an application build is unnecessary.
 4. Check supported languages when changing interface text. Include before and after
    screenshots for visible interface changes.
-5. Open a pull request explaining the problem, resulting behavior, related issue,
-   and validation. I review proposed changes before merging them.
+5. Push your branch to your fork and open a PR against this repository's `main`
+   branch. Explain the problem, resulting behavior, related issue if any, and
+   tests you ran. I review proposed changes before merging them.
 
 Preserve author credits, license notices, data attribution, and flight-simulation-only
-warnings. Permission applies to the agreed scope; it does not authorize unrelated reuse.
+warnings.
+
+## AI-assisted contributions
+
+Using AI tools is fine. You are responsible for everything you submit: you must
+understand the changes, fully test them for their intended behavior and affected
+scenarios, and be able to explain how and why they work. Review AI-generated
+code yourself and include the actual testing you performed in the PR.
+
+Pure AI slop and blind vibe coding are not encouraged. Submitting generated
+changes you cannot explain or have not tested wastes review effort. AI assistance
+does not replace your judgment or responsibility for the contribution.
+
+## Respect review time
+
+Keep submissions focused and respond constructively to feedback. I reserve the
+right to close abusive or spam submissions and block someone's access to this
+repository if they abuse it, including through repeated unreviewed, untested,
+or low-effort AI-generated PRs that waste review effort.
 
 ## 中文
 
-我欢迎问题报告、功能建议、测试反馈及文档改进建议。修改或复用任何内容前，
-请先阅读[许可证](LICENSE)和 [EULA](EULA.txt)。源码公开不代表获得不受限制的修改或再分发权限。
-代码、文档或翻译修改，请先与我讨论方案，并在修改或发布前取得许可证要求的书面许可。
+我欢迎问题报告、功能建议、测试反馈、文档改进及直接的代码贡献。
+你可以 fork TaxiNow Pro，在自己的分支中完成修改，然后提交 pull request（PR）。
+
+我允许以向本仓库准备和提交贡献为目的进行 fork 和修改。
+这项许可不授权无关的复用或再分发；其他用途仍须遵守[许可证](LICENSE)和 [EULA](EULA.txt)。
 
 ### 报告问题与提出建议
 
@@ -56,10 +80,28 @@ warnings. Permission applies to the agreed scope; it does not authorize unrelate
 
 ### 提交修改
 
-在我确认范围并提供所需许可后，按照[构建指南](docs/BUILDING.md)准备环境，
-在名称清晰的分支中完成约定修改。代码修改请运行
+较大的改动请先提交 issue 讨论方案；范围明确的小修复可以直接提交 PR。
+先 fork 本仓库并克隆自己的 fork，按照[构建指南](docs/BUILDING.md)准备环境，
+然后创建名称清晰的分支完成修改。代码修改请运行
 `./scripts/build.ps1 -Configuration Release`，并按需要补充或更新测试。
 仅修改文档时，检查链接和措辞即可。界面修改请检查支持的语言，并附前后截图。
 
-提交 PR 时，请说明问题、修改后的行为、关联 Issue 和验证结果。我会审核后再决定合并。
+将分支推送到自己的 fork，然后向本仓库的 `main` 分支提交 PR，
+说明问题、修改后的行为、关联 Issue（如有）和实际执行的测试。我会审核后再决定合并。
 请保留作者署名、许可证声明、数据来源标注及仅供模拟飞行的提示。
+
+### AI 辅助贡献
+
+可以使用 AI 工具，但你必须对提交的全部内容负责：理解每项修改，
+充分测试预期行为及受影响的场景，并能够解释为什么这样改、修改如何工作。
+请自行审查 AI 生成的代码，并在 PR 中写明实际执行的测试。
+
+不鼓励提交纯粹的 AI slop，也不鼓励盲目的 vibe coding。
+提交自己无法解释或没有测试过的生成内容，会浪费审核精力。
+使用 AI 不能替代你的判断，也不能免除你对贡献的责任。
+
+### 尊重审核精力
+
+请保持提交范围清晰，并建设性地回应反馈。如果有人滥用仓库，
+包括反复提交未经自行审查、未经测试或低投入的 AI 生成 PR，浪费审核精力，
+我保留关闭滥用或垃圾提交、以及封禁其仓库访问的权利。
