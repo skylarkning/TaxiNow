@@ -23,6 +23,50 @@ contributions from **[睡务局局长](https://github.com/stewieqi-del)**.<br>
 
 **[English](#english) | [中文](#中文) | [Contribute / 参与贡献](CONTRIBUTING.md)**
 
+## Screenshots / 界面预览
+
+From planning your flight to finding your way around the airport, TaxiNow Pro
+keeps the route and ground views within reach. These V2.0 screenshots show the
+main workspaces and optional overlays.
+
+从查看飞行计划到规划机场滑行路线，TaxiNow Pro 将航线与地面地图整合在一起。
+以下 V2.0 截图展示主要界面及可选图层。
+
+### Globe overview / 地球总览
+
+Explore the route workspace in 3D with terrain and flight information region (FIR) boundaries.<br>
+在 3D 地球上浏览航线工作区，查看地形和飞行情报区（FIR）边界。
+
+![TaxiNow Pro 3D globe with terrain and FIR boundaries](assets/screenshots/globe-overview.png)
+
+### Flight plan / 飞行计划
+
+Import a SimBrief plan and review the departure, destination, waypoints, aircraft, and planned altitude alongside the map.<br>
+导入 SimBrief 计划，在地图旁查看出发与到达机场、航路点、机型及计划高度。
+
+![Imported Toronto-to-Vancouver flight plan with route and weather overlays](assets/screenshots/flight-plan.png)
+
+### Route details / 航线详情
+
+Inspect the route distance, planned altitude, and individual waypoint coordinates in Route Info.<br>
+在 Route Info 中查看航线距离、计划高度及各航路点的坐标。
+
+![Route Info panel with waypoint coordinates and highlighted flight route](assets/screenshots/route-details.png)
+
+### Traffic and weather / 交通与天气
+
+Combine optional VATSIM traffic, controller labels, weather radar, and terrain overlays on the route map.<br>
+在航线地图上组合显示可选的 VATSIM 交通、管制标签、天气雷达和地形图层。
+
+![VATSIM aircraft and controller labels over weather radar and terrain](assets/screenshots/traffic-weather.png)
+
+### Taxi planning / 滑行规划
+
+Compare taxi-route alternatives and preview the selected route in blue on a detailed airport map, shown here at Toronto Pearson in dark mode.<br>
+比较多条滑行路线，在详细机场地图上以蓝色预览所选路线；图中为暗色模式下的多伦多皮尔逊机场。
+
+![Dark-mode Toronto Pearson airport map with taxi-route alternatives and blue route preview](assets/screenshots/taxi-planner.png)
+
 ## English
 
 ### Download and start
