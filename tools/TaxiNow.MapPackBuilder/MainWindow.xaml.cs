@@ -240,7 +240,7 @@ public partial class MainWindow : Window
                 token);
 
             var baseUrl =
-                "https://github.com/skylarkning/TaxiNow-Release/"
+                "https://github.com/skylarkning/TaxiNow/"
                 + $"releases/download/{releaseTag}";
             var buildArguments = new List<string>
             {

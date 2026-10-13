@@ -1035,7 +1035,7 @@ async function checkForUpdates(
 ): Promise<void> {
   try {
     const response = await fetch(
-      "https://api.github.com/repos/skylarkning/TaxiNow-Release/releases/latest",
+      "https://api.github.com/repos/skylarkning/TaxiNow/releases/latest",
       { headers: { Accept: "application/vnd.github+json" } }
     );
     if (!response.ok) {

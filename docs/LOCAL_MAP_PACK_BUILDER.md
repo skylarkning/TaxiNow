@@ -125,15 +125,15 @@ A passing build writes:
 - `output\metadata\*.json` — package metadata;
 - `output\failures.json` — must remain empty.
 
-## 5. Upload to TaxiNow-Release
+## 5. Upload to TaxiNow
 
 Follow the generated `PUBLISHING.md` exactly:
 
 1. Create or select the matching release tag in
-   `skylarkning/TaxiNow-Release`.
+   `skylarkning/TaxiNow`.
 2. Upload every generated ZIP to that GitHub Release. Upload the ZIP files
    before changing the public index.
-3. Clone or update `skylarkning/TaxiNow-Release`.
+3. Clone or update `skylarkning/TaxiNow`.
 4. Copy `index.publish.json` to `map-packs\index.json`.
 5. Review, commit, and push the index directly to `main`.
 6. Verify both the Release asset URLs and the raw public index.

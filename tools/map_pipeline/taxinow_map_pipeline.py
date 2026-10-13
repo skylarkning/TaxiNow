@@ -64,7 +64,7 @@ CATALOG_MAXIMUM_AGE = timedelta(days=7)
 CATALOG_REQUEST_TIMEOUT = 30
 CATALOG_ATTEMPTS_PER_URL = 2
 MAP_PACK_INDEX_URLS = (
-    "https://raw.githubusercontent.com/skylarkning/TaxiNow-Release/main/map-packs/index.json",
+    "https://raw.githubusercontent.com/skylarkning/TaxiNow/main/map-packs/index.json",
 )
 MAP_PACK_INDEX_MAXIMUM_AGE = timedelta(hours=6)
 MAP_PACK_REQUEST_TIMEOUT = 90

@@ -44,7 +44,7 @@ python .\tools\map_pipeline\global_map_pack_builder.py build `
   --plan .\artifacts\global-packs\plan.json `
   --output .\artifacts\global-packs\output `
   --version 2026.07.30.1 `
-  --base-url https://github.com/skylarkning/TaxiNow-Release/releases/download/v1.0.0-beta.4
+  --base-url https://github.com/skylarkning/TaxiNow/releases/download/v1.0.0-beta.4
 ```
 
 The build is resumable by region. It preserves completed metadata, caches

@@ -1,14 +1,15 @@
 # Windows distribution
 
-TaxiNow V2.0 (internal build 202) ships in two forms:
+TaxiNow Pro V2.0 (internal build 207) ships in two forms:
 
 1. A Windows installer is the primary release for most users.
 2. A portable ZIP is a secondary release for advanced users and troubleshooting.
 
 Official public binaries are published only by `skylarkning` through the
 [TaxiNow page on flightsim.to](https://flightsim.to/addon/112712/taxinow) and the
-[TaxiNow-Release repository](https://github.com/skylarkning/TaxiNow-Release).
-The private development repository is not a public distribution channel.
+[TaxiNow repository](https://github.com/skylarkning/TaxiNow).
+This public repository contains the source code, release documentation, and official downloads.
+Legacy TaxiNow-Release downloads remain available for compatibility.
 
 The per-user installer:
 
